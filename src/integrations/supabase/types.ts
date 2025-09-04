@@ -14,7 +14,155 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_accounts: {
+        Row: {
+          created_at: string
+          id: string
+          password_hash: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          password_hash: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          password_hash?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      attendance_records: {
+        Row: {
+          check_in_time: string | null
+          check_out_time: string | null
+          created_at: string
+          date: string
+          id: string
+          location_address: string | null
+          location_lat: number | null
+          location_lng: number | null
+          reason: string | null
+          selfie_photo_url: string | null
+          staff_name: string
+          staff_uid: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          check_in_time?: string | null
+          check_out_time?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          location_address?: string | null
+          location_lat?: number | null
+          location_lng?: number | null
+          reason?: string | null
+          selfie_photo_url?: string | null
+          staff_name: string
+          staff_uid: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          check_in_time?: string | null
+          check_out_time?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          location_address?: string | null
+          location_lat?: number | null
+          location_lng?: number | null
+          reason?: string | null
+          selfie_photo_url?: string | null
+          staff_name?: string
+          staff_uid?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_records_staff_uid_fkey"
+            columns: ["staff_uid"]
+            isOneToOne: false
+            referencedRelation: "staff_users"
+            referencedColumns: ["uid"]
+          },
+        ]
+      }
+      geofence_areas: {
+        Row: {
+          center_lat: number | null
+          center_lng: number | null
+          coordinates: Json | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          radius: number | null
+          updated_at: string
+        }
+        Insert: {
+          center_lat?: number | null
+          center_lng?: number | null
+          coordinates?: Json | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          radius?: number | null
+          updated_at?: string
+        }
+        Update: {
+          center_lat?: number | null
+          center_lng?: number | null
+          coordinates?: Json | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          radius?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      staff_users: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          position: string
+          uid: string
+          updated_at: string
+          work_area: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          position: string
+          uid: string
+          updated_at?: string
+          work_area: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          position?: string
+          uid?: string
+          updated_at?: string
+          work_area?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
