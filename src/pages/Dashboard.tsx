@@ -158,15 +158,16 @@ const Dashboard = () => {
             <h1 className="text-3xl font-bold">Admin Dashboard</h1>
             <p className="text-muted-foreground">Smart Zone Absensi Management</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button 
               variant="outline" 
               onClick={() => setShowGeofence(!showGeofence)}
+              className="gradient-secondary"
             >
               <MapPin className="h-4 w-4 mr-2" />
-              {showGeofence ? 'Hide' : 'Manage'} Geofence
+              Geofence
             </Button>
-            <Button variant="outline" onClick={handleLogout}>
+            <Button variant="outline" onClick={handleLogout} className="hover:bg-destructive/10">
               <LogOut className="h-4 w-4 mr-2" />
               Logout
             </Button>
