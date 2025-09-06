@@ -7,6 +7,7 @@ import { Shield, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import bcrypt from 'bcryptjs';
 
 
 const Login = () => {
@@ -47,9 +48,8 @@ const Login = () => {
         return;
       }
 
-      // For now, we'll use simple comparison since bcrypt is complex in the browser
-      // In production, you'd want to hash on the server side
-      const isPasswordValid = credentials.password === 'admin123';
+      // Compare password with stored hash
+      const isPasswordValid = await bcrypt.compare(credentials.password, adminData.password_hash);
       
       if (!isPasswordValid) {
         toast({
