@@ -82,7 +82,7 @@ const AttendanceExporter = () => {
       .from('attendance_records')
       .select(`
         *,
-        staff_users!inner(name, position, work_area)
+        staff_users!inner(name, position, work_area, division)
       `)
       .gte('date', filters.startDate)
       .lte('date', filters.endDate)
@@ -153,12 +153,13 @@ const AttendanceExporter = () => {
       }
 
       // Prepare data for Excel
-      const excelData = attendanceData.map((record, index) => ({
+      const excelData = attendanceData.map((record: any, index: number) => ({
         'No': index + 1,
         'UID Karyawan': record.staff_uid,
         'Nama Karyawan': record.staff_name,
         'Jabatan': record.staff_users?.position || '-',
         'Area Kerja': record.staff_users?.work_area || '-',
+        'Divisi': record.staff_users?.division || '-',
         'Tanggal': new Date(record.date).toLocaleDateString('id-ID'),
         'Status': record.status.toUpperCase(),
         'Waktu Check In': formatDateForExport(record.check_in_time),

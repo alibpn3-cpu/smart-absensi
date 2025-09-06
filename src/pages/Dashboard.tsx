@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Users, 
   Calendar, 
@@ -12,12 +13,18 @@ import {
   Clock,
   TrendingUp,
   Filter,
-  Eye
+  Eye,
+  UserPlus,
+  Settings,
+  FileSpreadsheet
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import GeofenceManager from '../components/GeofenceManager';
+import EmployeeManager from '../components/EmployeeManager';
+import AdminManager from '../components/AdminManager';
+import AttendanceExporter from '../components/AttendanceExporter';
 
 interface AttendanceRecord {
   id: string;
@@ -233,125 +240,161 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Geofence Manager */}
-        {showGeofence && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Geofence Management</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <GeofenceManager />
-            </CardContent>
-          </Card>
-        )}
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="attendance" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="attendance">Attendance</TabsTrigger>
+            <TabsTrigger value="employees">
+              <UserPlus className="h-4 w-4 mr-2" />
+              Employees
+            </TabsTrigger>
+            <TabsTrigger value="admins">
+              <Settings className="h-4 w-4 mr-2" />
+              Admins
+            </TabsTrigger>
+            <TabsTrigger value="export">
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Export
+            </TabsTrigger>
+            <TabsTrigger value="geofence">
+              <MapPin className="h-4 w-4 mr-2" />
+              Geofence
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
-              Filter Attendance Records
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4 items-end">
-              <div className="space-y-2">
-                <Label htmlFor="date">Tanggal</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                />
-              </div>
-              <Button onClick={fetchDashboardData} disabled={loading}>
-                <Calendar className="h-4 w-4 mr-2" />
-                Update
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Attendance Records */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Attendance Records - {new Date(selectedDate).toLocaleDateString('id-ID')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8">Loading...</div>
-            ) : attendanceRecords.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No attendance records found for selected date
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {attendanceRecords.map((record) => (
-                  <div
-                    key={record.id}
-                    className="border rounded-lg p-4 space-y-3"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-semibold">{record.staff_name}</h3>
-                        <p className="text-sm text-muted-foreground">ID: {record.staff_uid}</p>
-                      </div>
-                      {getStatusBadge(record.status)}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Check In:</p>
-                        <p className="font-medium">
-                          {record.check_in_time 
-                            ? new Date(record.check_in_time).toLocaleString('id-ID')
-                            : '-'
-                          }
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Check Out:</p>
-                        <p className="font-medium">
-                          {record.check_out_time 
-                            ? new Date(record.check_out_time).toLocaleString('id-ID')
-                            : '-'
-                          }
-                        </p>
-                      </div>
-                    </div>
-
-                    {record.location_address && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Location:</p>
-                        <p className="text-sm">{record.location_address}</p>
-                      </div>
-                    )}
-
-                    {record.reason && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Reason:</p>
-                        <p className="text-sm">{record.reason}</p>
-                      </div>
-                    )}
-
-                    {record.selfie_photo_url && (
-                      <div className="flex justify-end">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => viewPhoto(record.selfie_photo_url!)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Photo
-                        </Button>
-                      </div>
-                    )}
+          <TabsContent value="attendance" className="space-y-6">
+            {/* Filters */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Filter className="h-5 w-5" />
+                  Filter Attendance Records
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4 items-end">
+                  <div className="space-y-2">
+                    <Label htmlFor="date">Tanggal</Label>
+                    <Input
+                      id="date"
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                    />
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <Button onClick={fetchDashboardData} disabled={loading}>
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Update
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Attendance Records */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Attendance Records - {new Date(selectedDate).toLocaleDateString('id-ID')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="text-center py-8">Loading...</div>
+                ) : attendanceRecords.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No attendance records found for selected date
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {attendanceRecords.map((record) => (
+                      <div
+                        key={record.id}
+                        className="border rounded-lg p-4 space-y-3"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-semibold">{record.staff_name}</h3>
+                            <p className="text-sm text-muted-foreground">ID: {record.staff_uid}</p>
+                          </div>
+                          {getStatusBadge(record.status)}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Check In:</p>
+                            <p className="font-medium">
+                              {record.check_in_time 
+                                ? new Date(record.check_in_time).toLocaleString('id-ID')
+                                : '-'
+                              }
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Check Out:</p>
+                            <p className="font-medium">
+                              {record.check_out_time 
+                                ? new Date(record.check_out_time).toLocaleString('id-ID')
+                                : '-'
+                              }
+                            </p>
+                          </div>
+                        </div>
+
+                        {record.location_address && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Location:</p>
+                            <p className="text-sm">{record.location_address}</p>
+                          </div>
+                        )}
+
+                        {record.reason && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Reason:</p>
+                            <p className="text-sm">{record.reason}</p>
+                          </div>
+                        )}
+
+                        {record.selfie_photo_url && (
+                          <div className="flex justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => viewPhoto(record.selfie_photo_url!)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Photo
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="employees">
+            <EmployeeManager />
+          </TabsContent>
+
+          <TabsContent value="admins">
+            <AdminManager />
+          </TabsContent>
+
+          <TabsContent value="export">
+            <AttendanceExporter />
+          </TabsContent>
+
+          <TabsContent value="geofence">
+            <Card>
+              <CardHeader>
+                <CardTitle>Geofence Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <GeofenceManager />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

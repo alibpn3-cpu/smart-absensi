@@ -27,6 +27,18 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose, loadi
 
   const startCamera = async () => {
     try {
+      // Check if permissions are already granted
+      const permissions = await navigator.permissions.query({ name: 'camera' as PermissionName });
+      
+      if (permissions.state === 'denied') {
+        toast({
+          title: "Camera Access Denied",
+          description: "Please enable camera permissions in your browser settings and refresh the page.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: 'user',
@@ -40,12 +52,30 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose, loadi
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-    } catch (error) {
-      toast({
-        title: "Camera Error",
-        description: "Unable to access camera. Please check permissions.",
-        variant: "destructive"
-      });
+
+      // Store permission granted state
+      localStorage.setItem('camera_permission_granted', 'true');
+      
+    } catch (error: any) {
+      if (error.name === 'NotAllowedError') {
+        toast({
+          title: "Camera Permission Required",
+          description: "Please allow camera access to take attendance photos. The permission will be remembered for future use.",
+          variant: "destructive"
+        });
+      } else if (error.name === 'NotFoundError') {
+        toast({
+          title: "No Camera Found",
+          description: "No camera device was found on this device.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Camera Error",
+          description: "Unable to access camera. Please check permissions and try again.",
+          variant: "destructive"
+        });
+      }
       console.error('Error accessing camera:', error);
     }
   };
