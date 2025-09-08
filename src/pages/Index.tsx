@@ -8,7 +8,7 @@ import AttendanceForm from '../components/AttendanceForm';
 const Index = () => {
   const navigate = useNavigate();
   const [logoUrl, setLogoUrl] = useState('');
-  const [appTitle, setAppTitle] = useState('Smart Zone Absensi');
+  const [appTitle, setAppTitle] = useState('Digital Absensi');
 
   useEffect(() => {
     // Fetch logo URL and app title from settings
