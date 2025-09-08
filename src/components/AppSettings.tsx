@@ -34,7 +34,7 @@ const AppSettings = () => {
         const titleSetting = data.find(item => item.setting_key === 'app_title');
         
         setLogoUrl(logoSetting?.setting_value || '');
-        setAppTitle(titleSetting?.setting_value || 'Smart Zone Absensi');
+        setAppTitle(titleSetting?.setting_value || 'Digital Absensi');
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
