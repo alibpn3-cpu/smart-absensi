@@ -26,6 +26,7 @@ import GeofenceManager from '../components/GeofenceManager';
 import EmployeeManager from '../components/EmployeeManager';
 import AdminManager from '../components/AdminManager';
 import AttendanceExporter from '../components/AttendanceExporter';
+import AppSettings from '../components/AppSettings';
 
 interface AttendanceRecord {
   id: string;
@@ -59,7 +60,7 @@ const Dashboard = () => {
     dinasCount: 0
   });
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [showGeofence, setShowGeofence] = useState(false);
+  
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -182,14 +183,6 @@ const Dashboard = () => {
           <div className="flex gap-2 flex-wrap">
             <Button 
               variant="outline" 
-              onClick={() => setShowGeofence(!showGeofence)}
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              Geofence
-            </Button>
-            <Button 
-              variant="outline" 
               onClick={handleLogout} 
               className="bg-red-500/20 border-red-400/30 text-red-300 hover:bg-red-500/30"
             >
@@ -260,7 +253,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 gap-1 bg-white/10 border-white/20 backdrop-blur-sm h-auto p-1">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 bg-white/10 border-white/20 backdrop-blur-sm h-auto p-1">
             <TabsTrigger value="attendance" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white flex-1 py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Attendance</span>
               <span className="sm:hidden">Absen</span>
@@ -284,6 +277,11 @@ const Dashboard = () => {
               <MapPin className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Geofence</span>
               <span className="sm:hidden">Lokasi</span>
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white flex-1 py-2 text-xs sm:text-sm">
+              <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Settings</span>
+              <span className="sm:hidden">Config</span>
             </TabsTrigger>
           </TabsList>
 
@@ -416,14 +414,18 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="geofence">
-            <Card>
+            <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle>Geofence Management</CardTitle>
+                <CardTitle className="text-white">Geofence Management</CardTitle>
               </CardHeader>
               <CardContent>
                 <GeofenceManager />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <AppSettings />
           </TabsContent>
         </Tabs>
       </div>
