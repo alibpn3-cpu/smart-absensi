@@ -9,7 +9,6 @@ import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import bcrypt from 'bcryptjs';
 
-
 const Login = () => {
   const navigate = useNavigate();
   const [credentials, setCredentials] = useState({
@@ -32,14 +31,14 @@ const Login = () => {
 
     setLoading(true);
     try {
-      // Fetch admin account
-      const { data: adminData, error } = await supabase
+      // First, validate against admin_accounts table
+      const { data: adminData, error: adminError } = await supabase
         .from('admin_accounts')
         .select('*')
         .eq('username', credentials.username)
         .single();
 
-      if (error || !adminData) {
+      if (adminError || !adminData) {
         toast({
           title: "Login Failed",
           description: "Invalid username or password",
@@ -58,6 +57,55 @@ const Login = () => {
           variant: "destructive"
         });
         return;
+      }
+
+      // Now authenticate with Supabase Auth using email format
+      const email = `${credentials.username}@admin.local`;
+      
+      // Try to sign in first
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: credentials.password
+      });
+
+      // If sign in fails, create the user first
+      if (signInError) {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: email,
+          password: credentials.password,
+          options: {
+            data: {
+              username: credentials.username,
+              role: 'admin'
+            }
+          }
+        });
+
+        if (signUpError) {
+          console.error('Sign up error:', signUpError);
+          toast({
+            title: "Error",
+            description: "Failed to create admin session",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        // Sign in after sign up
+        const { error: secondSignInError } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: credentials.password
+        });
+
+        if (secondSignInError) {
+          console.error('Second sign in error:', secondSignInError);
+          toast({
+            title: "Error",
+            description: "Failed to authenticate",
+            variant: "destructive"
+          });
+          return;
+        }
       }
 
       toast({

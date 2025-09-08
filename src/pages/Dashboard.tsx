@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import GeofenceManager from '../components/GeofenceManager';
 import EmployeeManager from '../components/EmployeeManager';
@@ -48,7 +49,7 @@ interface AttendanceSummary {
 }
 
 const Dashboard = () => {
-  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [summary, setSummary] = useState<AttendanceSummary>({
     totalStaff: 0,
@@ -112,8 +113,21 @@ const Dashboard = () => {
     }
   };
 
-  const handleLogout = () => {
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Success",
+        description: "Successfully logged out"
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to logout",
+        variant: "destructive"
+      });
+    }
   };
 
   const getStatusBadge = (status: string) => {
