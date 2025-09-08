@@ -64,6 +64,21 @@ const AppSettings = () => {
         }
       ];
 
+      // Update browser tab title and favicon
+      if (appTitle) {
+        document.title = appTitle;
+      }
+      if (logoUrl) {
+        // Update favicon
+        let favicon = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+        if (!favicon) {
+          favicon = document.createElement('link');
+          favicon.rel = 'icon';
+          document.head.appendChild(favicon);
+        }
+        favicon.href = logoUrl;
+      }
+
       const { error } = await supabase
         .from('app_settings')
         .upsert(settingsToUpdate, {
@@ -89,21 +104,21 @@ const AppSettings = () => {
   };
 
   return (
-    <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
+    <Card className="bg-white border-gray-200">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-white">
+        <CardTitle className="flex items-center gap-2 text-black">
           <Settings className="h-5 w-5" />
           Application Settings
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {loading ? (
-          <div className="text-center py-8 text-white">Loading settings...</div>
+          <div className="text-center py-8 text-black">Loading settings...</div>
         ) : (
           <div className="space-y-4">
             {/* App Title Setting */}
             <div className="space-y-2">
-              <Label htmlFor="appTitle" className="text-white flex items-center gap-2">
+              <Label htmlFor="appTitle" className="text-black flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 Application Title
               </Label>
@@ -113,18 +128,18 @@ const AppSettings = () => {
                 value={appTitle}
                 onChange={(e) => setAppTitle(e.target.value)}
                 placeholder="Smart Zone Absensi"
-                className="bg-white/10 border-white/20 text-white placeholder:text-slate-400"
+                className="bg-white border-gray-300 text-black placeholder:text-gray-500"
               />
-              <p className="text-xs text-slate-300">
-                Enter the title for your application. It will be displayed on the main page.
+              <p className="text-xs text-gray-600">
+                Enter the title for your application. It will be displayed on the main page and browser tab.
               </p>
             </div>
 
             {/* Logo URL Setting */}
             <div className="space-y-2">
-              <Label htmlFor="logoUrl" className="text-white flex items-center gap-2">
+              <Label htmlFor="logoUrl" className="text-black flex items-center gap-2">
                 <Image className="h-4 w-4" />
-                Logo URL
+                Logo URL (Browser Tab Icon)
               </Label>
               <Input
                 id="logoUrl"
@@ -132,18 +147,18 @@ const AppSettings = () => {
                 value={logoUrl}
                 onChange={(e) => setLogoUrl(e.target.value)}
                 placeholder="https://example.com/logo.png"
-                className="bg-white/10 border-white/20 text-white placeholder:text-slate-400"
+                className="bg-white border-gray-300 text-black placeholder:text-gray-500"
               />
-              <p className="text-xs text-slate-300">
-                Enter the URL of your company logo. It will be displayed in the main page header.
+              <p className="text-xs text-gray-600">
+                Enter the URL of your company logo. It will be displayed in the main page header and browser tab icon.
               </p>
             </div>
 
             {/* Logo Preview */}
             {(logoUrl || appTitle) && (
               <div className="space-y-2">
-                <Label className="text-white">Preview</Label>
-                <div className="bg-white/5 border border-white/20 rounded-lg p-4 flex items-center gap-3">
+                <Label className="text-black">Preview</Label>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-center gap-3">
                   {logoUrl && (
                     <img 
                       src={logoUrl} 
@@ -156,7 +171,7 @@ const AppSettings = () => {
                     />
                   )}
                   <div>
-                    <p className="text-white text-sm font-medium">{appTitle || 'Smart Zone Absensi'}</p>
+                    <p className="text-black text-sm font-medium">{appTitle || 'Smart Zone Absensi'}</p>
                   </div>
                 </div>
               </div>
@@ -167,7 +182,7 @@ const AppSettings = () => {
               <Button
                 onClick={saveSettings}
                 disabled={saving}
-                className="bg-white/20 border-white/30 text-white hover:bg-white/30"
+                className="bg-blue-600 text-white hover:bg-blue-700"
               >
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? 'Saving...' : 'Save Settings'}
