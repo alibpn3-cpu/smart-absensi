@@ -30,15 +30,31 @@ const Login = () => {
     }
 
     setLoading(true);
+    console.log('Attempting login with:', credentials.username);
+    
     try {
       // First, validate against admin_accounts table
+      console.log('Fetching admin account...');
       const { data: adminData, error: adminError } = await supabase
         .from('admin_accounts')
         .select('*')
         .eq('username', credentials.username)
-        .single();
+        .maybeSingle();
 
-      if (adminError || !adminData) {
+      console.log('Admin data:', adminData, 'Error:', adminError);
+
+      if (adminError) {
+        console.error('Database error:', adminError);
+        toast({
+          title: "Database Error",
+          description: `Error: ${adminError.message}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!adminData) {
+        console.log('No admin account found for username:', credentials.username);
         toast({
           title: "Login Failed",
           description: "Invalid username or password",
@@ -48,65 +64,28 @@ const Login = () => {
       }
 
       // Compare password with stored hash
+      console.log('Comparing passwords...');
       const isPasswordValid = await bcrypt.compare(credentials.password, adminData.password_hash);
+      console.log('Password valid:', isPasswordValid);
       
       if (!isPasswordValid) {
+        console.log('Password comparison failed');
         toast({
-          title: "Login Failed",
+          title: "Login Failed", 
           description: "Invalid username or password",
           variant: "destructive"
         });
         return;
       }
 
-      // Now authenticate with Supabase Auth using email format
-      const email = `${credentials.username}@admin.local`;
+      // Successful login - create session manually since we don't use Supabase Auth
+      console.log('Login successful, navigating to dashboard...');
       
-      // Try to sign in first
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: credentials.password
-      });
-
-      // If sign in fails, create the user first
-      if (signInError) {
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: email,
-          password: credentials.password,
-          options: {
-            data: {
-              username: credentials.username,
-              role: 'admin'
-            }
-          }
-        });
-
-        if (signUpError) {
-          console.error('Sign up error:', signUpError);
-          toast({
-            title: "Error",
-            description: "Failed to create admin session",
-            variant: "destructive"
-          });
-          return;
-        }
-
-        // Sign in after sign up
-        const { error: secondSignInError } = await supabase.auth.signInWithPassword({
-          email: email,
-          password: credentials.password
-        });
-
-        if (secondSignInError) {
-          console.error('Second sign in error:', secondSignInError);
-          toast({
-            title: "Error",
-            description: "Failed to authenticate",
-            variant: "destructive"
-          });
-          return;
-        }
-      }
+      // Store admin session in localStorage
+      localStorage.setItem('adminSession', JSON.stringify({
+        username: credentials.username,
+        loginTime: new Date().toISOString()
+      }));
 
       toast({
         title: "Success",
@@ -115,11 +94,12 @@ const Login = () => {
 
       // Navigate to dashboard
       navigate('/dashboard');
+      
     } catch (error) {
       console.error('Login error:', error);
       toast({
         title: "Error",
-        description: "An error occurred during login",
+        description: `Login error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
     } finally {

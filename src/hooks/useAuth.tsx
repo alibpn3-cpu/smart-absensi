@@ -1,43 +1,52 @@
 import { useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+
+interface AdminSession {
+  username: string;
+  loginTime: string;
+}
 
 export const useAuth = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const [adminSession, setAdminSession] = useState<AdminSession | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+    // Check for admin session in localStorage
+    const checkSession = () => {
+      try {
+        const sessionData = localStorage.getItem('adminSession');
+        if (sessionData) {
+          const session: AdminSession = JSON.parse(sessionData);
+          setAdminSession(session);
+        }
+      } catch (error) {
+        console.error('Error checking admin session:', error);
+        localStorage.removeItem('adminSession');
+      }
       setLoading(false);
     };
 
-    getSession();
+    checkSession();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null);
-        setLoading(false);
+    // Listen for storage changes (if user logs out in another tab)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'adminSession') {
+        checkSession();
       }
-    );
+    };
 
-    return () => subscription.unsubscribe();
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('Sign out error:', error);
-    }
+  const signOut = () => {
+    localStorage.removeItem('adminSession');
+    setAdminSession(null);
   };
 
   return {
-    user,
+    user: adminSession,
     loading,
     signOut,
-    isAuthenticated: !!user
+    isAuthenticated: !!adminSession
   };
 };
