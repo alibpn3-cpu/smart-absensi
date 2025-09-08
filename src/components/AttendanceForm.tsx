@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Camera, MapPin, Clock, CheckCircle, Calendar, Users } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import CameraCapture from './CameraCapture';
@@ -31,11 +32,13 @@ interface PermissionsState {
 
 const AttendanceForm = () => {
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
+  const [filteredStaff, setFilteredStaff] = useState<StaffUser[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<StaffUser | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [attendanceStatus, setAttendanceStatus] = useState<'wfo' | 'wfh' | 'dinas'>('wfo');
   const [reason, setReason] = useState('');
   const [showCamera, setShowCamera] = useState(false);
-  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number; address: string } | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number; address: string; coordinates: string } | null>(null);
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
@@ -44,6 +47,7 @@ const AttendanceForm = () => {
   useEffect(() => {
     fetchStaffUsers();
     checkStoredPermissions();
+    loadSavedStaff();
     
     // Update current time every second
     const timer = setInterval(() => {
@@ -56,8 +60,24 @@ const AttendanceForm = () => {
   useEffect(() => {
     if (selectedStaff) {
       fetchTodayAttendance();
+      // Save selected staff to localStorage
+      localStorage.setItem('last_selected_staff', JSON.stringify(selectedStaff));
     }
   }, [selectedStaff]);
+
+  useEffect(() => {
+    // Filter staff based on search query
+    if (searchQuery.trim() === '') {
+      setFilteredStaff(staffUsers);
+    } else {
+      const filtered = staffUsers.filter(staff => 
+        staff.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        staff.position.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        staff.uid.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredStaff(filtered);
+    }
+  }, [searchQuery, staffUsers]);
 
   const checkStoredPermissions = () => {
     const storedPermissions = localStorage.getItem('attendance_permissions');
@@ -69,6 +89,18 @@ const AttendanceForm = () => {
   const savePermissions = (newPermissions: PermissionsState) => {
     setPermissions(newPermissions);
     localStorage.setItem('attendance_permissions', JSON.stringify(newPermissions));
+  };
+
+  const loadSavedStaff = () => {
+    const savedStaff = localStorage.getItem('last_selected_staff');
+    if (savedStaff) {
+      try {
+        const staff = JSON.parse(savedStaff);
+        setSelectedStaff(staff);
+      } catch (error) {
+        console.error('Error loading saved staff:', error);
+      }
+    }
   };
 
   const fetchStaffUsers = async () => {
@@ -86,6 +118,7 @@ const AttendanceForm = () => {
       });
     } else {
       setStaffUsers(data || []);
+      setFilteredStaff(data || []);
     }
   };
 
@@ -107,7 +140,7 @@ const AttendanceForm = () => {
     }
   };
 
-  const requestLocationPermission = (): Promise<{ lat: number; lng: number; address: string }> => {
+  const requestLocationPermission = (): Promise<{ lat: number; lng: number; address: string; coordinates: string }> => {
     return new Promise(async (resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error('Geolocation not supported'));
@@ -120,8 +153,8 @@ const AttendanceForm = () => {
           async (position) => {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
-            const address = await getAddressFromCoords(lat, lng);
-            resolve({ lat, lng, address });
+            const locationData = await getAddressFromCoords(lat, lng);
+            resolve({ lat, lng, address: locationData.address, coordinates: locationData.coordinates });
           },
           (error) => reject(error),
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
@@ -134,12 +167,12 @@ const AttendanceForm = () => {
         async (position) => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
-          const address = await getAddressFromCoords(lat, lng);
+          const locationData = await getAddressFromCoords(lat, lng);
           
           // Save permission
           savePermissions({ ...permissions, location: true });
           
-          resolve({ lat, lng, address });
+          resolve({ lat, lng, address: locationData.address, coordinates: locationData.coordinates });
         },
         (error) => reject(error),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
@@ -147,16 +180,51 @@ const AttendanceForm = () => {
     });
   };
 
-  const getAddressFromCoords = async (lat: number, lng: number): Promise<string> => {
+  const getAddressFromCoords = async (lat: number, lng: number): Promise<{ address: string; coordinates: string }> => {
     try {
-      // Using a free geocoding service (you might want to use a better one in production)
+      // Using a free geocoding service to get detailed address
       const response = await fetch(
         `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=id`
       );
       const data = await response.json();
-      return data.display_name || data.locality || `${lat}, ${lng}`;
+      
+      // Build detailed address from available data
+      let detailedAddress = '';
+      
+      if (data.localityInfo && data.localityInfo.administrative) {
+        const admin = data.localityInfo.administrative;
+        // Find street/road info if available
+        const roadInfo = admin.find((item: any) => item.order >= 8);
+        const districtInfo = admin.find((item: any) => item.order === 7);
+        const cityInfo = admin.find((item: any) => item.order === 5);
+        const provinceInfo = admin.find((item: any) => item.order === 4);
+        
+        const addressParts = [];
+        if (roadInfo) addressParts.push(roadInfo.name);
+        if (districtInfo) addressParts.push(districtInfo.name);
+        if (cityInfo) addressParts.push(cityInfo.name);
+        if (provinceInfo) addressParts.push(provinceInfo.name);
+        
+        detailedAddress = addressParts.join(', ');
+      }
+      
+      // Fallback to basic address if detailed not available
+      if (!detailedAddress) {
+        detailedAddress = data.locality || data.city || `${data.principalSubdivision}, ${data.countryName}` || 'Lokasi tidak diketahui';
+      }
+      
+      const coordinates = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      
+      return {
+        address: detailedAddress,
+        coordinates: coordinates
+      };
     } catch (error) {
-      return `${lat}, ${lng}`;
+      const coordinates = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      return {
+        address: `Koordinat: ${coordinates}`,
+        coordinates: coordinates
+      };
     }
   };
 
@@ -205,6 +273,7 @@ const AttendanceForm = () => {
   const handleStaffSelect = (staffUid: string) => {
     const staff = staffUsers.find(s => s.uid === staffUid);
     setSelectedStaff(staff || null);
+    setSearchQuery(''); // Clear search when staff is selected
   };
 
   const handlePhotoCapture = async (photoBlob: Blob) => {
@@ -351,21 +420,44 @@ const AttendanceForm = () => {
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-primary" />
                 <label className="text-sm font-semibold">Nama Staff</label>
+                {selectedStaff && (
+                  <Badge variant="secondary" className="text-xs">
+                    Tersimpan: {selectedStaff.name}
+                  </Badge>
+                )}
               </div>
-              <Select onValueChange={handleStaffSelect}>
+              
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cari nama staff..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 h-12 border-2 hover:border-primary transition-colors"
+                />
+              </div>
+              
+              <Select onValueChange={handleStaffSelect} value={selectedStaff?.uid || ''}>
                 <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
                   <SelectValue placeholder="Pilih nama staff..." />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border shadow-lg max-h-48 overflow-y-auto z-50">
-                  {staffUsers.map((staff) => (
-                    <SelectItem 
-                      key={staff.uid} 
-                      value={staff.uid}
-                      className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground"
-                    >
-                      {staff.name} - {staff.position}
-                    </SelectItem>
-                  ))}
+                  {filteredStaff.length === 0 ? (
+                    <div className="p-3 text-center text-muted-foreground text-sm">
+                      {searchQuery ? 'Tidak ada staff yang cocok' : 'Tidak ada data staff'}
+                    </div>
+                  ) : (
+                    filteredStaff.map((staff) => (
+                      <SelectItem 
+                        key={staff.uid} 
+                        value={staff.uid}
+                        className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground"
+                      >
+                        {staff.name} - {staff.position}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -424,10 +516,23 @@ const AttendanceForm = () => {
                   <MapPin className="h-4 w-4 text-success" />
                   <span className="text-sm font-semibold text-success">Lokasi Saat Ini</span>
                 </div>
-                <p className="text-sm text-success">{currentLocation.address}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {currentLocation.lat.toFixed(6)}, {currentLocation.lng.toFixed(6)}
-                </p>
+                <p className="text-sm text-success mb-2">{currentLocation.address}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    📍 {currentLocation.coordinates}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(
+                      `https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`,
+                      '_blank'
+                    )}
+                    className="text-xs h-6"
+                  >
+                    🗺️ Lihat di Maps
+                  </Button>
+                </div>
               </div>
             )}
 

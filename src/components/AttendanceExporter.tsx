@@ -166,6 +166,7 @@ const AttendanceExporter = () => {
         'Waktu Check Out': formatDateForExport(record.check_out_time),
         'Total Jam Kerja': calculateWorkHours(record.check_in_time, record.check_out_time),
         'Alamat Lokasi': record.location_address || '-',
+        'Koordinat': record.location_lat && record.location_lng ? `${record.location_lat}, ${record.location_lng}` : '-',
         'Latitude': record.location_lat || '-',
         'Longitude': record.location_lng || '-',
         'Alasan': record.reason || '-',
@@ -189,7 +190,8 @@ const AttendanceExporter = () => {
         { wch: 18 },  // Check In
         { wch: 18 },  // Check Out
         { wch: 12 },  // Total Jam
-        { wch: 30 },  // Alamat
+        { wch: 35 },  // Alamat
+        { wch: 15 },  // Koordinat
         { wch: 12 },  // Lat
         { wch: 12 },  // Lng
         { wch: 20 },  // Alasan

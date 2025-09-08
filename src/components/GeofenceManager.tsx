@@ -242,7 +242,7 @@ const GeofenceManager = () => {
                 <Input
                   id="radius"
                   type="number"
-                  placeholder="e.g., 100"
+                  placeholder="e.g., 50"
                   value={formData.radius}
                   onChange={(e) => setFormData(prev => ({ ...prev, radius: e.target.value }))}
                 />
