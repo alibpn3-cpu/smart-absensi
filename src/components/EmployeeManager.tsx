@@ -312,11 +312,11 @@ const EmployeeManager = () => {
             {employees.map((employee) => (
               <div
                 key={employee.id}
-                className="border rounded-lg p-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
+                className="border rounded-lg p-4 flex items-center justify-between hover:bg-muted/50 hover:text-foreground transition-colors cursor-pointer"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-semibold">{employee.name}</h3>
+                    <h3 className="font-semibold text-foreground">{employee.name}</h3>
                     <Badge variant={employee.is_active ? "default" : "secondary"}>
                       {employee.is_active ? "Active" : "Inactive"}
                     </Badge>
