@@ -23,6 +23,8 @@ interface AttendanceRecord {
   check_out_time: string | null;
   status: 'wfo' | 'wfh' | 'dinas';
   location_address: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
 }
 
 interface PermissionsState {
@@ -427,22 +429,24 @@ const AttendanceForm = () => {
                 )}
               </div>
               
-              {/* Search Input */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Cari nama staff..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 h-12 border-2 hover:border-primary transition-colors"
-                />
-              </div>
-              
               <Select onValueChange={handleStaffSelect} value={selectedStaff?.uid || ''}>
                 <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
                   <SelectValue placeholder="Pilih nama staff..." />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border shadow-lg max-h-48 overflow-y-auto z-50">
+                  {/* Search Input inside dropdown */}
+                  <div className="sticky top-0 bg-popover p-2 border-b border-border">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Cari nama staff..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 h-10 border text-popover-foreground"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
                   {filteredStaff.length === 0 ? (
                     <div className="p-3 text-center text-muted-foreground text-sm">
                       {searchQuery ? 'Tidak ada staff yang cocok' : 'Tidak ada data staff'}
@@ -464,20 +468,20 @@ const AttendanceForm = () => {
 
             {/* Staff Info Display */}
             {selectedStaff && (
-              <div className="gradient-accent p-4 rounded-lg space-y-3 border border-primary/20">
+              <div className="bg-muted/30 p-4 rounded-lg space-y-3 border">
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-muted-foreground block">UID:</span>
-                    <span className="font-semibold">{selectedStaff.uid}</span>
+                    <span className="font-semibold text-foreground">{selectedStaff.uid}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground block">Jabatan:</span>
-                    <span className="font-semibold">{selectedStaff.position}</span>
+                    <span className="font-semibold text-foreground">{selectedStaff.position}</span>
                   </div>
                 </div>
                 <div>
                   <span className="text-muted-foreground text-sm block">Area Tugas:</span>
-                  <span className="font-semibold">{selectedStaff.work_area}</span>
+                  <span className="font-semibold text-foreground">{selectedStaff.work_area}</span>
                 </div>
               </div>
             )}
@@ -550,7 +554,12 @@ const AttendanceForm = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Check In:</span>
                       <span className="font-medium">
-                        {new Date(todayAttendance.check_in_time).toLocaleTimeString('id-ID')}
+                        {new Date(todayAttendance.check_in_time).toLocaleTimeString('id-ID', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: true
+                        })}
                       </span>
                     </div>
                   )}
@@ -558,14 +567,35 @@ const AttendanceForm = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Check Out:</span>
                       <span className="font-medium">
-                        {new Date(todayAttendance.check_out_time).toLocaleTimeString('id-ID')}
+                        {new Date(todayAttendance.check_out_time).toLocaleTimeString('id-ID', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: true
+                        })}
                       </span>
                     </div>
                   )}
                   {todayAttendance.location_address && (
                     <div>
                       <span className="text-muted-foreground block">Lokasi:</span>
-                      <span className="font-medium text-xs">{todayAttendance.location_address}</span>
+                      <span className="font-medium text-xs mb-2 block">{todayAttendance.location_address}</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          📍 Koordinat: {todayAttendance.location_lat}, {todayAttendance.location_lng}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(
+                            `https://www.google.com/maps?q=${todayAttendance.location_lat},${todayAttendance.location_lng}`,
+                            '_blank'
+                          )}
+                          className="text-xs h-6"
+                        >
+                          🗺️ Lihat di Maps
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>

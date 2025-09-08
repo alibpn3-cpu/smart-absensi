@@ -35,6 +35,8 @@ interface AttendanceRecord {
   check_in_time: string | null;
   check_out_time: string | null;
   location_address: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
   status: 'wfo' | 'wfh' | 'dinas';
   reason: string | null;
   date: string;
@@ -175,21 +177,19 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background p-2 sm:p-4">
       <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-title-primary">Admin Dashboard</h1>
             <p className="text-muted-foreground">Smart Zone Absensi Management</p>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button 
-              variant="outline" 
-              onClick={handleLogout} 
-              className="bg-red-500/20 border-red-400/30 text-red-300 hover:bg-red-500/30"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
+          <Button 
+            variant="outline" 
+            onClick={handleLogout} 
+            className="bg-primary/20 border-primary/30 text-primary hover:bg-primary/30"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
         </div>
 
         {/* Summary Cards */}
@@ -350,7 +350,12 @@ const Dashboard = () => {
                             <p className="text-muted-foreground">Check In:</p>
                             <p className="font-medium text-foreground">
                               {record.check_in_time 
-                                ? new Date(record.check_in_time).toLocaleString('id-ID')
+                                ? new Date(record.check_in_time).toLocaleTimeString('id-ID', {
+                                    hour: '2-digit',
+                                    minute: '2-digit', 
+                                    second: '2-digit',
+                                    hour12: true
+                                  })
                                 : '-'
                               }
                             </p>
@@ -359,7 +364,12 @@ const Dashboard = () => {
                             <p className="text-muted-foreground">Check Out:</p>
                             <p className="font-medium text-foreground">
                               {record.check_out_time 
-                                ? new Date(record.check_out_time).toLocaleString('id-ID')
+                                ? new Date(record.check_out_time).toLocaleTimeString('id-ID', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit', 
+                                    hour12: true
+                                  })
                                 : '-'
                               }
                             </p>
@@ -368,8 +378,24 @@ const Dashboard = () => {
 
                         {record.location_address && (
                           <div>
-                            <p className="text-sm text-muted-foreground">Location:</p>
-                            <p className="text-sm text-foreground">{record.location_address}</p>
+                            <p className="text-sm text-muted-foreground">Lokasi:</p>
+                            <p className="text-sm text-foreground mb-2">{record.location_address}</p>
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-muted-foreground">
+                                📍 Koordinat: {record.location_lat}, {record.location_lng}
+                              </p>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(
+                                  `https://www.google.com/maps?q=${record.location_lat},${record.location_lng}`,
+                                  '_blank'
+                                )}
+                                className="text-xs h-6"
+                              >
+                                🗺️ Lihat di Maps
+                              </Button>
+                            </div>
                           </div>
                         )}
 
