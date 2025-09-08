@@ -41,6 +41,8 @@ export const useAuth = () => {
   const signOut = () => {
     localStorage.removeItem('adminSession');
     setAdminSession(null);
+    // Force navigation to login page
+    window.location.href = '/login';
   };
 
   return {

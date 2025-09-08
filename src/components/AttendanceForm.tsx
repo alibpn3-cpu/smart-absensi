@@ -362,13 +362,14 @@ const AttendanceForm = () => {
                 <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
                   <SelectValue placeholder="Pilih nama staff..." />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white border border-slate-200 shadow-lg max-h-48 overflow-y-auto z-50">
                   {staffUsers.map((staff) => (
-                    <SelectItem key={staff.uid} value={staff.uid}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{staff.name}</span>
-                        <span className="text-xs text-muted-foreground">{staff.position}</span>
-                      </div>
+                    <SelectItem 
+                      key={staff.uid} 
+                      value={staff.uid}
+                      className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50 px-3 py-2"
+                    >
+                      {staff.name} - {staff.position}
                     </SelectItem>
                   ))}
                 </SelectContent>

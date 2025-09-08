@@ -115,7 +115,7 @@ const Dashboard = () => {
 
   const handleLogout = async () => {
     try {
-      await signOut();
+      signOut(); // No need for await since it just clears localStorage and navigates
       toast({
         title: "Success",
         description: "Successfully logged out"
@@ -171,24 +171,28 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-2 sm:p-4">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-            <p className="text-muted-foreground">Smart Zone Absensi Management</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">Admin Dashboard</h1>
+            <p className="text-slate-300">Smart Zone Absensi Management</p>
           </div>
           <div className="flex gap-2 flex-wrap">
             <Button 
               variant="outline" 
               onClick={() => setShowGeofence(!showGeofence)}
-              className="gradient-secondary"
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
             >
               <MapPin className="h-4 w-4 mr-2" />
               Geofence
             </Button>
-            <Button variant="outline" onClick={handleLogout} className="hover:bg-destructive/10">
+            <Button 
+              variant="outline" 
+              onClick={handleLogout} 
+              className="bg-red-500/20 border-red-400/30 text-red-300 hover:bg-red-500/30"
+            >
               <LogOut className="h-4 w-4 mr-2" />
               Logout
             </Button>
@@ -196,25 +200,25 @@ const Dashboard = () => {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Card>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+          <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium text-white">Total Staff</CardTitle>
+              <Users className="h-4 w-4 text-slate-300" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary.totalStaff}</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{summary.totalStaff}</div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Hadir Hari Ini</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium text-white">Hadir Hari Ini</CardTitle>
+              <TrendingUp className="h-4 w-4 text-slate-300" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary.presentToday}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-xl sm:text-2xl font-bold text-white">{summary.presentToday}</div>
+              <p className="text-xs text-slate-300">
                 {summary.totalStaff > 0 
                   ? `${Math.round((summary.presentToday / summary.totalStaff) * 100)}% kehadiran`
                   : '0% kehadiran'
@@ -223,80 +227,92 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">WFO</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium text-white">WFO</CardTitle>
+              <Clock className="h-4 w-4 text-slate-300" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary.wfoCount}</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{summary.wfoCount}</div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">WFH</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium text-white">WFH</CardTitle>
+              <Clock className="h-4 w-4 text-slate-300" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary.wfhCount}</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{summary.wfhCount}</div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Dinas</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium text-white">Dinas</CardTitle>
+              <Clock className="h-4 w-4 text-slate-300" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary.dinasCount}</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{summary.dinasCount}</div>
             </CardContent>
           </Card>
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="attendance" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="attendance">Attendance</TabsTrigger>
-            <TabsTrigger value="employees">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Employees
+        <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 gap-1 bg-white/10 border-white/20 backdrop-blur-sm h-auto p-1">
+            <TabsTrigger value="attendance" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white flex-1 py-2 text-xs sm:text-sm">
+              <span className="hidden sm:inline">Attendance</span>
+              <span className="sm:hidden">Absen</span>
             </TabsTrigger>
-            <TabsTrigger value="admins">
-              <Settings className="h-4 w-4 mr-2" />
-              Admins
+            <TabsTrigger value="employees" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white flex-1 py-2 text-xs sm:text-sm">
+              <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Employees</span>
+              <span className="sm:hidden">Staff</span>
             </TabsTrigger>
-            <TabsTrigger value="export">
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Export
+            <TabsTrigger value="admins" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white flex-1 py-2 text-xs sm:text-sm">
+              <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Admins</span>
+              <span className="sm:hidden">Admin</span>
             </TabsTrigger>
-            <TabsTrigger value="geofence">
-              <MapPin className="h-4 w-4 mr-2" />
-              Geofence
+            <TabsTrigger value="export" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white flex-1 py-2 text-xs sm:text-sm">
+              <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Export</span>
+              <span className="sm:hidden">Data</span>
+            </TabsTrigger>
+            <TabsTrigger value="geofence" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white flex-1 py-2 text-xs sm:text-sm">
+              <MapPin className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Geofence</span>
+              <span className="sm:hidden">Lokasi</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="attendance" className="space-y-6">
+          <TabsContent value="attendance" className="space-y-4 sm:space-y-6">
             {/* Filters */}
-            <Card>
+            <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-white">
                   <Filter className="h-5 w-5" />
                   Filter Attendance Records
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-4 items-end">
-                  <div className="space-y-2">
-                    <Label htmlFor="date">Tanggal</Label>
+                <div className="flex flex-col sm:flex-row gap-4 items-end">
+                  <div className="space-y-2 flex-1 sm:flex-initial">
+                    <Label htmlFor="date" className="text-white">Tanggal</Label>
                     <Input
                       id="date"
                       type="date"
                       value={selectedDate}
                       onChange={(e) => setSelectedDate(e.target.value)}
+                      className="bg-white/10 border-white/20 text-white"
                     />
                   </div>
-                  <Button onClick={fetchDashboardData} disabled={loading}>
+                  <Button 
+                    onClick={fetchDashboardData} 
+                    disabled={loading}
+                    className="bg-white/20 border-white/30 text-white hover:bg-white/30 w-full sm:w-auto"
+                  >
                     <Calendar className="h-4 w-4 mr-2" />
                     Update
                   </Button>
@@ -305,15 +321,15 @@ const Dashboard = () => {
             </Card>
 
             {/* Attendance Records */}
-            <Card>
+            <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle>Attendance Records - {new Date(selectedDate).toLocaleDateString('id-ID')}</CardTitle>
+                <CardTitle className="text-white">Attendance Records - {new Date(selectedDate).toLocaleDateString('id-ID')}</CardTitle>
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <div className="text-center py-8">Loading...</div>
+                  <div className="text-center py-8 text-white">Loading...</div>
                 ) : attendanceRecords.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="text-center py-8 text-slate-300">
                     No attendance records found for selected date
                   </div>
                 ) : (
@@ -321,20 +337,20 @@ const Dashboard = () => {
                     {attendanceRecords.map((record) => (
                       <div
                         key={record.id}
-                        className="border rounded-lg p-4 space-y-3"
+                        className="border border-white/20 rounded-lg p-4 space-y-3 bg-white/5"
                       >
                         <div className="flex justify-between items-start">
                           <div>
-                            <h3 className="font-semibold">{record.staff_name}</h3>
-                            <p className="text-sm text-muted-foreground">ID: {record.staff_uid}</p>
+                            <h3 className="font-semibold text-white">{record.staff_name}</h3>
+                            <p className="text-sm text-slate-300">ID: {record.staff_uid}</p>
                           </div>
                           {getStatusBadge(record.status)}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
-                            <p className="text-muted-foreground">Check In:</p>
-                            <p className="font-medium">
+                            <p className="text-slate-300">Check In:</p>
+                            <p className="font-medium text-white">
                               {record.check_in_time 
                                 ? new Date(record.check_in_time).toLocaleString('id-ID')
                                 : '-'
@@ -342,8 +358,8 @@ const Dashboard = () => {
                             </p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Check Out:</p>
-                            <p className="font-medium">
+                            <p className="text-slate-300">Check Out:</p>
+                            <p className="font-medium text-white">
                               {record.check_out_time 
                                 ? new Date(record.check_out_time).toLocaleString('id-ID')
                                 : '-'
@@ -354,15 +370,15 @@ const Dashboard = () => {
 
                         {record.location_address && (
                           <div>
-                            <p className="text-sm text-muted-foreground">Location:</p>
-                            <p className="text-sm">{record.location_address}</p>
+                            <p className="text-sm text-slate-300">Location:</p>
+                            <p className="text-sm text-white">{record.location_address}</p>
                           </div>
                         )}
 
                         {record.reason && (
                           <div>
-                            <p className="text-sm text-muted-foreground">Reason:</p>
-                            <p className="text-sm">{record.reason}</p>
+                            <p className="text-sm text-slate-300">Reason:</p>
+                            <p className="text-sm text-white">{record.reason}</p>
                           </div>
                         )}
 
@@ -372,6 +388,7 @@ const Dashboard = () => {
                               variant="outline"
                               size="sm"
                               onClick={() => viewPhoto(record.selfie_photo_url!)}
+                              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
                             >
                               <Eye className="h-4 w-4 mr-2" />
                               View Photo
