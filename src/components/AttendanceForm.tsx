@@ -356,12 +356,12 @@ const AttendanceForm = () => {
                 <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
                   <SelectValue placeholder="Pilih nama staff..." />
                 </SelectTrigger>
-                <SelectContent className="bg-white border border-slate-200 shadow-lg max-h-48 overflow-y-auto z-50">
+                <SelectContent className="bg-popover border-border shadow-lg max-h-48 overflow-y-auto z-50">
                   {staffUsers.map((staff) => (
                     <SelectItem 
                       key={staff.uid} 
                       value={staff.uid}
-                      className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50 px-3 py-2"
+                      className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground"
                     >
                       {staff.name} - {staff.position}
                     </SelectItem>
@@ -397,7 +397,7 @@ const AttendanceForm = () => {
                 <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-popover border-border shadow-lg z-50">
                   <SelectItem value="wfo">🏢 WFO (Work From Office)</SelectItem>
                   <SelectItem value="wfh">🏠 WFH (Work From Home)</SelectItem>
                   <SelectItem value="dinas">🚗 Dinas Luar</SelectItem>
