@@ -178,16 +178,16 @@ const Dashboard = () => {
       <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl sm:text-3xl font-bold text-title-primary">Admin Dashboard</h1>
             <p className="text-muted-foreground">Smart Zone Absensi Management</p>
           </div>
           <Button 
             variant="outline" 
             onClick={handleLogout} 
-            className="bg-primary/20 border-primary/30 text-primary hover:bg-primary/30"
+            className="bg-blue-500/20 border-blue-500/30 text-blue-600 hover:bg-blue-500/30 ml-2"
           >
-            <LogOut className="h-4 w-4 mr-2" />
+            <LogOut className="h-4 w-4 mr-1" />
             Logout
           </Button>
         </div>

@@ -433,35 +433,38 @@ const AttendanceForm = () => {
                 <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
                   <SelectValue placeholder="Pilih nama staff..." />
                 </SelectTrigger>
-                <SelectContent className="bg-popover border-border shadow-lg max-h-48 overflow-y-auto z-50">
+                <SelectContent className="bg-popover border-border shadow-lg max-h-60 overflow-hidden z-50">
                   {/* Search Input inside dropdown */}
-                  <div className="sticky top-0 bg-popover p-2 border-b border-border">
+                  <div className="sticky top-0 bg-popover p-2 border-b border-border z-10">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         placeholder="Cari nama staff..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 h-10 border text-popover-foreground"
+                        className="pl-10 h-8 border text-popover-foreground bg-background"
                         onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
                       />
                     </div>
                   </div>
-                  {filteredStaff.length === 0 ? (
-                    <div className="p-3 text-center text-muted-foreground text-sm">
-                      {searchQuery ? 'Tidak ada staff yang cocok' : 'Tidak ada data staff'}
-                    </div>
-                  ) : (
-                    filteredStaff.map((staff) => (
-                      <SelectItem 
-                        key={staff.uid} 
-                        value={staff.uid}
-                        className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground"
-                      >
-                        {staff.name} - {staff.position}
-                      </SelectItem>
-                    ))
-                  )}
+                  <div className="max-h-40 overflow-y-auto">
+                    {filteredStaff.length === 0 ? (
+                      <div className="p-3 text-center text-muted-foreground text-sm">
+                        {searchQuery ? 'Tidak ada staff yang cocok' : 'Tidak ada data staff'}
+                      </div>
+                    ) : (
+                      filteredStaff.map((staff) => (
+                        <SelectItem 
+                          key={staff.uid} 
+                          value={staff.uid}
+                          className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground"
+                        >
+                          {staff.name} - {staff.position}
+                        </SelectItem>
+                      ))
+                    )}
+                  </div>
                 </SelectContent>
               </Select>
             </div>
