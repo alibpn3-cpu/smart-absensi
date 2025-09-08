@@ -8,26 +8,34 @@ import AttendanceForm from '../components/AttendanceForm';
 const Index = () => {
   const navigate = useNavigate();
   const [logoUrl, setLogoUrl] = useState('');
+  const [appTitle, setAppTitle] = useState('Smart Zone Absensi');
 
   useEffect(() => {
-    // Fetch logo URL from settings
-    const fetchLogo = async () => {
+    // Fetch logo URL and app title from settings
+    const fetchSettings = async () => {
       try {
         const { data } = await supabase
           .from('app_settings')
-          .select('setting_value')
-          .eq('setting_key', 'app_logo_url')
-          .single();
+          .select('setting_key, setting_value')
+          .in('setting_key', ['app_logo_url', 'app_title']);
         
-        if (data?.setting_value) {
-          setLogoUrl(data.setting_value);
+        if (data && data.length > 0) {
+          const logoSetting = data.find(item => item.setting_key === 'app_logo_url');
+          const titleSetting = data.find(item => item.setting_key === 'app_title');
+          
+          if (logoSetting?.setting_value) {
+            setLogoUrl(logoSetting.setting_value);
+          }
+          if (titleSetting?.setting_value) {
+            setAppTitle(titleSetting.setting_value);
+          }
         }
       } catch (error) {
-        console.log('Logo not configured');
+        console.log('Settings not configured');
       }
     };
     
-    fetchLogo();
+    fetchSettings();
   }, []);
 
   return (
@@ -54,8 +62,7 @@ const Index = () => {
               />
             )}
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">Smart Zone Absensi</h1>
-              <p className="text-slate-300 text-sm sm:text-base">Modern Attendance Management System</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">{appTitle}</h1>
             </div>
           </div>
         </div>

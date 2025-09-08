@@ -318,17 +318,11 @@ const AttendanceForm = () => {
   const isCompleted = todayAttendance?.check_in_time && todayAttendance?.check_out_time;
 
   return (
-    <div className="min-h-screen gradient-primary p-4">
+    <div className="min-h-screen bg-background p-4">
       <div className="max-w-md mx-auto space-y-6 animate-fade-in">
         {/* Header with Date/Time */}
-        <Card className="gradient-secondary border-0 shadow-lg">
+        <Card className="bg-card border shadow-lg">
           <CardHeader className="text-center pb-4">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Clock className="h-6 w-6 text-primary" />
-              <CardTitle className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Smart Zone Absensi
-              </CardTitle>
-            </div>
             <div className="space-y-1">
               <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4" />
