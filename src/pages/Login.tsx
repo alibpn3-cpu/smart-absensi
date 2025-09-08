@@ -30,31 +30,56 @@ const Login = () => {
     }
 
     setLoading(true);
-    console.log('Attempting login with:', credentials.username);
+    console.log('🔐 Starting login process for:', credentials.username);
     
     try {
-      // First, validate against admin_accounts table
-      console.log('Fetching admin account...');
+      // Test database connection first
+      console.log('🔍 Testing database connection...');
+      const { data: testData, error: testError } = await supabase
+        .from('admin_accounts')
+        .select('username')
+        .limit(1);
+      
+      console.log('📊 Database test result:', { testData, testError });
+
+      if (testError) {
+        console.error('❌ Database connection failed:', testError);
+        toast({
+          title: "Database Connection Error",
+          description: `Cannot connect to database: ${testError.message}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Fetch admin account
+      console.log('👤 Fetching admin account for:', credentials.username);
       const { data: adminData, error: adminError } = await supabase
         .from('admin_accounts')
-        .select('*')
+        .select('username, password_hash')
         .eq('username', credentials.username)
         .maybeSingle();
 
-      console.log('Admin data:', adminData, 'Error:', adminError);
+      console.log('📝 Admin query result:', { 
+        found: !!adminData, 
+        username: adminData?.username,
+        hasHash: !!adminData?.password_hash,
+        hashLength: adminData?.password_hash?.length,
+        error: adminError 
+      });
 
       if (adminError) {
-        console.error('Database error:', adminError);
+        console.error('❌ Admin fetch error:', adminError);
         toast({
           title: "Database Error",
-          description: `Error: ${adminError.message}`,
+          description: `Query error: ${adminError.message}`,
           variant: "destructive"
         });
         return;
       }
 
       if (!adminData) {
-        console.log('No admin account found for username:', credentials.username);
+        console.log('🚫 No admin account found for username:', credentials.username);
         toast({
           title: "Login Failed",
           description: "Invalid username or password",
@@ -64,12 +89,22 @@ const Login = () => {
       }
 
       // Compare password with stored hash
-      console.log('Comparing passwords...');
+      console.log('🔒 Comparing password...');
+      console.log('Password input length:', credentials.password.length);
+      console.log('Hash format check:', adminData.password_hash.substring(0, 4));
+      
       const isPasswordValid = await bcrypt.compare(credentials.password, adminData.password_hash);
-      console.log('Password valid:', isPasswordValid);
+      console.log('✅ Password validation result:', isPasswordValid);
       
       if (!isPasswordValid) {
-        console.log('Password comparison failed');
+        console.log('❌ Password comparison failed');
+        
+        // Additional debugging for password issues
+        console.log('🔧 Debug info:');
+        console.log('- Input password:', credentials.password);
+        console.log('- Expected for admin: admin123');
+        console.log('- Expected for it_bpn: Xadmin2025');
+        
         toast({
           title: "Login Failed", 
           description: "Invalid username or password",
@@ -78,25 +113,33 @@ const Login = () => {
         return;
       }
 
-      // Successful login - create session manually since we don't use Supabase Auth
-      console.log('Login successful, navigating to dashboard...');
+      // Successful login
+      console.log('🎉 Login successful! Creating session...');
       
-      // Store admin session in localStorage
-      localStorage.setItem('adminSession', JSON.stringify({
+      const sessionData = {
         username: credentials.username,
         loginTime: new Date().toISOString()
-      }));
+      };
+      
+      localStorage.setItem('adminSession', JSON.stringify(sessionData));
+      console.log('💾 Session stored:', sessionData);
 
       toast({
         title: "Success",
         description: "Successfully logged in!"
       });
 
-      // Navigate to dashboard
+      console.log('🚀 Navigating to dashboard...');
       navigate('/dashboard');
       
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('💥 Login error:', error);
+      console.error('Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack'
+      });
+      
       toast({
         title: "Error",
         description: `Login error: ${error instanceof Error ? error.message : 'Unknown error'}`,
