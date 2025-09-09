@@ -3,13 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Settings, Save, Image } from 'lucide-react';
+import { Settings, Save, Image, Clock } from 'lucide-react';
 
 const AppSettings = () => {
   const [logoUrl, setLogoUrl] = useState('');
   const [appTitle, setAppTitle] = useState('');
+  const [timezone, setTimezone] = useState('WIB');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -23,7 +25,7 @@ const AppSettings = () => {
       const { data, error } = await supabase
         .from('app_settings')
         .select('setting_key, setting_value')
-        .in('setting_key', ['app_logo_url', 'app_title']);
+        .in('setting_key', ['app_logo_url', 'app_title', 'app_timezone']);
 
       if (error && error.code !== 'PGRST116') {
         throw error;
@@ -32,9 +34,11 @@ const AppSettings = () => {
       if (data && data.length > 0) {
         const logoSetting = data.find(item => item.setting_key === 'app_logo_url');
         const titleSetting = data.find(item => item.setting_key === 'app_title');
+        const timezoneSetting = data.find(item => item.setting_key === 'app_timezone');
         
         setLogoUrl(logoSetting?.setting_value || '');
         setAppTitle(titleSetting?.setting_value || 'Digital Absensi');
+        setTimezone(timezoneSetting?.setting_value || 'WIB');
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -61,6 +65,11 @@ const AppSettings = () => {
           setting_key: 'app_title',
           setting_value: appTitle,
           description: 'Application title displayed on main page and forms'
+        },
+        {
+          setting_key: 'app_timezone',
+          setting_value: timezone,
+          description: 'Application timezone for clock display'
         }
       ];
 
@@ -116,6 +125,30 @@ const AppSettings = () => {
           <div className="text-center py-8 text-black">Loading settings...</div>
         ) : (
           <div className="space-y-4">
+            {/* Timezone Setting */}
+            <div className="space-y-2">
+              <Label htmlFor="timezone" className="text-black flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Time Zone
+              </Label>
+              <Select
+                value={timezone}
+                onValueChange={setTimezone}
+              >
+                <SelectTrigger className="bg-white border-gray-300 text-black">
+                  <SelectValue placeholder="Select timezone" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="WIB">WIB (UTC+7) - Waktu Indonesia Barat</SelectItem>
+                  <SelectItem value="WITA">WITA (UTC+8) - Waktu Indonesia Tengah</SelectItem>
+                  <SelectItem value="WIT">WIT (UTC+9) - Waktu Indonesia Timur</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-600">
+                Choose the timezone for your location. This will affect the clock display on the main page.
+              </p>
+            </div>
+
             {/* App Title Setting */}
             <div className="space-y-2">
               <Label htmlFor="appTitle" className="text-black flex items-center gap-2">

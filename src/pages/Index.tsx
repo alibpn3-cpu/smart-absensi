@@ -9,25 +9,31 @@ const Index = () => {
   const navigate = useNavigate();
   const [logoUrl, setLogoUrl] = useState('');
   const [appTitle, setAppTitle] = useState('Digital Absensi');
+  const [timezone, setTimezone] = useState('WIB');
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    // Fetch logo URL and app title from settings
+    // Fetch logo URL, app title and timezone from settings
     const fetchSettings = async () => {
       try {
         const { data } = await supabase
           .from('app_settings')
           .select('setting_key, setting_value')
-          .in('setting_key', ['app_logo_url', 'app_title']);
+          .in('setting_key', ['app_logo_url', 'app_title', 'app_timezone']);
         
         if (data && data.length > 0) {
           const logoSetting = data.find(item => item.setting_key === 'app_logo_url');
           const titleSetting = data.find(item => item.setting_key === 'app_title');
+          const timezoneSetting = data.find(item => item.setting_key === 'app_timezone');
           
           if (logoSetting?.setting_value) {
             setLogoUrl(logoSetting.setting_value);
           }
           if (titleSetting?.setting_value) {
             setAppTitle(titleSetting.setting_value);
+          }
+          if (timezoneSetting?.setting_value) {
+            setTimezone(timezoneSetting.setting_value);
           }
         }
       } catch (error) {
@@ -36,7 +42,32 @@ const Index = () => {
     };
     
     fetchSettings();
+
+    // Update time every second
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
   }, []);
+
+  const formatTimeWithTimezone = (date: Date, tz: string) => {
+    const timeZoneOffsets = {
+      'WIB': 7,   // UTC+7
+      'WITA': 8,  // UTC+8  
+      'WIT': 9    // UTC+9
+    };
+    
+    const offset = timeZoneOffsets[tz as keyof typeof timeZoneOffsets] || 7;
+    const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+    const localTime = new Date(utc + (offset * 3600000));
+    
+    const hours = localTime.getHours().toString().padStart(2, '0');
+    const minutes = localTime.getMinutes().toString().padStart(2, '0');
+    const seconds = localTime.getSeconds().toString().padStart(2, '0');
+    
+    return `${hours}:${minutes}:${seconds} ${tz}`;
+  };
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -67,14 +98,19 @@ const Index = () => {
               </div>
             </div>
             
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => navigate('/login')}
-              className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 p-2"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <div className="text-sm font-mono text-primary bg-primary/10 px-2 py-1 rounded-md">
+                {formatTimeWithTimezone(currentTime, timezone)}
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/login')}
+                className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 p-2"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>

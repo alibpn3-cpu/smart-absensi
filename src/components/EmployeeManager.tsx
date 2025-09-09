@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -26,6 +27,9 @@ const EmployeeManager = () => {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<StaffUser | null>(null);
+  const [positions, setPositions] = useState<string[]>([]);
+  const [workAreas, setWorkAreas] = useState<string[]>([]);
+  const [divisions, setDivisions] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     uid: '',
     name: '',
@@ -36,7 +40,51 @@ const EmployeeManager = () => {
 
   useEffect(() => {
     fetchEmployees();
+    fetchDropdownData();
   }, []);
+
+  const fetchDropdownData = async () => {
+    try {
+      // Fetch positions
+      const { data: positionData } = await supabase
+        .from('staff_users')
+        .select('position')
+        .not('position', 'is', null)
+        .neq('position', '');
+      
+      // Fetch work areas
+      const { data: workAreaData } = await supabase
+        .from('staff_users')
+        .select('work_area')
+        .not('work_area', 'is', null)
+        .neq('work_area', '');
+      
+      // Fetch divisions
+      const { data: divisionData } = await supabase
+        .from('staff_users')
+        .select('division')
+        .not('division', 'is', null)
+        .neq('division', '');
+
+      // Extract unique values
+      if (positionData) {
+        const uniquePositions = [...new Set(positionData.map(item => item.position))].sort();
+        setPositions(uniquePositions);
+      }
+      
+      if (workAreaData) {
+        const uniqueWorkAreas = [...new Set(workAreaData.map(item => item.work_area))].sort();
+        setWorkAreas(uniqueWorkAreas);
+      }
+      
+      if (divisionData) {
+        const uniqueDivisions = [...new Set(divisionData.map(item => item.division))].sort();
+        setDivisions(uniqueDivisions);
+      }
+    } catch (error) {
+      console.error('Error fetching dropdown data:', error);
+    }
+  };
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -252,32 +300,59 @@ const EmployeeManager = () => {
                 
                 <div className="space-y-2">
                   <Label htmlFor="position">Position *</Label>
-                  <Input
-                    id="position"
+                  <Select
                     value={formData.position}
-                    onChange={(e) => setFormData({...formData, position: e.target.value})}
-                    placeholder="e.g., Software Developer"
-                  />
+                    onValueChange={(value) => setFormData({...formData, position: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select position" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {positions.map((position) => (
+                        <SelectItem key={position} value={position}>
+                          {position}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="work_area">Work Area *</Label>
-                  <Input
-                    id="work_area"
+                  <Select
                     value={formData.work_area}
-                    onChange={(e) => setFormData({...formData, work_area: e.target.value})}
-                    placeholder="e.g., IT Department"
-                  />
+                    onValueChange={(value) => setFormData({...formData, work_area: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select work area" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workAreas.map((workArea) => (
+                        <SelectItem key={workArea} value={workArea}>
+                          {workArea}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="division">Division (Optional)</Label>
-                  <Input
-                    id="division"
+                  <Select
                     value={formData.division}
-                    onChange={(e) => setFormData({...formData, division: e.target.value})}
-                    placeholder="e.g., Engineering"
-                  />
+                    onValueChange={(value) => setFormData({...formData, division: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select division" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {divisions.map((division) => (
+                        <SelectItem key={division} value={division}>
+                          {division}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="flex gap-2 pt-4">
