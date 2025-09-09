@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Search } from 'lucide-react';
+import { Camera, MapPin, Clock, CheckCircle, Calendar, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import CameraCapture from './CameraCapture';
@@ -34,9 +34,7 @@ interface PermissionsState {
 
 const AttendanceForm = () => {
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
-  const [filteredStaff, setFilteredStaff] = useState<StaffUser[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<StaffUser | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [attendanceStatus, setAttendanceStatus] = useState<'wfo' | 'wfh' | 'dinas'>('wfo');
   const [reason, setReason] = useState('');
   const [showCamera, setShowCamera] = useState(false);
@@ -46,8 +44,6 @@ const AttendanceForm = () => {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [permissions, setPermissions] = useState<PermissionsState>({ location: false, camera: false });
   const [timezone, setTimezone] = useState('WIB');
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchStaffUsers();
@@ -71,32 +67,6 @@ const AttendanceForm = () => {
     }
   }, [selectedStaff]);
 
-  useEffect(() => {
-    // Filter staff based on search query
-    if (searchQuery.trim() === '') {
-      setFilteredStaff(staffUsers);
-    } else {
-      const filtered = staffUsers.filter(staff => 
-        staff.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        staff.position.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        staff.uid.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredStaff(filtered);
-    }
-  }, [searchQuery, staffUsers]);
-
-  // Focus search input when dropdown opens
-  useEffect(() => {
-    if (dropdownOpen && searchInputRef.current) {
-      const timer = setTimeout(() => {
-        if (searchInputRef.current) {
-          searchInputRef.current.focus();
-          searchInputRef.current.select();
-        }
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [dropdownOpen]);
 
   const checkStoredPermissions = () => {
     const storedPermissions = localStorage.getItem('attendance_permissions');
@@ -137,7 +107,6 @@ const AttendanceForm = () => {
       });
     } else {
       setStaffUsers(data || []);
-      setFilteredStaff(data || []);
     }
   };
 
@@ -458,7 +427,6 @@ const AttendanceForm = () => {
   const handleStaffSelect = (staffUid: string) => {
     const staff = staffUsers.find(s => s.uid === staffUid);
     setSelectedStaff(staff || null);
-    setSearchQuery(''); // Clear search when staff is selected
   };
 
   const handlePhotoCapture = async (photoBlob: Blob) => {
@@ -608,55 +576,21 @@ const AttendanceForm = () => {
                 )}
               </div>
               
-              <Select 
+              <Select
                 onValueChange={handleStaffSelect} 
                 value={selectedStaff?.uid || ''}
-                onOpenChange={(open) => setDropdownOpen(open)}
               >
                 <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
                   <SelectValue placeholder="Pilih nama staff..." />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border shadow-lg max-h-60 overflow-hidden z-50">
-                  {/* Search Input inside dropdown */}
-                  <div className="sticky top-0 bg-popover p-2 border-b border-border z-10">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        ref={searchInputRef}
-                        placeholder="Cari nama staff..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 h-8 border text-popover-foreground bg-background"
-                        autoFocus
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTimeout(() => {
-                            e.currentTarget.focus();
-                            e.currentTarget.select();
-                          }, 50);
-                        }}
-                        onKeyDown={(e) => {
-                          e.stopPropagation();
-                          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                            e.preventDefault();
-                          }
-                        }}
-                        onFocus={(e) => {
-                          e.stopPropagation();
-                          setTimeout(() => {
-                            e.currentTarget.select();
-                          }, 50);
-                        }}
-                      />
-                    </div>
-                  </div>
                   <div className="max-h-40 overflow-y-auto">
-                    {filteredStaff.length === 0 ? (
+                    {staffUsers.length === 0 ? (
                       <div className="p-3 text-center text-muted-foreground text-sm">
-                        {searchQuery ? 'Tidak ada staff yang cocok' : 'Tidak ada data staff'}
+                        Tidak ada data staff
                       </div>
                     ) : (
-                      filteredStaff.map((staff) => (
+                      staffUsers.map((staff) => (
                         <SelectItem 
                           key={staff.uid} 
                           value={staff.uid}
