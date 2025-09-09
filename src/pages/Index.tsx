@@ -50,32 +50,33 @@ const Index = () => {
       {/* Header */}
       <div className="relative z-10 flex flex-col items-center text-center p-4 sm:p-6 space-y-6">
         <div className="flex flex-col items-center space-y-4">
-          <div className="flex items-center justify-center gap-3">
-            {logoUrl && (
-              <img 
-                src={logoUrl} 
-                alt="Company Logo" 
-                className="h-12 w-12 sm:h-16 sm:w-16 object-contain rounded-lg shadow-lg"
-                onError={(e) => {
-                  console.log('Logo failed to load');
-                }}
-              />
-            )}
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-title-primary">{appTitle}</h1>
+          <div className="flex items-center justify-between w-full max-w-md gap-3">
+            <div className="flex items-center gap-3 flex-1 justify-center">
+              {logoUrl && (
+                <img 
+                  src={logoUrl} 
+                  alt="Company Logo" 
+                  className="h-12 w-12 sm:h-16 sm:w-16 object-contain rounded-lg shadow-lg"
+                  onError={(e) => {
+                    console.log('Logo failed to load');
+                  }}
+                />
+              )}
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-title-primary">{appTitle}</h1>
+              </div>
             </div>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate('/login')}
+              className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 p-2"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-        
-        <Button 
-          variant="outline" 
-          onClick={() => navigate('/login')}
-          className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105"
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          <span className="hidden sm:inline">Admin Login</span>
-          <span className="sm:hidden">Admin</span>
-        </Button>
       </div>
 
 

@@ -45,8 +45,8 @@ const AdminManager = () => {
 
     if (error) {
       toast({
-        title: "Error",
-        description: "Failed to fetch admin accounts",
+        title: "Gagal",
+        description: "Gagal memuat akun admin",
         variant: "destructive"
       });
     } else {
@@ -101,8 +101,8 @@ const AdminManager = () => {
     
     if (!formData.username) {
       toast({
-        title: "Error",
-        description: "Username is required",
+        title: "Gagal",
+        description: "Username wajib diisi",
         variant: "destructive"
       });
       return;
@@ -110,8 +110,8 @@ const AdminManager = () => {
 
     if (!editingAdmin && !formData.password) {
       toast({
-        title: "Error",
-        description: "Password is required for new admin",
+        title: "Gagal",
+        description: "Password wajib diisi untuk admin baru",
         variant: "destructive"
       });
       return;
@@ -119,8 +119,8 @@ const AdminManager = () => {
 
     if (formData.password && formData.password !== formData.confirmPassword) {
       toast({
-        title: "Error",
-        description: "Passwords do not match",
+        title: "Gagal",
+        description: "Password tidak cocok",
         variant: "destructive"
       });
       return;
@@ -137,8 +137,8 @@ const AdminManager = () => {
         if (error) throw error;
         
         toast({
-          title: "Success",
-          description: "Admin account updated successfully"
+          title: "Berhasil",
+          description: "Akun admin berhasil diperbarui"
         });
       } else {
         // Check if username already exists
@@ -150,8 +150,8 @@ const AdminManager = () => {
 
         if (existingAdmin) {
           toast({
-            title: "Error",
-            description: "Username already exists",
+            title: "Gagal",
+            description: "Username sudah ada",
             variant: "destructive"
           });
           return;
@@ -169,8 +169,8 @@ const AdminManager = () => {
         if (error) throw error;
         
         toast({
-          title: "Success",
-          description: "Admin account created successfully"
+          title: "Berhasil",
+          description: "Akun admin berhasil dibuat"
         });
       }
 
@@ -180,8 +180,8 @@ const AdminManager = () => {
     } catch (error) {
       console.error('Error saving admin:', error);
       toast({
-        title: "Error",
-        description: "Failed to save admin account",
+        title: "Gagal",
+        description: "Gagal menyimpan akun admin",
         variant: "destructive"
       });
     }
@@ -192,8 +192,8 @@ const AdminManager = () => {
     
     if (!passwordData.newPassword) {
       toast({
-        title: "Error",
-        description: "New password is required",
+        title: "Gagal",
+        description: "Password baru wajib diisi",
         variant: "destructive"
       });
       return;
@@ -201,8 +201,8 @@ const AdminManager = () => {
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       toast({
-        title: "Error",
-        description: "Passwords do not match",
+        title: "Gagal",
+        description: "Password tidak cocok",
         variant: "destructive"
       });
       return;
@@ -210,8 +210,8 @@ const AdminManager = () => {
 
     if (passwordData.newPassword.length < 6) {
       toast({
-        title: "Error",
-        description: "Password must be at least 6 characters long",
+        title: "Gagal",
+        description: "Password minimal 6 karakter",
         variant: "destructive"
       });
       return;
@@ -227,15 +227,15 @@ const AdminManager = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Password updated successfully"
+        title: "Berhasil",
+        description: "Password berhasil diperbarui"
       });
       setIsPasswordDialogOpen(false);
       resetPasswordForm();
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to update password",
+        title: "Gagal",
+        description: "Gagal memperbarui password",
         variant: "destructive"
       });
     }
@@ -244,8 +244,8 @@ const AdminManager = () => {
   const deleteAdmin = async (admin: AdminUser) => {
     if (admins.length === 1) {
       toast({
-        title: "Error",
-        description: "Cannot delete the last admin account",
+        title: "Gagal",
+        description: "Tidak dapat menghapus akun admin terakhir",
         variant: "destructive"
       });
       return;
@@ -260,14 +260,14 @@ const AdminManager = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Admin account deleted successfully"
+        title: "Berhasil",
+        description: "Akun admin berhasil dihapus"
       });
       fetchAdmins();
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to delete admin account",
+        title: "Gagal",
+        description: "Gagal menghapus akun admin",
         variant: "destructive"
       });
     }

@@ -89,8 +89,8 @@ const EmployeeManager = () => {
     
     if (!formData.uid || !formData.name || !formData.position || !formData.work_area) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields",
+        title: "Gagal",
+        description: "Silakan lengkapi semua field yang wajib",
         variant: "destructive"
       });
       return;
@@ -115,8 +115,8 @@ const EmployeeManager = () => {
         if (error) throw error;
         
         toast({
-          title: "Success",
-          description: "Employee updated successfully"
+          title: "Berhasil",
+          description: "Karyawan berhasil diperbarui"
         });
       } else {
         // Check if UID already exists
@@ -128,8 +128,8 @@ const EmployeeManager = () => {
 
         if (existingEmployee) {
           toast({
-            title: "Error",
-            description: "Employee UID already exists",
+            title: "Gagal",
+            description: "UID karyawan sudah ada",
             variant: "destructive"
           });
           return;
@@ -143,8 +143,8 @@ const EmployeeManager = () => {
         if (error) throw error;
         
         toast({
-          title: "Success",
-          description: "Employee added successfully"
+          title: "Berhasil",
+          description: "Karyawan berhasil ditambahkan"
         });
       }
 
@@ -154,8 +154,8 @@ const EmployeeManager = () => {
     } catch (error) {
       console.error('Error saving employee:', error);
       toast({
-        title: "Error",
-        description: "Failed to save employee",
+        title: "Gagal",
+        description: "Gagal menyimpan data karyawan",
         variant: "destructive"
       });
     }
@@ -171,14 +171,14 @@ const EmployeeManager = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: `Employee ${employee.is_active ? 'deactivated' : 'activated'} successfully`
+        title: "Berhasil",
+        description: `Karyawan ${employee.is_active ? 'dinonaktifkan' : 'diaktifkan'} berhasil`
       });
       fetchEmployees();
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to update employee status",
+        title: "Gagal",
+        description: "Gagal memperbarui status karyawan",
         variant: "destructive"
       });
     }
@@ -194,14 +194,14 @@ const EmployeeManager = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Employee deleted successfully"
+        title: "Berhasil",
+        description: "Karyawan berhasil dihapus"
       });
       fetchEmployees();
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to delete employee",
+        title: "Gagal",
+        description: "Gagal menghapus karyawan",
         variant: "destructive"
       });
     }

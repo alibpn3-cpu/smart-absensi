@@ -114,8 +114,8 @@ const AttendanceForm = () => {
 
     if (error) {
       toast({
-        title: "Error",
-        description: "Failed to load staff data",
+        title: "Gagal",
+        description: "Gagal memuat data staff",
         variant: "destructive"
       });
     } else {
@@ -288,8 +288,8 @@ const AttendanceForm = () => {
         const isInGeofence = await checkGeofence(currentLocation.lat, currentLocation.lng);
         if (!isInGeofence) {
           toast({
-            title: "Location Error",
-            description: "You must be within the office area to check in for WFO",
+            title: "Error Lokasi",
+            description: "Anda harus berada di dalam area kantor untuk absen WFO",
             variant: "destructive"
           });
           setLoading(false);
@@ -343,8 +343,8 @@ const AttendanceForm = () => {
       }
 
       toast({
-        title: "Success",
-        description: `Successfully ${isCheckOut ? 'checked out' : 'checked in'}!`
+        title: "Berhasil",
+        description: `Berhasil ${isCheckOut ? 'check out' : 'check in'}!`
       });
 
       setShowCamera(false);
@@ -353,8 +353,8 @@ const AttendanceForm = () => {
     } catch (error) {
       console.error('Error saving attendance:', error);
       toast({
-        title: "Error",
-        description: "Failed to save attendance record",
+        title: "Gagal",
+        description: "Gagal menyimpan catatan absensi",
         variant: "destructive"
       });
     } finally {
@@ -365,8 +365,8 @@ const AttendanceForm = () => {
   const handleAttendanceAction = async () => {
     if (!selectedStaff) {
       toast({
-        title: "Error",
-        description: "Please select a staff member",
+        title: "Gagal",
+        description: "Silakan pilih nama staff",
         variant: "destructive"
       });
       return;
@@ -378,8 +378,8 @@ const AttendanceForm = () => {
       setShowCamera(true);
     } catch (error) {
       toast({
-        title: "Location Error", 
-        description: "Please enable location access to continue",
+        title: "Error Lokasi", 
+        description: "Silakan aktifkan akses lokasi untuk melanjutkan",
         variant: "destructive"
       });
     }

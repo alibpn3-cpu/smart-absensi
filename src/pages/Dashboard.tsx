@@ -107,8 +107,8 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast({
-        title: "Error",
-        description: "Failed to load dashboard data",
+        title: "Gagal",
+        description: "Gagal memuat data dashboard",
         variant: "destructive"
       });
     } finally {
@@ -120,14 +120,14 @@ const Dashboard = () => {
     try {
       signOut(); // No need for await since it just clears localStorage and navigates
       toast({
-        title: "Success",
-        description: "Successfully logged out"
+        title: "Berhasil",
+        description: "Berhasil logout"
       });
     } catch (error) {
       console.error('Logout error:', error);
       toast({
-        title: "Error",
-        description: "Failed to logout",
+        title: "Gagal",
+        description: "Gagal logout",
         variant: "destructive"
       });
     }
@@ -166,8 +166,8 @@ const Dashboard = () => {
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to load photo",
+        title: "Gagal",
+        description: "Gagal memuat foto",
         variant: "destructive"
       });
     }

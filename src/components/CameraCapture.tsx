@@ -32,8 +32,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose, loadi
       
       if (permissions.state === 'denied') {
         toast({
-          title: "Camera Access Denied",
-          description: "Please enable camera permissions in your browser settings and refresh the page.",
+          title: "Akses Kamera Ditolak",
+          description: "Silakan izinkan akses kamera di pengaturan browser dan refresh halaman ini.",
           variant: "destructive"
         });
         return;
@@ -59,20 +59,20 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose, loadi
     } catch (error: any) {
       if (error.name === 'NotAllowedError') {
         toast({
-          title: "Camera Permission Required",
-          description: "Please allow camera access to take attendance photos. The permission will be remembered for future use.",
+          title: "Izin Kamera Diperlukan",
+          description: "Silakan izinkan akses kamera untuk mengambil foto absensi. Izin akan diingat untuk penggunaan selanjutnya.",
           variant: "destructive"
         });
       } else if (error.name === 'NotFoundError') {
         toast({
-          title: "No Camera Found",
-          description: "No camera device was found on this device.",
+          title: "Kamera Tidak Ditemukan",
+          description: "Tidak ada perangkat kamera yang ditemukan pada perangkat ini.",
           variant: "destructive"
         });
       } else {
         toast({
-          title: "Camera Error",
-          description: "Unable to access camera. Please check permissions and try again.",
+          title: "Error Kamera",
+          description: "Tidak dapat mengakses kamera. Silakan periksa izin dan coba lagi.",
           variant: "destructive"
         });
       }

@@ -39,8 +39,8 @@ const AppSettings = () => {
     } catch (error) {
       console.error('Error fetching settings:', error);
       toast({
-        title: "Error",
-        description: "Failed to load settings",
+        title: "Gagal",
+        description: "Gagal memuat pengaturan",
         variant: "destructive"
       });
     } finally {
@@ -88,14 +88,14 @@ const AppSettings = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Settings saved successfully"
+        title: "Berhasil",
+        description: "Pengaturan berhasil disimpan"
       });
     } catch (error) {
       console.error('Error saving settings:', error);
       toast({
-        title: "Error",
-        description: "Failed to save settings",
+        title: "Gagal",
+        description: "Gagal menyimpan pengaturan",
         variant: "destructive"
       });
     } finally {

@@ -43,11 +43,11 @@ const GeofenceManager = () => {
       setGeofences(data || []);
     } catch (error) {
       console.error('Error fetching geofences:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load geofence areas",
-        variant: "destructive"
-      });
+        toast({
+          title: "Gagal",
+          description: "Gagal memuat area geofence",
+          variant: "destructive"
+        });
     }
   };
 
@@ -56,8 +56,8 @@ const GeofenceManager = () => {
     
     if (!formData.name || !formData.center_lat || !formData.center_lng || !formData.radius) {
       toast({
-        title: "Error",
-        description: "Please fill in all fields",
+        title: "Gagal",
+        description: "Silakan lengkapi semua field",
         variant: "destructive"
       });
       return;
@@ -82,8 +82,8 @@ const GeofenceManager = () => {
         if (error) throw error;
         
         toast({
-          title: "Success",
-          description: "Geofence area updated successfully"
+          title: "Berhasil",
+          description: "Area geofence berhasil diperbarui"
         });
       } else {
         // Create new geofence
@@ -94,8 +94,8 @@ const GeofenceManager = () => {
         if (error) throw error;
         
         toast({
-          title: "Success",
-          description: "New geofence area created successfully"
+          title: "Berhasil",
+          description: "Area geofence baru berhasil dibuat"
         });
       }
 
@@ -107,8 +107,8 @@ const GeofenceManager = () => {
     } catch (error) {
       console.error('Error saving geofence:', error);
       toast({
-        title: "Error",
-        description: "Failed to save geofence area",
+        title: "Gagal",
+        description: "Gagal menyimpan area geofence",
         variant: "destructive"
       });
     }
@@ -137,16 +137,16 @@ const GeofenceManager = () => {
       if (error) throw error;
       
       toast({
-        title: "Success",
-        description: "Geofence area deleted successfully"
+        title: "Berhasil",
+        description: "Area geofence berhasil dihapus"
       });
       
       fetchGeofences();
     } catch (error) {
       console.error('Error deleting geofence:', error);
       toast({
-        title: "Error",
-        description: "Failed to delete geofence area",
+        title: "Gagal",
+        description: "Gagal menghapus area geofence",
         variant: "destructive"
       });
     }
@@ -162,16 +162,16 @@ const GeofenceManager = () => {
       if (error) throw error;
       
       toast({
-        title: "Success",
-        description: `Geofence area ${!currentStatus ? 'activated' : 'deactivated'}`
+        title: "Berhasil",
+        description: `Area geofence ${!currentStatus ? 'diaktifkan' : 'dinonaktifkan'}`
       });
       
       fetchGeofences();
     } catch (error) {
       console.error('Error updating geofence status:', error);
       toast({
-        title: "Error",
-        description: "Failed to update geofence status",
+        title: "Gagal",
+        description: "Gagal memperbarui status geofence",
         variant: "destructive"
       });
     }
@@ -180,8 +180,8 @@ const GeofenceManager = () => {
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
       toast({
-        title: "Error",
-        description: "Geolocation is not supported by this browser",
+        title: "Gagal",
+        description: "Geolocation tidak didukung oleh browser ini",
         variant: "destructive"
       });
       return;
@@ -195,14 +195,14 @@ const GeofenceManager = () => {
           center_lng: position.coords.longitude.toString()
         }));
         toast({
-          title: "Success",
-          description: "Current location obtained successfully"
+          title: "Berhasil",
+          description: "Lokasi saat ini berhasil diperoleh"
         });
       },
       (error) => {
         toast({
-          title: "Error",
-          description: "Failed to get current location",
+          title: "Gagal",
+          description: "Gagal mendapatkan lokasi saat ini",
           variant: "destructive"
         });
       }

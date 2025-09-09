@@ -58,8 +58,8 @@ const AttendanceExporter = () => {
 
     if (error) {
       toast({
-        title: "Error",
-        description: "Failed to fetch employees",
+        title: "Gagal",
+        description: "Gagal memuat data karyawan",
         variant: "destructive"
       });
     } else {
@@ -71,8 +71,8 @@ const AttendanceExporter = () => {
   const fetchAttendanceData = async () => {
     if (!filters.startDate || !filters.endDate) {
       toast({
-        title: "Error",
-        description: "Please select start and end dates",
+        title: "Gagal",
+        description: "Silakan pilih tanggal mulai dan akhir",
         variant: "destructive"
       });
       return null;
@@ -103,8 +103,8 @@ const AttendanceExporter = () => {
 
     if (error) {
       toast({
-        title: "Error",
-        description: "Failed to fetch attendance data",
+        title: "Gagal",
+        description: "Gagal memuat data absensi",
         variant: "destructive"
       });
       return null;
@@ -144,8 +144,8 @@ const AttendanceExporter = () => {
       
       if (!attendanceData || attendanceData.length === 0) {
         toast({
-          title: "No Data",
-          description: "No attendance records found for the selected filters",
+          title: "Tidak Ada Data",
+          description: "Tidak ada catatan absensi untuk filter yang dipilih",
           variant: "destructive"
         });
         setLoading(false);
@@ -225,15 +225,15 @@ const AttendanceExporter = () => {
       saveAs(blob, filename);
 
       toast({
-        title: "Success",
-        description: `Report exported successfully! ${attendanceData.length} records exported.`
+        title: "Berhasil",
+        description: `Laporan berhasil diekspor! ${attendanceData.length} catatan diekspor.`
       });
 
     } catch (error) {
       console.error('Export error:', error);
       toast({
-        title: "Error",
-        description: "Failed to export attendance report",
+        title: "Gagal",
+        description: "Gagal mengekspor laporan absensi",
         variant: "destructive"
       });
     } finally {
