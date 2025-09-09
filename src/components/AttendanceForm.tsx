@@ -218,8 +218,40 @@ const AttendanceForm = () => {
     });
   };
 
+  const generatePlusCode = (lat: number, lng: number): string => {
+    // Simple Plus Code generation (approximation for display purposes)
+    // This is a simplified version - real Plus Codes use more complex encoding
+    const chars = '23456789CFGHJMPQRVWX';
+    
+    // Normalize coordinates
+    const normalizedLat = lat + 90;
+    const normalizedLng = lng + 180;
+    
+    // Generate grid position (simplified)
+    const gridLat = Math.floor(normalizedLat * 8000) % 8000;
+    const gridLng = Math.floor(normalizedLng * 8000) % 8000;
+    
+    // Create Plus Code (simplified 8-character version)
+    let code = '';
+    let tempLat = gridLat;
+    let tempLng = gridLng;
+    
+    for (let i = 0; i < 4; i++) {
+      const latIdx = Math.floor(tempLat / Math.pow(20, 3 - i)) % 20;
+      const lngIdx = Math.floor(tempLng / Math.pow(20, 3 - i)) % 20;
+      code += chars[latIdx] + chars[lngIdx];
+      tempLat %= Math.pow(20, 3 - i);
+      tempLng %= Math.pow(20, 3 - i);
+    }
+    
+    return code.substring(0, 4) + '+' + code.substring(4, 6);
+  };
+
   const getAddressFromCoords = async (lat: number, lng: number): Promise<{ address: string; coordinates: string }> => {
     try {
+      // Generate Plus Code for the coordinates
+      const plusCode = generatePlusCode(lat, lng);
+      
       // Using a free geocoding service to get detailed address
       const response = await fetch(
         `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=id`
@@ -251,16 +283,19 @@ const AttendanceForm = () => {
         detailedAddress = data.locality || data.city || `${data.principalSubdivision}, ${data.countryName}` || 'Lokasi tidak diketahui';
       }
       
+      // Include Plus Code in the address
+      const fullAddress = `${plusCode} - ${detailedAddress}`;
       const coordinates = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       
       return {
-        address: detailedAddress,
+        address: fullAddress,
         coordinates: coordinates
       };
     } catch (error) {
+      const plusCode = generatePlusCode(lat, lng);
       const coordinates = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       return {
-        address: `Koordinat: ${coordinates}`,
+        address: `${plusCode} - Koordinat: ${coordinates}`,
         coordinates: coordinates
       };
     }
@@ -475,8 +510,10 @@ const AttendanceForm = () => {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-10 h-8 border text-popover-foreground bg-background"
+                        autoFocus
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
+                        onFocus={(e) => e.stopPropagation()}
                       />
                     </div>
                   </div>
@@ -548,32 +585,6 @@ const AttendanceForm = () => {
               />
             </div>
 
-            {/* Current Location Display */}
-            {currentLocation && (
-              <div className="p-4 bg-success/10 border border-success/30 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <MapPin className="h-4 w-4 text-success" />
-                  <span className="text-sm font-semibold text-success">Lokasi Saat Ini</span>
-                </div>
-                <p className="text-sm text-success mb-2">{currentLocation.address}</p>
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    📍 {currentLocation.coordinates}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(
-                      `https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`,
-                      '_blank'
-                    )}
-                    className="text-xs h-6"
-                  >
-                    🗺️ Lihat di Maps
-                  </Button>
-                </div>
-              </div>
-            )}
 
             {/* Today's Attendance Status */}
             {todayAttendance && (
@@ -617,7 +628,7 @@ const AttendanceForm = () => {
                       <span className="font-medium text-xs mb-2 block">{todayAttendance.location_address}</span>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
-                          📍 Koordinat: {todayAttendance.location_lat}, {todayAttendance.location_lng}
+                          📍 {todayAttendance.location_lat}, {todayAttendance.location_lng}
                         </span>
                         <Button
                           variant="outline"
