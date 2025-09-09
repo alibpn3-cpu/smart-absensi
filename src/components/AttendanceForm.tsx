@@ -45,11 +45,13 @@ const AttendanceForm = () => {
   const [loading, setLoading] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [permissions, setPermissions] = useState<PermissionsState>({ location: false, camera: false });
+  const [timezone, setTimezone] = useState('WIB');
 
   useEffect(() => {
     fetchStaffUsers();
     checkStoredPermissions();
     loadSavedStaff();
+    fetchTimezone();
     
     // Update current time every second
     const timer = setInterval(() => {
@@ -122,6 +124,40 @@ const AttendanceForm = () => {
       setStaffUsers(data || []);
       setFilteredStaff(data || []);
     }
+  };
+
+  const fetchTimezone = async () => {
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('setting_value')
+        .eq('setting_key', 'app_timezone')
+        .single();
+      
+      if (data?.setting_value) {
+        setTimezone(data.setting_value);
+      }
+    } catch (error) {
+      console.log('Timezone setting not found, using default WIB');
+    }
+  };
+
+  const formatTimeWithTimezone = (date: Date, tz: string) => {
+    const timeZoneOffsets = {
+      'WIB': 7,   // UTC+7
+      'WITA': 8,  // UTC+8  
+      'WIT': 9    // UTC+9
+    };
+    
+    const offset = timeZoneOffsets[tz as keyof typeof timeZoneOffsets] || 7;
+    const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+    const localTime = new Date(utc + (offset * 3600000));
+    
+    const hours = localTime.getHours().toString().padStart(2, '0');
+    const minutes = localTime.getMinutes().toString().padStart(2, '0');
+    const seconds = localTime.getSeconds().toString().padStart(2, '0');
+    
+    return `${hours}:${minutes}:${seconds} ${tz}`;
   };
 
   const fetchTodayAttendance = async () => {
@@ -405,11 +441,7 @@ const AttendanceForm = () => {
                 })}
               </div>
               <div className="text-2xl font-bold text-primary">
-                {currentDateTime.toLocaleTimeString('id-ID', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit'
-                })}
+                {formatTimeWithTimezone(currentDateTime, timezone)}
               </div>
             </div>
           </CardHeader>

@@ -99,10 +99,7 @@ const Index = () => {
             </div>
             
             <div className="flex items-center gap-2">
-              <div className="text-sm font-mono text-primary bg-primary/10 px-2 py-1 rounded-md">
-                {formatTimeWithTimezone(currentTime, timezone)}
-              </div>
-              <Button 
+              <Button
                 variant="outline" 
                 size="sm"
                 onClick={() => navigate('/login')}
