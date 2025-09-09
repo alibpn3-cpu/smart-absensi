@@ -46,6 +46,7 @@ const AttendanceForm = () => {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [permissions, setPermissions] = useState<PermissionsState>({ location: false, camera: false });
   const [timezone, setTimezone] = useState('WIB');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -83,6 +84,19 @@ const AttendanceForm = () => {
       setFilteredStaff(filtered);
     }
   }, [searchQuery, staffUsers]);
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (dropdownOpen && searchInputRef.current) {
+      const timer = setTimeout(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          searchInputRef.current.select();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [dropdownOpen]);
 
   const checkStoredPermissions = () => {
     const storedPermissions = localStorage.getItem('attendance_permissions');
@@ -253,68 +267,171 @@ const AttendanceForm = () => {
   };
 
   const getAddressFromCoords = async (lat: number, lng: number): Promise<{ address: string; coordinates: string }> => {
+    console.log(`🔍 Fetching address for coordinates: ${lat}, ${lng}`);
+    
     try {
       // Generate Plus Code for the coordinates
       const plusCode = generatePlusCode(lat, lng);
+      console.log(`📍 Generated Plus Code: ${plusCode}`);
       
-      // Using OpenStreetMap Nominatim for detailed geocoding (free and detailed)
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=id`
-      );
-      const data = await response.json();
-      
-      // Build detailed address from OpenStreetMap data
       let detailedAddress = '';
       
-      if (data.address) {
-        const addr = data.address;
-        const addressParts = [];
+      // Try OpenStreetMap Nominatim first (more detailed for Indonesia)
+      try {
+        console.log('🌐 Trying OpenStreetMap Nominatim...');
+        const nominatimResponse = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=id&zoom=18`,
+          {
+            headers: {
+              'User-Agent': 'AttendanceApp/1.0'
+            }
+          }
+        );
         
-        // Street details
-        if (addr.house_number && addr.road) {
-          addressParts.push(`${addr.road} No.${addr.house_number}`);
-        } else if (addr.road) {
-          addressParts.push(addr.road);
+        if (nominatimResponse.ok) {
+          const nominatimData = await nominatimResponse.json();
+          console.log('🗺️ Nominatim response:', nominatimData);
+          
+          if (nominatimData.address) {
+            const addr = nominatimData.address;
+            const addressParts = [];
+            
+            // Build detailed address - Indonesian format
+            if (addr.house_number && addr.road) {
+              addressParts.push(`${addr.road} No.${addr.house_number}`);
+            } else if (addr.road) {
+              addressParts.push(addr.road);
+            }
+            
+            // Add more detailed components
+            if (addr.hamlet) addressParts.push(addr.hamlet);
+            if (addr.neighbourhood) addressParts.push(addr.neighbourhood);
+            if (addr.village) addressParts.push(addr.village);
+            if (addr.suburb) addressParts.push(addr.suburb);
+            
+            // Administrative levels
+            if (addr.city_district || addr.county) {
+              addressParts.push(addr.city_district || addr.county);
+            }
+            
+            if (addr.city) addressParts.push(addr.city);
+            else if (addr.town) addressParts.push(addr.town);
+            else if (addr.municipality) addressParts.push(addr.municipality);
+            
+            if (addr.state) addressParts.push(addr.state);
+            
+            // Postal code - very important!
+            if (addr.postcode) {
+              addressParts.push(addr.postcode);
+            }
+            
+            if (addressParts.length > 0) {
+              detailedAddress = addressParts.join(', ');
+              console.log('✅ Built detailed address from Nominatim:', detailedAddress);
+            }
+          }
+          
+          // If no detailed address, try display_name
+          if (!detailedAddress && nominatimData.display_name) {
+            detailedAddress = nominatimData.display_name;
+            console.log('📝 Using display_name from Nominatim:', detailedAddress);
+          }
         }
-        
-        // Neighborhood/Village details
-        if (addr.neighbourhood) addressParts.push(addr.neighbourhood);
-        if (addr.village) addressParts.push(addr.village);
-        if (addr.suburb) addressParts.push(addr.suburb);
-        
-        // Administrative details
-        if (addr.city_district) addressParts.push(addr.city_district);
-        if (addr.city) addressParts.push(addr.city);
-        else if (addr.town) addressParts.push(addr.town);
-        else if (addr.municipality) addressParts.push(addr.municipality);
-        
-        if (addr.state) addressParts.push(addr.state);
-        
-        // Postal code
-        if (addr.postcode) addressParts.push(addr.postcode);
-        
-        detailedAddress = addressParts.join(', ');
+      } catch (nominatimError) {
+        console.log('❌ Nominatim failed:', nominatimError);
       }
       
-      // Fallback to display_name if detailed address building failed
-      if (!detailedAddress && data.display_name) {
-        detailedAddress = data.display_name;
+      // Fallback to BigDataCloud if Nominatim didn't work
+      if (!detailedAddress) {
+        try {
+          console.log('🌐 Trying BigDataCloud as fallback...');
+          const bigDataResponse = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=id`
+          );
+          
+          if (bigDataResponse.ok) {
+            const bigDataData = await bigDataResponse.json();
+            console.log('🌍 BigDataCloud response:', bigDataData);
+            
+            const addressComponents = [];
+            
+            if (bigDataData.locality) addressComponents.push(bigDataData.locality);
+            if (bigDataData.localityInfo?.administrative?.[3]?.name) {
+              addressComponents.push(bigDataData.localityInfo.administrative[3].name);
+            }
+            if (bigDataData.localityInfo?.administrative?.[2]?.name) {
+              addressComponents.push(bigDataData.localityInfo.administrative[2].name);
+            }
+            if (bigDataData.city) addressComponents.push(bigDataData.city);
+            if (bigDataData.principalSubdivision) addressComponents.push(bigDataData.principalSubdivision);
+            
+            // Try to get postal code from BigDataCloud
+            if (bigDataData.postcode) {
+              addressComponents.push(bigDataData.postcode);
+            }
+            
+            if (addressComponents.length > 0) {
+              detailedAddress = addressComponents.join(', ');
+              console.log('✅ Built address from BigDataCloud:', detailedAddress);
+            }
+          }
+        } catch (bigDataError) {
+          console.log('❌ BigDataCloud failed:', bigDataError);
+        }
+      }
+      
+      // Third fallback - try LocationIQ
+      if (!detailedAddress) {
+        try {
+          console.log('🌐 Trying LocationIQ as second fallback...');
+          const locationIqResponse = await fetch(
+            `https://us1.locationiq.com/v1/reverse.php?key=pk.locationiq.default_pk&lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=id`
+          );
+          
+          if (locationIqResponse.ok) {
+            const locationIqData = await locationIqResponse.json();
+            console.log('🌍 LocationIQ response:', locationIqData);
+            
+            if (locationIqData.address) {
+              const addr = locationIqData.address;
+              const addressParts = [];
+              
+              if (addr.road) addressParts.push(addr.road);
+              if (addr.neighbourhood) addressParts.push(addr.neighbourhood);
+              if (addr.suburb) addressParts.push(addr.suburb);
+              if (addr.city) addressParts.push(addr.city);
+              if (addr.state) addressParts.push(addr.state);
+              if (addr.postcode) addressParts.push(addr.postcode);
+              
+              if (addressParts.length > 0) {
+                detailedAddress = addressParts.join(', ');
+                console.log('✅ Built address from LocationIQ:', detailedAddress);
+              }
+            }
+          }
+        } catch (locationIqError) {
+          console.log('❌ LocationIQ failed:', locationIqError);
+        }
       }
       
       // Final fallback
       if (!detailedAddress) {
-        detailedAddress = 'Lokasi tidak diketahui';
+        detailedAddress = `Koordinat ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        console.log('⚠️ Using coordinate fallback');
       }
       
       // Include Plus Code in the address
       const fullAddress = `${plusCode} - ${detailedAddress}`;
       const coordinates = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       
+      console.log('📍 Final address:', fullAddress);
+      
       return {
         address: fullAddress,
         coordinates: coordinates
       };
     } catch (error) {
+      console.error('❌ All geocoding attempts failed:', error);
       const plusCode = generatePlusCode(lat, lng);
       const coordinates = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       return {
@@ -519,7 +636,11 @@ const AttendanceForm = () => {
                 )}
               </div>
               
-              <Select onValueChange={handleStaffSelect} value={selectedStaff?.uid || ''}>
+              <Select 
+                onValueChange={handleStaffSelect} 
+                value={selectedStaff?.uid || ''}
+                onOpenChange={(open) => setDropdownOpen(open)}
+              >
                 <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
                   <SelectValue placeholder="Pilih nama staff..." />
                 </SelectTrigger>
