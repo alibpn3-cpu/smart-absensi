@@ -93,7 +93,7 @@ const AttendanceForm = () => {
           searchInputRef.current.focus();
           searchInputRef.current.select();
         }
-      }, 100);
+      }, 200);
       return () => clearTimeout(timer);
     }
   }, [dropdownOpen]);
@@ -233,46 +233,18 @@ const AttendanceForm = () => {
     });
   };
 
-  const generatePlusCode = (lat: number, lng: number): string => {
-    // More accurate Plus Code generation based on the Google Plus Codes algorithm
-    const chars = '23456789CFGHJMPQRVWX';
-    const precision = 10;
-    
-    // Normalize coordinates to 0-180 range
-    let normalizedLat = lat + 90;
-    let normalizedLng = lng + 180;
-    
-    let code = '';
-    let latErr = 90;
-    let lngErr = 180;
-    
-    for (let i = 0; i < precision; i++) {
-      latErr /= 20;
-      lngErr /= 20;
-      
-      const latIdx = Math.floor(normalizedLat / latErr);
-      const lngIdx = Math.floor(normalizedLng / lngErr);
-      
-      if (i < 8) {
-        code += chars[latIdx] + chars[lngIdx];
-      }
-      
-      normalizedLat -= latIdx * latErr;
-      normalizedLng -= lngIdx * lngErr;
-      
-      if (i === 3) code += '+';
-    }
-    
-    return code.substring(0, 8);
+  const generateLocationCode = (lat: number, lng: number): string => {
+    // Simple GPS coordinate format instead of faulty Plus Code generation
+    return `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   };
 
   const getAddressFromCoords = async (lat: number, lng: number): Promise<{ address: string; coordinates: string }> => {
     console.log(`🔍 Fetching address for coordinates: ${lat}, ${lng}`);
     
     try {
-      // Generate Plus Code for the coordinates
-      const plusCode = generatePlusCode(lat, lng);
-      console.log(`📍 Generated Plus Code: ${plusCode}`);
+      // Generate location code for the coordinates
+      const locationCode = generateLocationCode(lat, lng);
+      console.log(`📍 Generated Location Code: ${locationCode}`);
       
       let detailedAddress = '';
       
@@ -420,8 +392,8 @@ const AttendanceForm = () => {
         console.log('⚠️ Using coordinate fallback');
       }
       
-      // Include Plus Code in the address
-      const fullAddress = `${plusCode} - ${detailedAddress}`;
+      // Include location code in the address
+      const fullAddress = `${locationCode} - ${detailedAddress}`;
       const coordinates = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       
       console.log('📍 Final address:', fullAddress);
@@ -432,10 +404,10 @@ const AttendanceForm = () => {
       };
     } catch (error) {
       console.error('❌ All geocoding attempts failed:', error);
-      const plusCode = generatePlusCode(lat, lng);
+      const locationCode = generateLocationCode(lat, lng);
       const coordinates = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       return {
-        address: `${plusCode} - Koordinat: ${coordinates}`,
+        address: `${locationCode} - Lokasi tidak dikenal`,
         coordinates: coordinates
       };
     }
@@ -658,7 +630,10 @@ const AttendanceForm = () => {
                         autoFocus
                         onClick={(e) => {
                           e.stopPropagation();
-                          e.currentTarget.focus();
+                          setTimeout(() => {
+                            e.currentTarget.focus();
+                            e.currentTarget.select();
+                          }, 50);
                         }}
                         onKeyDown={(e) => {
                           e.stopPropagation();
@@ -668,7 +643,9 @@ const AttendanceForm = () => {
                         }}
                         onFocus={(e) => {
                           e.stopPropagation();
-                          e.currentTarget.select();
+                          setTimeout(() => {
+                            e.currentTarget.select();
+                          }, 50);
                         }}
                       />
                     </div>
