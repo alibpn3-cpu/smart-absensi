@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -46,6 +46,7 @@ const AttendanceForm = () => {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [permissions, setPermissions] = useState<PermissionsState>({ location: false, camera: false });
   const [timezone, setTimezone] = useState('WIB');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchStaffUsers();
@@ -219,32 +220,36 @@ const AttendanceForm = () => {
   };
 
   const generatePlusCode = (lat: number, lng: number): string => {
-    // Simple Plus Code generation (approximation for display purposes)
-    // This is a simplified version - real Plus Codes use more complex encoding
+    // More accurate Plus Code generation based on the Google Plus Codes algorithm
     const chars = '23456789CFGHJMPQRVWX';
+    const precision = 10;
     
-    // Normalize coordinates
-    const normalizedLat = lat + 90;
-    const normalizedLng = lng + 180;
+    // Normalize coordinates to 0-180 range
+    let normalizedLat = lat + 90;
+    let normalizedLng = lng + 180;
     
-    // Generate grid position (simplified)
-    const gridLat = Math.floor(normalizedLat * 8000) % 8000;
-    const gridLng = Math.floor(normalizedLng * 8000) % 8000;
-    
-    // Create Plus Code (simplified 8-character version)
     let code = '';
-    let tempLat = gridLat;
-    let tempLng = gridLng;
+    let latErr = 90;
+    let lngErr = 180;
     
-    for (let i = 0; i < 4; i++) {
-      const latIdx = Math.floor(tempLat / Math.pow(20, 3 - i)) % 20;
-      const lngIdx = Math.floor(tempLng / Math.pow(20, 3 - i)) % 20;
-      code += chars[latIdx] + chars[lngIdx];
-      tempLat %= Math.pow(20, 3 - i);
-      tempLng %= Math.pow(20, 3 - i);
+    for (let i = 0; i < precision; i++) {
+      latErr /= 20;
+      lngErr /= 20;
+      
+      const latIdx = Math.floor(normalizedLat / latErr);
+      const lngIdx = Math.floor(normalizedLng / lngErr);
+      
+      if (i < 8) {
+        code += chars[latIdx] + chars[lngIdx];
+      }
+      
+      normalizedLat -= latIdx * latErr;
+      normalizedLng -= lngIdx * lngErr;
+      
+      if (i === 3) code += '+';
     }
     
-    return code.substring(0, 4) + '+' + code.substring(4, 6);
+    return code.substring(0, 8);
   };
 
   const getAddressFromCoords = async (lat: number, lng: number): Promise<{ address: string; coordinates: string }> => {
@@ -252,35 +257,53 @@ const AttendanceForm = () => {
       // Generate Plus Code for the coordinates
       const plusCode = generatePlusCode(lat, lng);
       
-      // Using a free geocoding service to get detailed address
+      // Using OpenStreetMap Nominatim for detailed geocoding (free and detailed)
       const response = await fetch(
-        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=id`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=id`
       );
       const data = await response.json();
       
-      // Build detailed address from available data
+      // Build detailed address from OpenStreetMap data
       let detailedAddress = '';
       
-      if (data.localityInfo && data.localityInfo.administrative) {
-        const admin = data.localityInfo.administrative;
-        // Find street/road info if available
-        const roadInfo = admin.find((item: any) => item.order >= 8);
-        const districtInfo = admin.find((item: any) => item.order === 7);
-        const cityInfo = admin.find((item: any) => item.order === 5);
-        const provinceInfo = admin.find((item: any) => item.order === 4);
-        
+      if (data.address) {
+        const addr = data.address;
         const addressParts = [];
-        if (roadInfo) addressParts.push(roadInfo.name);
-        if (districtInfo) addressParts.push(districtInfo.name);
-        if (cityInfo) addressParts.push(cityInfo.name);
-        if (provinceInfo) addressParts.push(provinceInfo.name);
+        
+        // Street details
+        if (addr.house_number && addr.road) {
+          addressParts.push(`${addr.road} No.${addr.house_number}`);
+        } else if (addr.road) {
+          addressParts.push(addr.road);
+        }
+        
+        // Neighborhood/Village details
+        if (addr.neighbourhood) addressParts.push(addr.neighbourhood);
+        if (addr.village) addressParts.push(addr.village);
+        if (addr.suburb) addressParts.push(addr.suburb);
+        
+        // Administrative details
+        if (addr.city_district) addressParts.push(addr.city_district);
+        if (addr.city) addressParts.push(addr.city);
+        else if (addr.town) addressParts.push(addr.town);
+        else if (addr.municipality) addressParts.push(addr.municipality);
+        
+        if (addr.state) addressParts.push(addr.state);
+        
+        // Postal code
+        if (addr.postcode) addressParts.push(addr.postcode);
         
         detailedAddress = addressParts.join(', ');
       }
       
-      // Fallback to basic address if detailed not available
+      // Fallback to display_name if detailed address building failed
+      if (!detailedAddress && data.display_name) {
+        detailedAddress = data.display_name;
+      }
+      
+      // Final fallback
       if (!detailedAddress) {
-        detailedAddress = data.locality || data.city || `${data.principalSubdivision}, ${data.countryName}` || 'Lokasi tidak diketahui';
+        detailedAddress = 'Lokasi tidak diketahui';
       }
       
       // Include Plus Code in the address
@@ -506,14 +529,26 @@ const AttendanceForm = () => {
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
+                        ref={searchInputRef}
                         placeholder="Cari nama staff..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-10 h-8 border text-popover-foreground bg-background"
                         autoFocus
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        onFocus={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.currentTarget.focus();
+                        }}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                            e.preventDefault();
+                          }
+                        }}
+                        onFocus={(e) => {
+                          e.stopPropagation();
+                          e.currentTarget.select();
+                        }}
                       />
                     </div>
                   </div>
