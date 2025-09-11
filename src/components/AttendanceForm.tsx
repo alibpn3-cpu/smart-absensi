@@ -34,7 +34,10 @@ interface PermissionsState {
 
 const AttendanceForm = () => {
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
+  const [filteredStaffUsers, setFilteredStaffUsers] = useState<StaffUser[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<StaffUser | null>(null);
+  const [selectedWorkArea, setSelectedWorkArea] = useState<string>('all');
+  const [workAreas, setWorkAreas] = useState<string[]>([]);
   const [attendanceStatus, setAttendanceStatus] = useState<'wfo' | 'wfh' | 'dinas'>('wfo');
   const [reason, setReason] = useState('');
   const [showCamera, setShowCamera] = useState(false);
@@ -106,7 +109,13 @@ const AttendanceForm = () => {
         variant: "destructive"
       });
     } else {
-      setStaffUsers(data || []);
+      const staff = data || [];
+      setStaffUsers(staff);
+      setFilteredStaffUsers(staff);
+      
+      // Extract unique work areas
+      const areas = [...new Set(staff.map(s => s.work_area))].sort();
+      setWorkAreas(areas);
     }
   };
 
@@ -429,6 +438,19 @@ const AttendanceForm = () => {
     setSelectedStaff(staff || null);
   };
 
+  const handleWorkAreaSelect = (area: string) => {
+    setSelectedWorkArea(area);
+    if (area === 'all') {
+      setFilteredStaffUsers(staffUsers);
+    } else {
+      setFilteredStaffUsers(staffUsers.filter(staff => staff.work_area === area));
+    }
+    // Clear selected staff if not in new filtered list
+    if (selectedStaff && area !== 'all' && selectedStaff.work_area !== area) {
+      setSelectedStaff(null);
+    }
+  };
+
   const handlePhotoCapture = async (photoBlob: Blob) => {
     if (!selectedStaff || !currentLocation) return;
 
@@ -564,6 +586,37 @@ const AttendanceForm = () => {
 
         <Card className="border-0 shadow-xl animate-slide-up">
           <CardContent className="space-y-6 p-6">
+            {/* Work Area Selection */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-primary" />
+                <label className="text-sm font-semibold">Area Tugas</label>
+              </div>
+              
+              <Select
+                onValueChange={handleWorkAreaSelect} 
+                value={selectedWorkArea}
+              >
+                <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
+                  <SelectValue placeholder="Pilih area tugas..." />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border shadow-lg max-h-60 overflow-hidden z-50">
+                  <SelectItem value="all" className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground font-semibold">
+                    🌍 Semua Area
+                  </SelectItem>
+                  {workAreas.map((area) => (
+                    <SelectItem 
+                      key={area} 
+                      value={area}
+                      className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground"
+                    >
+                      📍 {area}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Staff Selection */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
@@ -585,12 +638,12 @@ const AttendanceForm = () => {
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border shadow-lg max-h-60 overflow-hidden z-50">
                   <div className="max-h-40 overflow-y-auto">
-                    {staffUsers.length === 0 ? (
+                    {filteredStaffUsers.length === 0 ? (
                       <div className="p-3 text-center text-muted-foreground text-sm">
-                        Tidak ada data staff
+                        {selectedWorkArea === 'all' ? 'Tidak ada data staff' : `Tidak ada staff di area ${selectedWorkArea}`}
                       </div>
                     ) : (
-                      staffUsers.map((staff) => (
+                      filteredStaffUsers.map((staff) => (
                         <SelectItem 
                           key={staff.uid} 
                           value={staff.uid}
@@ -604,7 +657,6 @@ const AttendanceForm = () => {
                 </SelectContent>
               </Select>
             </div>
-
             {/* Staff Info Display */}
             {selectedStaff && (
               <div className="bg-muted/30 p-4 rounded-lg space-y-3 border">
