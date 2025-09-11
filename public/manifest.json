@@ -1,7 +1,7 @@
 {
-  "name": "Smart Zone Absensi",
-  "short_name": "Absensi",
-  "description": "Smart Zone Attendance Management System",
+  "name": "Digital Absensi",
+  "short_name": "Digital Absensi",
+  "description": "Aplikasi absensi online untuk WFH,WFO dan Dinas Staff Petrolog",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
