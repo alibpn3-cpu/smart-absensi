@@ -610,10 +610,8 @@ const AttendanceForm = () => {
                   {formatTimeWithTimezone(currentDateTime, timezone)}
                 </div>
                 <Select value={timezone} onValueChange={updateTimezone}>
-                  <SelectTrigger asChild>
-                    <Button variant="ghost" size="sm" className="p-1 h-8 w-8">
-                      <Globe className="h-4 w-4" />
-                    </Button>
+                  <SelectTrigger className="p-1 h-8 w-8 border-0 bg-transparent hover:bg-accent rounded-full">
+                    <Globe className="h-4 w-4" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="WIB">WIB (UTC+7)</SelectItem>
