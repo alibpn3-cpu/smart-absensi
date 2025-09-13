@@ -167,14 +167,6 @@ const AttendanceExporter = () => {
 
       // Prepare data for Excel
       const excelData = attendanceData.map((record: any, index: number) => {
-        const coordinatesValue = record.location_lat && record.location_lng 
-          ? `=HYPERLINK("https://www.google.com/maps?q=${record.location_lat},${record.location_lng}","${record.location_lat}, ${record.location_lng}")` 
-          : '-';
-        
-        const photoUrl = record.selfie_photo_url 
-          ? `=HYPERLINK("${record.selfie_photo_url}","Lihat Foto")` 
-          : '-';
-
         return {
           'No': index + 1,
           'UID Karyawan': record.staff_uid,
@@ -188,8 +180,10 @@ const AttendanceExporter = () => {
           'Waktu Check Out': formatDateForExport(record.check_out_time),
           'Total Jam Kerja': calculateWorkHours(record.check_in_time, record.check_out_time),
           'Alamat Lokasi': record.location_address || '-',
-          'Koordinat': coordinatesValue,
-          'Foto': photoUrl,
+          'Koordinat': record.location_lat && record.location_lng 
+            ? `${record.location_lat}, ${record.location_lng}` 
+            : '-',
+          'Foto': record.selfie_photo_url ? 'Lihat Foto' : '-',
           'Alasan': record.reason || '-',
           'Waktu Input': formatDateForExport(record.created_at)
         };
@@ -198,6 +192,32 @@ const AttendanceExporter = () => {
       // Create workbook
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(excelData);
+
+      // Add hyperlinks after creating the sheet
+      attendanceData.forEach((record: any, index: number) => {
+        const rowIndex = index + 2; // +2 because row 1 is header and Excel is 1-indexed
+        
+        // Add coordinate hyperlink
+        if (record.location_lat && record.location_lng) {
+          const coordCell = `M${rowIndex}`; // Column M is Koordinat
+          const mapsUrl = `https://www.google.com/maps?q=${record.location_lat},${record.location_lng}`;
+          ws[coordCell] = {
+            t: 's',
+            v: `${record.location_lat}, ${record.location_lng}`,
+            l: { Target: mapsUrl, Tooltip: 'Buka lokasi di Google Maps' }
+          };
+        }
+        
+        // Add photo hyperlink
+        if (record.selfie_photo_url) {
+          const photoCell = `N${rowIndex}`; // Column N is Foto
+          ws[photoCell] = {
+            t: 's',
+            v: 'Lihat Foto',
+            l: { Target: record.selfie_photo_url, Tooltip: 'Buka foto selfie' }
+          };
+        }
+      });
 
       // Set column widths
       const colWidths = [
