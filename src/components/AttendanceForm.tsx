@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Camera, MapPin, Clock, CheckCircle, Calendar, Users } from 'lucide-react';
+import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Globe } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import CameraCapture from './CameraCapture';
@@ -151,6 +151,34 @@ const AttendanceForm = () => {
     const seconds = localTime.getSeconds().toString().padStart(2, '0');
     
     return `${hours}:${minutes}:${seconds} ${tz}`;
+  };
+
+  const updateTimezone = async (newTimezone: string) => {
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          setting_key: 'app_timezone',
+          setting_value: newTimezone,
+          description: 'Application timezone for clock display'
+        }, {
+          onConflict: 'setting_key'
+        });
+
+      if (error) throw error;
+
+      setTimezone(newTimezone);
+      toast({
+        title: "Berhasil",
+        description: `Timezone berhasil diubah ke ${newTimezone}`
+      });
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: "Gagal mengubah timezone",
+        variant: "destructive"
+      });
+    }
   };
 
   const fetchTodayAttendance = async () => {
@@ -577,8 +605,22 @@ const AttendanceForm = () => {
                   day: 'numeric' 
                 })}
               </div>
-              <div className="text-2xl font-bold text-primary">
-                {formatTimeWithTimezone(currentDateTime, timezone)}
+              <div className="flex items-center justify-center gap-3">
+                <div className="text-2xl font-bold text-primary">
+                  {formatTimeWithTimezone(currentDateTime, timezone)}
+                </div>
+                <Select value={timezone} onValueChange={updateTimezone}>
+                  <SelectTrigger asChild>
+                    <Button variant="ghost" size="sm" className="p-1 h-8 w-8">
+                      <Globe className="h-4 w-4" />
+                    </Button>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="WIB">WIB (UTC+7)</SelectItem>
+                    <SelectItem value="WITA">WITA (UTC+8)</SelectItem>
+                    <SelectItem value="WIT">WIT (UTC+9)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardHeader>

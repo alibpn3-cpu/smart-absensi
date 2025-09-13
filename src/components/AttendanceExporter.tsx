@@ -15,6 +15,7 @@ interface ExportFilters {
   endDate: string;
   status: string;
   employeeUid: string;
+  workArea: string;
 }
 
 interface StaffUser {
@@ -27,9 +28,11 @@ const AttendanceExporter = () => {
     startDate: '',
     endDate: '',
     status: 'all',
-    employeeUid: 'all'
+    employeeUid: 'all',
+    workArea: 'all'
   });
   const [employees, setEmployees] = useState<StaffUser[]>([]);
+  const [workAreas, setWorkAreas] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
 
@@ -52,7 +55,7 @@ const AttendanceExporter = () => {
     setLoadingEmployees(true);
     const { data, error } = await supabase
       .from('staff_users')
-      .select('uid, name')
+      .select('uid, name, work_area')
       .eq('is_active', true)
       .order('name');
 
@@ -63,7 +66,12 @@ const AttendanceExporter = () => {
         variant: "destructive"
       });
     } else {
-      setEmployees(data || []);
+      const staff = data || [];
+      setEmployees(staff);
+      
+      // Extract unique work areas
+      const areas = [...new Set(staff.map((s: any) => s.work_area))].sort();
+      setWorkAreas(areas);
     }
     setLoadingEmployees(false);
   };
@@ -97,6 +105,11 @@ const AttendanceExporter = () => {
     // Apply employee filter
     if (filters.employeeUid !== 'all') {
       query = query.eq('staff_uid', filters.employeeUid);
+    }
+
+    // Apply work area filter
+    if (filters.workArea !== 'all') {
+      query = query.eq('staff_users.work_area', filters.workArea);
     }
 
     const { data, error } = await query;
@@ -153,25 +166,34 @@ const AttendanceExporter = () => {
       }
 
       // Prepare data for Excel
-      const excelData = attendanceData.map((record: any, index: number) => ({
-        'No': index + 1,
-        'UID Karyawan': record.staff_uid,
-        'Nama Karyawan': record.staff_name,
-        'Jabatan': record.staff_users?.position || '-',
-        'Area Kerja': record.staff_users?.work_area || '-',
-        'Divisi': record.staff_users?.division || '-',
-        'Tanggal': new Date(record.date).toLocaleDateString('id-ID'),
-        'Status': record.status.toUpperCase(),
-        'Waktu Check In': formatDateForExport(record.check_in_time),
-        'Waktu Check Out': formatDateForExport(record.check_out_time),
-        'Total Jam Kerja': calculateWorkHours(record.check_in_time, record.check_out_time),
-        'Alamat Lokasi': record.location_address || '-',
-        'Koordinat': record.location_lat && record.location_lng ? `${record.location_lat}, ${record.location_lng}` : '-',
-        'Latitude': record.location_lat || '-',
-        'Longitude': record.location_lng || '-',
-        'Alasan': record.reason || '-',
-        'Waktu Input': formatDateForExport(record.created_at)
-      }));
+      const excelData = attendanceData.map((record: any, index: number) => {
+        const coordinatesValue = record.location_lat && record.location_lng 
+          ? `=HYPERLINK("https://www.google.com/maps?q=${record.location_lat},${record.location_lng}","${record.location_lat}, ${record.location_lng}")` 
+          : '-';
+        
+        const photoUrl = record.selfie_photo_url 
+          ? `=HYPERLINK("${record.selfie_photo_url}","Lihat Foto")` 
+          : '-';
+
+        return {
+          'No': index + 1,
+          'UID Karyawan': record.staff_uid,
+          'Nama Karyawan': record.staff_name,
+          'Jabatan': record.staff_users?.position || '-',
+          'Area Kerja': record.staff_users?.work_area || '-',
+          'Divisi': record.staff_users?.division || '-',
+          'Tanggal': new Date(record.date).toLocaleDateString('id-ID'),
+          'Status': record.status.toUpperCase(),
+          'Waktu Check In': formatDateForExport(record.check_in_time),
+          'Waktu Check Out': formatDateForExport(record.check_out_time),
+          'Total Jam Kerja': calculateWorkHours(record.check_in_time, record.check_out_time),
+          'Alamat Lokasi': record.location_address || '-',
+          'Koordinat': coordinatesValue,
+          'Foto': photoUrl,
+          'Alasan': record.reason || '-',
+          'Waktu Input': formatDateForExport(record.created_at)
+        };
+      });
 
       // Create workbook
       const wb = XLSX.utils.book_new();
@@ -191,9 +213,8 @@ const AttendanceExporter = () => {
         { wch: 18 },  // Check Out
         { wch: 12 },  // Total Jam
         { wch: 35 },  // Alamat
-        { wch: 15 },  // Koordinat
-        { wch: 12 },  // Lat
-        { wch: 12 },  // Lng
+        { wch: 20 },  // Koordinat
+        { wch: 15 },  // Foto
         { wch: 20 },  // Alasan
         { wch: 18 }   // Waktu Input
       ];
@@ -214,8 +235,9 @@ const AttendanceExporter = () => {
       const endDate = new Date(filters.endDate).toLocaleDateString('id-ID').replace(/\//g, '-');
       const statusText = filters.status === 'all' ? 'Semua' : filters.status.toUpperCase();
       const employeeText = filters.employeeUid === 'all' ? 'Semua-Karyawan' : filters.employeeUid;
+      const workAreaText = filters.workArea === 'all' ? 'Semua-Area' : filters.workArea;
       
-      const filename = `Laporan-Absensi_${startDate}_${endDate}_${statusText}_${employeeText}.xlsx`;
+      const filename = `Laporan-Absensi_${startDate}_${endDate}_${statusText}_${workAreaText}_${employeeText}.xlsx`;
 
       // Generate Excel file
       const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -252,7 +274,7 @@ const AttendanceExporter = () => {
       <CardContent>
         <div className="space-y-6">
           {/* Filter Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Date Range */}
             <div className="space-y-2">
               <Label htmlFor="startDate">Tanggal Mulai</Label>
@@ -286,6 +308,28 @@ const AttendanceExporter = () => {
                   <SelectItem value="wfo">WFO</SelectItem>
                   <SelectItem value="wfh">WFH</SelectItem>
                   <SelectItem value="dinas">Dinas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Work Area Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="workArea">Area Tugas</Label>
+              <Select 
+                value={filters.workArea} 
+                onValueChange={(value) => setFilters({...filters, workArea: value})}
+                disabled={loadingEmployees}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Area</SelectItem>
+                  {workAreas.map((area) => (
+                    <SelectItem key={area} value={area}>
+                      {area}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -326,6 +370,7 @@ const AttendanceExporter = () => {
                 {filters.endDate ? new Date(filters.endDate).toLocaleDateString('id-ID') : '-'}
               </div>
               <div>📋 Status: {filters.status === 'all' ? 'Semua Status' : filters.status.toUpperCase()}</div>
+              <div>🏢 Area Tugas: {filters.workArea === 'all' ? 'Semua Area' : filters.workArea}</div>
               <div>👤 Karyawan: {filters.employeeUid === 'all' ? 'Semua Karyawan' : employees.find(e => e.uid === filters.employeeUid)?.name || filters.employeeUid}</div>
             </div>
           </div>
@@ -355,7 +400,8 @@ const AttendanceExporter = () => {
           {/* Export Info */}
           <div className="text-center text-sm text-muted-foreground">
             <p>📄 File akan berformat Excel (.xlsx) dengan orientasi landscape</p>
-            <p>📍 Termasuk alamat lengkap dan koordinat lokasi absen</p>
+            <p>📍 Koordinat lokasi dapat diklik untuk membuka peta di browser</p>
+            <p>📷 Kolom foto berisi link untuk membuka foto selfie saat absen</p>
             <p>⏱️ Data jam kerja otomatis dihitung berdasarkan check-in dan check-out</p>
           </div>
         </div>

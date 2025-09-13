@@ -127,30 +127,6 @@ const AppSettings = () => {
           <div className="space-y-4">
             {/* Timezone Setting */}
             <div className="space-y-2">
-              <Label htmlFor="timezone" className="text-black flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Time Zone
-              </Label>
-              <Select
-                value={timezone}
-                onValueChange={setTimezone}
-              >
-                <SelectTrigger className="bg-white border-gray-300 text-black">
-                  <SelectValue placeholder="Select timezone" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="WIB">WIB (UTC+7) - Waktu Indonesia Barat</SelectItem>
-                  <SelectItem value="WITA">WITA (UTC+8) - Waktu Indonesia Tengah</SelectItem>
-                  <SelectItem value="WIT">WIT (UTC+9) - Waktu Indonesia Timur</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-600">
-                Choose the timezone for your location. This will affect the clock display on the main page.
-              </p>
-            </div>
-
-            {/* App Title Setting */}
-            <div className="space-y-2">
               <Label htmlFor="appTitle" className="text-black flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 Application Title
