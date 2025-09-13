@@ -193,6 +193,24 @@ const AttendanceExporter = () => {
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(excelData);
 
+      // Generate signed URLs for private photos
+      const signedPhotoUrls = await Promise.all(
+        attendanceData.map(async (record: any) => {
+          if (record.selfie_photo_url) {
+            try {
+              const { data } = await supabase
+                .storage
+                .from('attendance-photos')
+                .createSignedUrl(record.selfie_photo_url, 60 * 60 * 24 * 14); // 14 days
+              return data?.signedUrl || null;
+            } catch (e) {
+              return null;
+            }
+          }
+          return null;
+        })
+      );
+
       // Add hyperlinks after creating the sheet
       attendanceData.forEach((record: any, index: number) => {
         const rowIndex = index + 2; // +2 because row 1 is header and Excel is 1-indexed
@@ -208,13 +226,14 @@ const AttendanceExporter = () => {
           };
         }
         
-        // Add photo hyperlink
-        if (record.selfie_photo_url) {
+        // Add photo hyperlink (signed URL)
+        const signedUrl = signedPhotoUrls[index];
+        if (signedUrl) {
           const photoCell = `N${rowIndex}`; // Column N is Foto
           ws[photoCell] = {
             t: 's',
             v: 'Lihat Foto',
-            l: { Target: record.selfie_photo_url, Tooltip: 'Buka foto selfie' }
+            l: { Target: signedUrl, Tooltip: 'Buka foto selfie' }
           };
         }
       });
