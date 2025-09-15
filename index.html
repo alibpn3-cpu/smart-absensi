@@ -1,50 +1,36 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Digital Absensi</title>
-    <meta name="description" content="Digital Absensi v.1.2">
-    <meta name="author" content="Digital Absensi" />
-    <link rel="icon" type="image/x-icon" href="https://storage.googleapis.com/gpt-engineer-file-uploads/1mkYYMBem1gGKUzdu4s9zduDCL63/uploads/1757857940137-petrolog gold.png"><text y='.9em' font-size='90'>📍</text></svg>">
-    
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#3b82f6">
-    
-    <!-- iOS PWA Support -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Digital Absensi">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%233b82f6' rx='20'/><text x='96' y='130' font-size='100' text-anchor='middle' fill='white'>📍</text></svg>">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Digital Absensi</title>
+  <meta name="description" content="Digital Absensi v.1.2">
+  <meta name="author" content="Digital Absensi" />
 
-    <meta property="og:title" content="Digital Absensi" />
-    <meta property="og:description" content="Digital Absesnsi v1.2" />
-    <meta property="og:type" content="website" />
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="https://storage.googleapis.com/gpt-engineer-file-uploads/1mkYYMBem1gGKUzdu4s9zduDCL63/uploads/1757857940137-petrolog%20gold.png">
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@smartzone" />
-    <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/1mkYYMBem1gGKUzdu4s9zduDCL63/social-images/social-1757857196474-pngwing.com (39).png">
-  <meta name="twitter:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/1mkYYMBem1gGKUzdu4s9zduDCL63/social-images/social-1757857196474-pngwing.com (39).png">
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+
+  <!-- iOS PWA Support -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Digital Absensi">
+  <link rel="apple-touch-icon" 
+        href="data:image/svg+xml,
+        <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'>
+          <rect width='192' height='192' fill='%233b82f6' rx='20'/>
+          <text x='96' y='130' font-size='100' text-anchor='middle' fill='white'>📍</text>
+        </svg>">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Digital Absensi" />
+  <meta property="og:description" content="Digital Absensi v1.2" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/1mkYYMBem1gGKUzdu4s9zduDCL63/social-images/social-1757857196474-pngwing.com%20(39).png">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@smartzone" />
+  <meta name="twitter:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/1mkYYMBem1gGKUzdu4s9zduDCL63/social-images/social-1757857196474-pngwing.com%20(39).png">
 </head>
-
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-    
-    <!-- Service Worker Registration -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('SW registered: ', registration);
-            })
-            .catch((registrationError) => {
-              console.log('SW registration failed: ', registrationError);
-            });
-        });
-      }
-    </script>
-  </body>
-</html>
