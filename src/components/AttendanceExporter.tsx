@@ -165,8 +165,43 @@ const AttendanceExporter = () => {
         return;
       }
 
-      // Prepare data for Excel
+      // Prepare data for Excel (resolve geofence name for WFO)
+      const { data: geofences } = await supabase
+        .from('geofence_areas')
+        .select('name, center_lat, center_lng, radius')
+        .eq('is_active', true);
+
+      const distance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+        const R = 6371e3;
+        const φ1 = (lat1 * Math.PI) / 180;
+        const φ2 = (lat2 * Math.PI) / 180;
+        const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+        const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+        const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      };
+
+      const findGeofenceName = (lat?: number, lng?: number): string | null => {
+        if (!lat || !lng || !geofences) return null;
+        for (const g of geofences as any[]) {
+          if (g.center_lat && g.center_lng && g.radius) {
+            const d = distance(
+              Number(lat),
+              Number(lng),
+              parseFloat(g.center_lat.toString()),
+              parseFloat(g.center_lng.toString())
+            );
+            if (d <= g.radius) return g.name as string;
+          }
+        }
+        return null;
+      };
+
       const excelData = attendanceData.map((record: any, index: number) => {
+        const geofenceName = record.status === 'wfo' && record.location_lat && record.location_lng
+          ? findGeofenceName(Number(record.location_lat), Number(record.location_lng))
+          : null;
         return {
           'No': index + 1,
           'UID Karyawan': record.staff_uid,
@@ -179,7 +214,7 @@ const AttendanceExporter = () => {
           'Waktu Check In': formatDateForExport(record.check_in_time),
           'Waktu Check Out': formatDateForExport(record.check_out_time),
           'Total Jam Kerja': calculateWorkHours(record.check_in_time, record.check_out_time),
-          'Alamat Lokasi': record.location_address || '-',
+          'Alamat Lokasi': geofenceName || record.location_address || '-',
           'Koordinat': record.location_lat && record.location_lng 
             ? `${record.location_lat}, ${record.location_lng}` 
             : '-',

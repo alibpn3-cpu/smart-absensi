@@ -47,6 +47,7 @@ const AttendanceForm = () => {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [permissions, setPermissions] = useState<PermissionsState>({ location: false, camera: false });
   const [timezone, setTimezone] = useState('WIB');
+  const [wfoLocationName, setWfoLocationName] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStaffUsers();
@@ -589,6 +590,65 @@ const AttendanceForm = () => {
     }
   };
 
+  // Clear app cache/cookies and SW, then reload
+  const handleClearCache = async () => {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      // Delete cookies
+      document.cookie.split(';').forEach((c) => {
+        const eqPos = c.indexOf('=');
+        const name = eqPos > -1 ? c.substr(0, eqPos) : c;
+        document.cookie = name.trim() + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+      });
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+      toast({ title: 'Berhasil', description: 'Cache & cookies dibersihkan. Memuat ulang...' });
+    } catch (e) {
+      toast({ title: 'Gagal', description: 'Tidak dapat membersihkan cache', variant: 'destructive' });
+    } finally {
+      setTimeout(() => window.location.reload(), 500);
+    }
+  };
+
+  // Compute geofence name for today attendance display (WFO)
+  useEffect(() => {
+    const run = async () => {
+      if (todayAttendance?.status === 'wfo' && todayAttendance.location_lat && todayAttendance.location_lng) {
+        const { data: geofences } = await supabase
+          .from('geofence_areas')
+          .select('*')
+          .eq('is_active', true);
+        if (geofences && geofences.length) {
+          const lat = Number(todayAttendance.location_lat);
+          const lng = Number(todayAttendance.location_lng);
+          for (const g of geofences as any[]) {
+            if (g.center_lat && g.center_lng && g.radius) {
+              const d = calculateDistance(
+                lat,
+                lng,
+                parseFloat(g.center_lat.toString()),
+                parseFloat(g.center_lng.toString())
+              );
+              if (d <= g.radius) {
+                setWfoLocationName(g.name as string);
+                return;
+              }
+            }
+          }
+        }
+      }
+      setWfoLocationName(null);
+    };
+    run();
+  }, [todayAttendance]);
+
   const isCheckedIn = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
   const isCompleted = todayAttendance?.check_in_time && todayAttendance?.check_out_time;
 
@@ -787,7 +847,10 @@ const AttendanceForm = () => {
                   {todayAttendance.location_address && (
                     <div>
                       <span className="text-muted-foreground block">Lokasi:</span>
-                      <span className="font-medium text-xs mb-2 block">{todayAttendance.location_address}</span>
+                      <span className="font-medium text-xs mb-2 block">
+                        {todayAttendance.status === 'wfo' && wfoLocationName ? wfoLocationName : (todayAttendance.location_address || '-')}
+                      </span>
+                      <span className="text-muted-foreground block text-xs">Koordinat:</span>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
                           📍 {todayAttendance.location_lat}, {todayAttendance.location_lng}
@@ -827,6 +890,13 @@ const AttendanceForm = () => {
             </Button>
           </CardContent>
         </Card>
+
+        <div className="text-center text-xs text-muted-foreground mt-2 space-y-2">
+          <div>Versi Aplikasi: v1.0.3</div>
+          <Button variant="outline" size="sm" onClick={handleClearCache}>
+            Update (Hapus Cache)
+          </Button>
+        </div>
 
         {/* Camera Modal */}
         {showCamera && (
