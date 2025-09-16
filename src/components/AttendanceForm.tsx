@@ -419,15 +419,15 @@ const AttendanceForm = () => {
     }
   };
 
-  const checkGeofence = async (lat: number, lng: number): Promise<boolean> => {
-    if (attendanceStatus !== 'wfo') return true;
+  const checkGeofence = async (lat: number, lng: number): Promise<{ isInGeofence: boolean; geofenceName?: string }> => {
+    if (attendanceStatus !== 'wfo') return { isInGeofence: true };
 
     const { data: geofences, error } = await supabase
       .from('geofence_areas')
       .select('*')
       .eq('is_active', true);
 
-    if (error || !geofences) return true;
+    if (error || !geofences) return { isInGeofence: true };
 
     for (const geofence of geofences) {
       if (geofence.center_lat && geofence.center_lng && geofence.radius) {
@@ -438,12 +438,12 @@ const AttendanceForm = () => {
         );
         
         if (distance <= geofence.radius) {
-          return true;
+          return { isInGeofence: true, geofenceName: geofence.name };
         }
       }
     }
 
-    return false;
+    return { isInGeofence: false };
   };
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -484,10 +484,11 @@ const AttendanceForm = () => {
 
     setLoading(true);
     try {
-      // Check geofence for WFO status
+      // Check geofence for WFO status and get geofence name
+      let locationAddress = currentLocation.address;
       if (attendanceStatus === 'wfo') {
-        const isInGeofence = await checkGeofence(currentLocation.lat, currentLocation.lng);
-        if (!isInGeofence) {
+        const geofenceResult = await checkGeofence(currentLocation.lat, currentLocation.lng);
+        if (!geofenceResult.isInGeofence) {
           toast({
             title: "Error Lokasi",
             description: "Anda harus berada di dalam area kantor untuk absen WFO",
@@ -496,6 +497,8 @@ const AttendanceForm = () => {
           setLoading(false);
           return;
         }
+        // Use geofence name as location for WFO status
+        locationAddress = geofenceResult.geofenceName || currentLocation.address;
       }
 
       // Upload photo to Supabase Storage
@@ -513,7 +516,7 @@ const AttendanceForm = () => {
         staff_name: selectedStaff.name,
         location_lat: currentLocation.lat,
         location_lng: currentLocation.lng,
-        location_address: currentLocation.address,
+        location_address: locationAddress,
         selfie_photo_url: uploadData.path,
         status: attendanceStatus,
         reason: reason || null,
