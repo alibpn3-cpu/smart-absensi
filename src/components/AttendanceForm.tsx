@@ -892,7 +892,7 @@ const AttendanceForm = () => {
         </Card>
 
         <div className="text-center text-xs text-muted-foreground mt-2 space-y-2">
-          <div>Versi Aplikasi: v1.0.3</div>
+          <div>Versi Aplikasi: v1.0.5 IT Dept. 2025</div>
           <Button variant="outline" size="sm" onClick={handleClearCache}>
             Update (Hapus Cache)
           </Button>
