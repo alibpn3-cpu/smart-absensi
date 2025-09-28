@@ -180,7 +180,7 @@ const Dashboard = () => {
         <div className="flex justify-between items-center">
           <div className="flex-1">
             <h1 className="text-2xl sm:text-3xl font-bold text-title-primary">Admin Dashboard</h1>
-            <p className="text-muted-foreground">Smart Zone Absensi Management</p>
+            <p className="text-muted-foreground">Petrolog Digital Absensi Management</p>
           </div>
           <Button 
             variant="outline" 
