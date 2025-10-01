@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -829,17 +830,12 @@ const AttendanceForm = () => {
                 <div className="flex gap-3">
                   {/* Staff Photo */}
                   <div className="flex-shrink-0">
-                    {selectedStaff.photo_url ? (
-                      <img 
-                        src={selectedStaff.photo_url} 
-                        alt={selectedStaff.name}
-                        className="w-10 h-10 rounded-full object-cover border-2 border-primary"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center">
+                    <Avatar className="w-10 h-10 border-2 border-primary">
+                      <AvatarImage src={selectedStaff.photo_url} alt={selectedStaff.name} />
+                      <AvatarFallback className="bg-primary/10">
                         <User className="w-5 h-5 text-primary" />
-                      </div>
-                    )}
+                      </AvatarFallback>
+                    </Avatar>
                   </div>
                   
                   {/* Staff Details */}

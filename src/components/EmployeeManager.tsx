@@ -37,14 +37,15 @@ const EmployeeManager = () => {
     name: '',
     position: '',
     work_area: '',
-    division: ''
+    division: '',
+    photo_url: ''
   });
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string>('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
   const [batchFile, setBatchFile] = useState<File | null>(null);
   const [batchLoading, setBatchLoading] = useState(false);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     fetchEmployees();
@@ -261,11 +262,12 @@ const EmployeeManager = () => {
       name: '',
       position: '',
       work_area: '',
-      division: ''
+      division: '',
+      photo_url: ''
     });
     setEditingEmployee(null);
     setPhotoFile(null);
-    setPhotoPreview(null);
+    setPhotoPreview('');
   };
 
   const openDialog = (employee?: StaffUser) => {
@@ -276,9 +278,10 @@ const EmployeeManager = () => {
         name: employee.name,
         position: employee.position,
         work_area: employee.work_area,
-        division: employee.division || ''
+        division: employee.division || '',
+        photo_url: employee.photo_url || ''
       });
-      setPhotoPreview(employee.photo_url || null);
+      setPhotoPreview(employee.photo_url || '');
     } else {
       resetForm();
     }
