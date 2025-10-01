@@ -149,9 +149,26 @@ const AttendanceForm = () => {
     
     const hours = localTime.getHours().toString().padStart(2, '0');
     const minutes = localTime.getMinutes().toString().padStart(2, '0');
-    const seconds = localTime.getSeconds().toString().padStart(2, '0');
     
-    return `${hours}:${minutes}:${seconds} ${tz}`;
+    return `${hours}:${minutes} ${tz}`;
+  };
+
+  const getTimeForTimezone = (date: Date, tz: string) => {
+    const timeZoneOffsets = {
+      'WIB': 7,   // UTC+7
+      'WITA': 8,  // UTC+8  
+      'WIT': 9    // UTC+9
+    };
+    
+    const offset = timeZoneOffsets[tz as keyof typeof timeZoneOffsets] || 7;
+    const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+    const localTime = new Date(utc + (offset * 3600000));
+    
+    return {
+      hours: localTime.getHours(),
+      minutes: localTime.getMinutes(),
+      seconds: localTime.getSeconds()
+    };
   };
 
   const updateTimezone = async (newTimezone: string) => {
@@ -669,6 +686,45 @@ const AttendanceForm = () => {
                 })}
               </div>
               <div className="flex items-center justify-center gap-3">
+                {/* Analog Clock */}
+                <div className="relative w-10 h-10 rounded-full border-2 border-primary bg-card shadow-sm">
+                  {/* Clock face dots */}
+                  <div className="absolute top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full" />
+                  <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full" />
+                  <div className="absolute top-1/2 left-0.5 -translate-y-1/2 w-1 h-1 bg-primary rounded-full" />
+                  <div className="absolute top-1/2 right-0.5 -translate-y-1/2 w-1 h-1 bg-primary rounded-full" />
+                  
+                  {/* Center dot */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-primary rounded-full z-10" />
+                  
+                  {/* Hour hand */}
+                  <div 
+                    className="absolute top-1/2 left-1/2 w-0.5 bg-primary rounded-full origin-bottom transition-transform duration-1000"
+                    style={{ 
+                      height: '35%',
+                      transform: `translate(-50%, -100%) rotate(${((getTimeForTimezone(currentDateTime, timezone).hours % 12) * 30) + (getTimeForTimezone(currentDateTime, timezone).minutes * 0.5)}deg)`
+                    }}
+                  />
+                  
+                  {/* Minute hand */}
+                  <div 
+                    className="absolute top-1/2 left-1/2 w-0.5 bg-primary rounded-full origin-bottom transition-transform duration-1000"
+                    style={{ 
+                      height: '45%',
+                      transform: `translate(-50%, -100%) rotate(${getTimeForTimezone(currentDateTime, timezone).minutes * 6}deg)`
+                    }}
+                  />
+                  
+                  {/* Second hand */}
+                  <div 
+                    className="absolute top-1/2 left-1/2 w-px bg-destructive rounded-full origin-bottom transition-transform duration-1000"
+                    style={{ 
+                      height: '45%',
+                      transform: `translate(-50%, -100%) rotate(${getTimeForTimezone(currentDateTime, timezone).seconds * 6}deg)`
+                    }}
+                  />
+                </div>
+
                 <div className="text-2xl font-bold text-primary">
                   {formatTimeWithTimezone(currentDateTime, timezone)}
                 </div>
