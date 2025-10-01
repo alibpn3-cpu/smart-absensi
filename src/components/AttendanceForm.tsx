@@ -679,12 +679,28 @@ const AttendanceForm = () => {
           <CardHeader className="pb-4">
             <div className="flex items-center justify-start gap-6 px-4">
               {/* Analog Clock - Left aligned */}
-              <div className="relative w-20 h-20 rounded-full border-2 border-primary bg-card shadow-sm flex-shrink-0">
-                {/* Clock face dots */}
-                <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
-                <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
-                <div className="absolute top-1/2 left-1 -translate-y-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
-                <div className="absolute top-1/2 right-1 -translate-y-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
+              <div className="relative w-24 h-24 rounded-full border-2 border-primary bg-card shadow-sm flex-shrink-0">
+                {/* Clock numbers 1-12 */}
+                {[...Array(12)].map((_, i) => {
+                  const hour = i + 1;
+                  const angle = (hour * 30 - 90) * (Math.PI / 180);
+                  const radius = 36;
+                  const x = radius * Math.cos(angle);
+                  const y = radius * Math.sin(angle);
+                  return (
+                    <div
+                      key={hour}
+                      className="absolute text-[8px] font-semibold text-primary"
+                      style={{
+                        left: `calc(50% + ${x}px)`,
+                        top: `calc(50% + ${y}px)`,
+                        transform: 'translate(-50%, -50%)'
+                      }}
+                    >
+                      {hour}
+                    </div>
+                  );
+                })}
                 
                 {/* Center dot */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full z-10" />
@@ -732,8 +748,13 @@ const AttendanceForm = () => {
 
                 {/* Digital Time */}
                 <div className="flex items-center gap-3">
-                  <div className="text-2xl font-bold text-primary">
-                    {formatTimeWithTimezone(currentDateTime, timezone)}
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xl font-bold text-primary">
+                      {formatTimeWithTimezone(currentDateTime, timezone).split(' ')[0]}
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {formatTimeWithTimezone(currentDateTime, timezone).split(' ')[1]}
+                    </span>
                   </div>
                   <Select value={timezone} onValueChange={updateTimezone}>
                     <SelectTrigger className="p-1 h-8 w-8 border-0 bg-transparent hover:bg-accent rounded-full">
