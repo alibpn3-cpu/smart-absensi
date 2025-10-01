@@ -675,19 +675,11 @@ const AttendanceForm = () => {
         {/* Header with Date/Time */}
         <Card className="bg-card border shadow-lg">
           <CardHeader className="text-center pb-4">
-            <div className="space-y-1">
-              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                {currentDateTime.toLocaleDateString('id-ID', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
-              </div>
-              <div className="flex items-center justify-center gap-3">
+            <div className="space-y-3">
+              {/* Row 1: Analog Clock + Date */}
+              <div className="flex items-center justify-center gap-4">
                 {/* Analog Clock */}
-                <div className="relative w-20 h-20 rounded-full border-2 border-primary bg-card shadow-sm">
+                <div className="relative w-20 h-20 rounded-full border-2 border-primary bg-card shadow-sm flex-shrink-0">
                   {/* Clock face dots */}
                   <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
                   <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
@@ -725,6 +717,20 @@ const AttendanceForm = () => {
                   />
                 </div>
 
+                {/* Date */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  {currentDateTime.toLocaleDateString('id-ID', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </div>
+              </div>
+
+              {/* Row 2: Digital Time */}
+              <div className="flex items-center justify-center gap-3">
                 <div className="text-2xl font-bold text-primary">
                   {formatTimeWithTimezone(currentDateTime, timezone)}
                 </div>
