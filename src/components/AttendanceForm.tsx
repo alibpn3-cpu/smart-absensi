@@ -674,49 +674,49 @@ const AttendanceForm = () => {
       <div className="max-w-md mx-auto space-y-6 animate-fade-in">
         {/* Header with Date/Time */}
         <Card className="bg-card border shadow-lg">
-          <CardHeader className="text-center pb-4">
-            <div className="space-y-3">
-              {/* Row 1: Analog Clock + Date */}
-              <div className="flex items-center justify-center gap-4">
-                {/* Analog Clock */}
-                <div className="relative w-20 h-20 rounded-full border-2 border-primary bg-card shadow-sm flex-shrink-0">
-                  {/* Clock face dots */}
-                  <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
-                  <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
-                  <div className="absolute top-1/2 left-1 -translate-y-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
-                  <div className="absolute top-1/2 right-1 -translate-y-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
-                  
-                  {/* Center dot */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full z-10" />
-                  
-                  {/* Hour hand */}
-                  <div 
-                    className="absolute top-1/2 left-1/2 w-1 bg-primary rounded-full origin-bottom transition-transform duration-1000"
-                    style={{ 
-                      height: '35%',
-                      transform: `translate(-50%, -100%) rotate(${((getTimeForTimezone(currentDateTime, timezone).hours % 12) * 30) + (getTimeForTimezone(currentDateTime, timezone).minutes * 0.5)}deg)`
-                    }}
-                  />
-                  
-                  {/* Minute hand */}
-                  <div 
-                    className="absolute top-1/2 left-1/2 w-1 bg-primary rounded-full origin-bottom transition-transform duration-1000"
-                    style={{ 
-                      height: '45%',
-                      transform: `translate(-50%, -100%) rotate(${getTimeForTimezone(currentDateTime, timezone).minutes * 6}deg)`
-                    }}
-                  />
-                  
-                  {/* Second hand */}
-                  <div 
-                    className="absolute top-1/2 left-1/2 w-px bg-destructive rounded-full origin-bottom transition-transform duration-1000"
-                    style={{ 
-                      height: '45%',
-                      transform: `translate(-50%, -100%) rotate(${getTimeForTimezone(currentDateTime, timezone).seconds * 6}deg)`
-                    }}
-                  />
-                </div>
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-start gap-6 px-4">
+              {/* Analog Clock - Left aligned */}
+              <div className="relative w-20 h-20 rounded-full border-2 border-primary bg-card shadow-sm flex-shrink-0">
+                {/* Clock face dots */}
+                <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
+                <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
+                <div className="absolute top-1/2 left-1 -translate-y-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
+                <div className="absolute top-1/2 right-1 -translate-y-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
+                
+                {/* Center dot */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full z-10" />
+                
+                {/* Hour hand */}
+                <div 
+                  className="absolute top-1/2 left-1/2 w-1 bg-primary rounded-full origin-bottom transition-transform duration-1000"
+                  style={{ 
+                    height: '35%',
+                    transform: `translate(-50%, -100%) rotate(${((getTimeForTimezone(currentDateTime, timezone).hours % 12) * 30) + (getTimeForTimezone(currentDateTime, timezone).minutes * 0.5)}deg)`
+                  }}
+                />
+                
+                {/* Minute hand */}
+                <div 
+                  className="absolute top-1/2 left-1/2 w-1 bg-primary rounded-full origin-bottom transition-transform duration-1000"
+                  style={{ 
+                    height: '45%',
+                    transform: `translate(-50%, -100%) rotate(${getTimeForTimezone(currentDateTime, timezone).minutes * 6}deg)`
+                  }}
+                />
+                
+                {/* Second hand */}
+                <div 
+                  className="absolute top-1/2 left-1/2 w-px bg-destructive rounded-full origin-bottom transition-transform duration-1000"
+                  style={{ 
+                    height: '45%',
+                    transform: `translate(-50%, -100%) rotate(${getTimeForTimezone(currentDateTime, timezone).seconds * 6}deg)`
+                  }}
+                />
+              </div>
 
+              {/* Date and Digital Time - Stacked vertically */}
+              <div className="flex flex-col gap-2">
                 {/* Date */}
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4" />
@@ -727,23 +727,23 @@ const AttendanceForm = () => {
                     day: 'numeric' 
                   })}
                 </div>
-              </div>
 
-              {/* Row 2: Digital Time */}
-              <div className="flex items-center justify-center gap-3">
-                <div className="text-2xl font-bold text-primary">
-                  {formatTimeWithTimezone(currentDateTime, timezone)}
+                {/* Digital Time */}
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl font-bold text-primary">
+                    {formatTimeWithTimezone(currentDateTime, timezone)}
+                  </div>
+                  <Select value={timezone} onValueChange={updateTimezone}>
+                    <SelectTrigger className="p-1 h-8 w-8 border-0 bg-transparent hover:bg-accent rounded-full">
+                      <Globe className="h-4 w-4" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="WIB">WIB (UTC+7)</SelectItem>
+                      <SelectItem value="WITA">WITA (UTC+8)</SelectItem>
+                      <SelectItem value="WIT">WIT (UTC+9)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Select value={timezone} onValueChange={updateTimezone}>
-                  <SelectTrigger className="p-1 h-8 w-8 border-0 bg-transparent hover:bg-accent rounded-full">
-                    <Globe className="h-4 w-4" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="WIB">WIB (UTC+7)</SelectItem>
-                    <SelectItem value="WITA">WITA (UTC+8)</SelectItem>
-                    <SelectItem value="WIT">WIT (UTC+9)</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
           </CardHeader>
