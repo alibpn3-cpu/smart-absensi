@@ -46,6 +46,8 @@ const EmployeeManager = () => {
   const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
   const [batchFile, setBatchFile] = useState<File | null>(null);
   const [batchLoading, setBatchLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [workAreaFilter, setWorkAreaFilter] = useState<string>('all');
 
   useEffect(() => {
     fetchEmployees();
@@ -821,6 +823,59 @@ const EmployeeManager = () => {
         </div>
       </CardHeader>
       <CardContent>
+        {/* Filters Section */}
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Search by Name */}
+            <div className="flex-1">
+              <Label htmlFor="search-name" className="text-sm mb-2 block">
+                Cari Nama Employee
+              </Label>
+              <Input
+                id="search-name"
+                type="text"
+                placeholder="Ketik nama employee..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            
+            {/* Work Area Filter */}
+            <div className="w-full sm:w-64">
+              <Label htmlFor="filter-work-area" className="text-sm mb-2 block">
+                Filter Work Area
+              </Label>
+              <Select value={workAreaFilter} onValueChange={setWorkAreaFilter}>
+                <SelectTrigger id="filter-work-area">
+                  <SelectValue placeholder="Pilih work area" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Work Area</SelectItem>
+                  {workAreas.map((workArea) => (
+                    <SelectItem key={workArea} value={workArea}>
+                      {workArea}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {/* Total Count */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Users className="h-4 w-4" />
+            <span>
+              Total Employee: <strong className="text-foreground">
+                {employees.filter(emp => {
+                  const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
+                  const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
+                  return matchesSearch && matchesWorkArea;
+                }).length}
+              </strong> dari {employees.length}
+            </span>
+          </div>
+        </div>
+
         {loading ? (
           <div className="text-center py-8">Loading employees...</div>
         ) : employees.length === 0 ? (
@@ -829,7 +884,13 @@ const EmployeeManager = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {employees.map((employee) => (
+            {employees
+              .filter(emp => {
+                const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
+                return matchesSearch && matchesWorkArea;
+              })
+              .map((employee) => (
               <div
                 key={employee.id}
                 className="border rounded-lg p-4 flex items-center gap-4 hover:bg-muted/50 hover:text-foreground transition-colors"
@@ -922,6 +983,17 @@ const EmployeeManager = () => {
                 </div>
               </div>
             ))}
+            
+            {/* No results message */}
+            {employees.filter(emp => {
+              const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
+              const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
+              return matchesSearch && matchesWorkArea;
+            }).length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                Tidak ada employee yang sesuai dengan filter.
+              </div>
+            )}
           </div>
         )}
       </CardContent>
