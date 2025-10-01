@@ -87,7 +87,7 @@ const Index = () => {
                 <img 
                   src={logoUrl} 
                   alt="Company Logo" 
-                  className="h-12 w-12 sm:h-16 sm:w-16 object-contain rounded-lg shadow-lg"
+                  className="h-12 w-12 sm:h-16 sm:w-16 object-contain bg-transparent"
                   onError={(e) => {
                     console.log('Logo failed to load');
                   }}
