@@ -679,7 +679,7 @@ const AttendanceForm = () => {
           <CardHeader className="pb-4">
             <div className="flex items-center justify-start gap-6 px-4">
               {/* Analog Clock - Left aligned */}
-              <div className="relative w-24 h-24 rounded-full border-2 border-primary bg-card shadow-sm flex-shrink-0">
+              <div className="relative w-22 h-22 rounded-full border-2 border-primary bg-card shadow-sm flex-shrink-0">
                 {/* Clock numbers 1-12 */}
                 {[...Array(12)].map((_, i) => {
                   const hour = i + 1;
@@ -690,7 +690,7 @@ const AttendanceForm = () => {
                   return (
                     <div
                       key={hour}
-                      className="absolute text-[8px] font-semibold text-primary"
+                      className="absolute text-[6px] font-semibold text-primary"
                       style={{
                         left: `calc(50% + ${x}px)`,
                         top: `calc(50% + ${y}px)`,
@@ -752,7 +752,7 @@ const AttendanceForm = () => {
                     <span className="text-xl font-bold text-primary">
                       {formatTimeWithTimezone(currentDateTime, timezone).split(' ')[0]}
                     </span>
-                    <span className="text-xs font-medium text-muted-foreground">
+                    <span className="text-xl font-medium text-muted-foreground">
                       {formatTimeWithTimezone(currentDateTime, timezone).split(' ')[1]}
                     </span>
                   </div>
