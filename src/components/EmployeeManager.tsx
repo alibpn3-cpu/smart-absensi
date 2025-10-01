@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
@@ -21,6 +21,7 @@ interface StaffUser {
   division?: string;
   is_active: boolean;
   created_at: string;
+  photo_url?: string;
 }
 
 const EmployeeManager = () => {
@@ -41,6 +42,9 @@ const EmployeeManager = () => {
   const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
   const [batchFile, setBatchFile] = useState<File | null>(null);
   const [batchLoading, setBatchLoading] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     fetchEmployees();
@@ -90,6 +94,148 @@ const EmployeeManager = () => {
     }
   };
 
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Resize to max 800px on longest side while maintaining aspect ratio
+          const maxSize = 800;
+          if (width > height && width > maxSize) {
+            height = (height / width) * maxSize;
+            width = maxSize;
+          } else if (height > maxSize) {
+            width = (width / height) * maxSize;
+            height = maxSize;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const compressedFile = new File([blob], file.name, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                });
+                resolve(compressedFile);
+              } else {
+                reject(new Error('Failed to compress image'));
+              }
+            },
+            'image/jpeg',
+            0.8 // 80% quality
+          );
+        };
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  };
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Error",
+        description: "Please select an image file",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Compress the image
+      const compressedFile = await compressImage(file);
+      
+      // Check if compressed file is still too large (> 512KB)
+      if (compressedFile.size > 512 * 1024) {
+        toast({
+          title: "Warning",
+          description: "Image is still large after compression. It may take longer to upload.",
+        });
+      }
+
+      setPhotoFile(compressedFile);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(compressedFile);
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process image",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const uploadPhoto = async (employeeUid: string): Promise<string | null> => {
+    if (!photoFile) return null;
+
+    try {
+      setUploadingPhoto(true);
+      const fileExt = photoFile.name.split('.').pop();
+      const fileName = `${employeeUid}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // Delete old photo if exists
+      if (editingEmployee?.photo_url) {
+        const oldFileName = editingEmployee.photo_url.split('/').pop();
+        if (oldFileName) {
+          await supabase.storage
+            .from('staff-photos')
+            .remove([oldFileName]);
+        }
+      }
+
+      // Upload new photo
+      const { error: uploadError } = await supabase.storage
+        .from('staff-photos')
+        .upload(filePath, photoFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('staff-photos')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload photo",
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const fetchEmployees = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -118,6 +264,8 @@ const EmployeeManager = () => {
       division: ''
     });
     setEditingEmployee(null);
+    setPhotoFile(null);
+    setPhotoPreview(null);
   };
 
   const openDialog = (employee?: StaffUser) => {
@@ -130,6 +278,7 @@ const EmployeeManager = () => {
         work_area: employee.work_area,
         division: employee.division || ''
       });
+      setPhotoPreview(employee.photo_url || null);
     } else {
       resetForm();
     }
@@ -148,15 +297,25 @@ const EmployeeManager = () => {
       return;
     }
 
-    const employeeData = {
-      uid: formData.uid,
-      name: formData.name,
-      position: formData.position,
-      work_area: formData.work_area,
-      division: formData.division || null
-    };
-
     try {
+      // Upload photo if selected
+      let photoUrl = editingEmployee?.photo_url || null;
+      if (photoFile) {
+        const uploadedUrl = await uploadPhoto(formData.uid);
+        if (uploadedUrl) {
+          photoUrl = uploadedUrl;
+        }
+      }
+
+      const employeeData = {
+        uid: formData.uid,
+        name: formData.name,
+        position: formData.position,
+        work_area: formData.work_area,
+        division: formData.division || null,
+        photo_url: photoUrl
+      };
+
       if (editingEmployee) {
         // Update existing employee
         const { error } = await supabase
@@ -176,7 +335,7 @@ const EmployeeManager = () => {
           .from('staff_users')
           .select('uid')
           .eq('uid', formData.uid)
-          .single();
+          .maybeSingle();
 
         if (existingEmployee) {
           toast({
@@ -593,10 +752,53 @@ const EmployeeManager = () => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="photo">Photo (Optional)</Label>
+                    <div className="flex items-center gap-4">
+                      {photoPreview ? (
+                        <div className="relative">
+                          <img 
+                            src={photoPreview} 
+                            alt="Preview" 
+                            className="w-16 h-16 rounded-full object-cover border-2 border-primary"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                            onClick={() => {
+                              setPhotoFile(null);
+                              setPhotoPreview(null);
+                            }}
+                          >
+                            ×
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-muted border-2 border-dashed border-muted-foreground flex items-center justify-center">
+                          <User className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <Input
+                          id="photo"
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoSelect}
+                          className="cursor-pointer"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Max 512KB (akan dikompres otomatis)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   
                   <div className="flex gap-2 pt-4">
-                    <Button type="submit" className="flex-1 gradient-primary">
-                      {editingEmployee ? 'Update' : 'Add'} Employee
+                    <Button type="submit" className="flex-1 gradient-primary" disabled={uploadingPhoto}>
+                      {uploadingPhoto ? 'Uploading...' : editingEmployee ? 'Update' : 'Add'} Employee
                     </Button>
                     <Button 
                       type="button" 
@@ -627,8 +829,23 @@ const EmployeeManager = () => {
             {employees.map((employee) => (
               <div
                 key={employee.id}
-                className="border rounded-lg p-4 flex items-center justify-between hover:bg-muted/50 hover:text-foreground transition-colors cursor-pointer"
+                className="border rounded-lg p-4 flex items-center gap-4 hover:bg-muted/50 hover:text-foreground transition-colors"
               >
+                {/* Employee Photo */}
+                <div className="flex-shrink-0">
+                  {employee.photo_url ? (
+                    <img 
+                      src={employee.photo_url} 
+                      alt={employee.name}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-primary"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center">
+                      <User className="w-6 h-6 text-primary" />
+                    </div>
+                  )}
+                </div>
+                
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <h3 className="font-semibold text-foreground">{employee.name}</h3>

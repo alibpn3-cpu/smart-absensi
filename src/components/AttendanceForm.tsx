@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Globe } from 'lucide-react';
+import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Globe, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import CameraCapture from './CameraCapture';
@@ -15,6 +15,7 @@ interface StaffUser {
   name: string;
   position: string;
   work_area: string;
+  photo_url?: string;
 }
 
 interface AttendanceRecord {
@@ -825,19 +826,39 @@ const AttendanceForm = () => {
             {/* Staff Info Display */}
             {selectedStaff && (
               <div className="bg-muted/30 p-4 rounded-lg space-y-3 border">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground block">UID:</span>
-                    <span className="font-semibold text-foreground">{selectedStaff.uid}</span>
+                <div className="flex gap-3">
+                  {/* Staff Photo */}
+                  <div className="flex-shrink-0">
+                    {selectedStaff.photo_url ? (
+                      <img 
+                        src={selectedStaff.photo_url} 
+                        alt={selectedStaff.name}
+                        className="w-10 h-10 rounded-full object-cover border-2 border-primary"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center">
+                        <User className="w-5 h-5 text-primary" />
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <span className="text-muted-foreground block">Jabatan:</span>
-                    <span className="font-semibold text-foreground">{selectedStaff.position}</span>
+                  
+                  {/* Staff Details */}
+                  <div className="flex-1 space-y-3">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-muted-foreground block">UID:</span>
+                        <span className="font-semibold text-foreground">{selectedStaff.uid}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Jabatan:</span>
+                        <span className="font-semibold text-foreground">{selectedStaff.position}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground text-sm block">Area Tugas:</span>
+                      <span className="font-semibold text-foreground">{selectedStaff.work_area}</span>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground text-sm block">Area Tugas:</span>
-                  <span className="font-semibold text-foreground">{selectedStaff.work_area}</span>
                 </div>
               </div>
             )}
