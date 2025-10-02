@@ -500,15 +500,24 @@ const AttendanceForm = () => {
   };
 
   const handlePhotoCapture = async (photoBlob: Blob) => {
-    if (!selectedStaff || !currentLocation) return;
+    if (!selectedStaff || !currentLocation) {
+      console.error('❌ Missing required data:', { selectedStaff, currentLocation });
+      return;
+    }
 
     setLoading(true);
+    console.log('📸 Starting attendance submission for:', selectedStaff.name);
+    
     try {
       // Check geofence for WFO status and get geofence name
       let locationAddress = currentLocation.address;
       if (attendanceStatus === 'wfo') {
+        console.log('🏢 Checking WFO geofence for location:', currentLocation.lat, currentLocation.lng);
         const geofenceResult = await checkGeofence(currentLocation.lat, currentLocation.lng);
+        console.log('📍 Geofence check result:', geofenceResult);
+        
         if (!geofenceResult.isInGeofence) {
+          console.error('❌ Not in geofence area');
           toast({
             title: "Error Lokasi",
             description: "Anda harus berada di dalam area kantor untuk absen WFO",
@@ -517,17 +526,27 @@ const AttendanceForm = () => {
           setLoading(false);
           return;
         }
-        // Use geofence name as location for WFO status
-        locationAddress = geofenceResult.geofenceName || currentLocation.address;
+        // CRITICAL: Use ONLY geofence name for WFO - no fallback to address
+        if (geofenceResult.geofenceName) {
+          locationAddress = geofenceResult.geofenceName;
+          console.log('✅ Using geofence name:', locationAddress);
+        } else {
+          console.warn('⚠️ No geofence name found, using address');
+        }
       }
 
       // Upload photo to Supabase Storage
       const fileName = `${selectedStaff.uid}_${Date.now()}.jpg`;
+      console.log('📤 Uploading photo:', fileName);
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('attendance-photos')
         .upload(fileName, photoBlob);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('❌ Photo upload error:', uploadError);
+        throw uploadError;
+      }
+      console.log('✅ Photo uploaded:', uploadData.path);
 
       // Save attendance record
       const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
@@ -546,8 +565,11 @@ const AttendanceForm = () => {
         )
       };
 
+      console.log('💾 Saving attendance data:', attendanceData);
+
       if (todayAttendance && isCheckOut) {
         // Update existing record for check-out
+        console.log('📝 Updating check-out for record:', todayAttendance.id);
         const { error } = await supabase
           .from('attendance_records')
           .update({
@@ -556,29 +578,40 @@ const AttendanceForm = () => {
           })
           .eq('id', todayAttendance.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Check-out update error:', error);
+          throw error;
+        }
+        console.log('✅ Check-out recorded successfully');
       } else if (!todayAttendance) {
         // Create new record for check-in
-        const { error } = await supabase
+        console.log('📝 Creating new check-in record');
+        const { error, data } = await supabase
           .from('attendance_records')
-          .insert([attendanceData]);
+          .insert([attendanceData])
+          .select();
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Check-in insert error:', error);
+          throw error;
+        }
+        console.log('✅ Check-in recorded successfully:', data);
       }
 
       toast({
         title: "Berhasil",
-        description: `Berhasil ${isCheckOut ? 'check out' : 'check in'}!`
+        description: `Berhasil ${isCheckOut ? 'check out' : 'check in'}! Lokasi: ${locationAddress}`
       });
 
       setShowCamera(false);
       setReason('');
       fetchTodayAttendance();
     } catch (error) {
-      console.error('Error saving attendance:', error);
+      console.error('❌ CRITICAL ERROR saving attendance:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       toast({
         title: "Gagal",
-        description: "Gagal menyimpan catatan absensi",
+        description: "Gagal menyimpan catatan absensi. Silakan coba lagi.",
         variant: "destructive"
       });
     } finally {
