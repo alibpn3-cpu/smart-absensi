@@ -10,6 +10,7 @@ import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Globe, User } from
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import CameraCapture from './CameraCapture';
+import { format } from 'date-fns';
 
 interface StaffUser {
   uid: string;
@@ -701,6 +702,17 @@ const AttendanceForm = () => {
   const isCheckedIn = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
   const isCompleted = todayAttendance?.check_in_time && todayAttendance?.check_out_time;
 
+  const formatCheckTime = (s: string | null | undefined) => {
+    if (!s) return '-';
+    try {
+      const d = new Date(s.replace(' ', 'T'));
+      if (isNaN(d.getTime())) return s;
+      return format(d, 'hh:mm:ss a').toLowerCase();
+    } catch {
+      return s;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-md mx-auto space-y-6 animate-fade-in">
@@ -942,20 +954,7 @@ const AttendanceForm = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Check In:</span>
                       <span className="font-medium">
-                        {(() => {
-                          try {
-                            const s = todayAttendance.check_in_time as string;
-                            if (!s) return '-';
-                            if (s.includes(' ') && s.includes('+')) {
-                              return s.split(' ')[1].split('+')[0]; // from "YYYY-MM-DD HH:mm:ss.sss+HH:MM"
-                            }
-                            if (/^\d{2}:\d{2}/.test(s)) return s; // e.g., "HH:mm WIB"
-                            const d = new Date(s.replace(' ', 'T'));
-                            return isNaN(d.getTime()) ? s : d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-                          } catch {
-                            return todayAttendance.check_in_time as string;
-                          }
-                        })()}
+                        {formatCheckTime(todayAttendance.check_in_time as string)}
                       </span>
                     </div>
                   )}
@@ -963,20 +962,7 @@ const AttendanceForm = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Check Out:</span>
                       <span className="font-medium">
-                        {(() => {
-                          try {
-                            const s = todayAttendance.check_out_time as string;
-                            if (!s) return '-';
-                            if (s.includes(' ') && s.includes('+')) {
-                              return s.split(' ')[1].split('+')[0];
-                            }
-                            if (/^\d{2}:\d{2}/.test(s)) return s;
-                            const d = new Date(s.replace(' ', 'T'));
-                            return isNaN(d.getTime()) ? s : d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-                          } catch {
-                            return todayAttendance.check_out_time as string;
-                          }
-                        })()}
+                        {formatCheckTime(todayAttendance.check_out_time as string)}
                       </span>
                     </div>
                   )}
