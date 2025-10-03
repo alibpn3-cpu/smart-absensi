@@ -181,7 +181,10 @@ const AttendanceForm = () => {
   const fetchTodayAttendance = async () => {
     if (!selectedStaff) return;
 
-    const today = new Date().toISOString().split('T')[0];
+    // Use device-local date (YYYY-MM-DD) to match records created in local timezone
+    const nowLocal = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const today = `${nowLocal.getFullYear()}-${pad(nowLocal.getMonth() + 1)}-${pad(nowLocal.getDate())}`;
     const { data, error } = await supabase
       .from('attendance_records')
       .select('*')
@@ -525,14 +528,28 @@ const AttendanceForm = () => {
       }
       console.log('✅ Photo uploaded:', uploadData.path);
 
-      // Save attendance record with formatted time string based on user's timezone
-      const currentTime = new Date();
-      const formattedTime = formatTimeWithTimezone(currentTime, timezone);
+      // Save attendance record with full local timestamp including timezone offset, e.g. 2025-10-03 10:02:40.123+08:00
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const y = now.getFullYear();
+      const M = pad(now.getMonth() + 1);
+      const d = pad(now.getDate());
+      const h = pad(now.getHours());
+      const m = pad(now.getMinutes());
+      const s = pad(now.getSeconds());
+      const ms = String(now.getMilliseconds()).padStart(3, '0');
+      const tzMin = -now.getTimezoneOffset();
+      const sign = tzMin >= 0 ? '+' : '-';
+      const offH = pad(Math.floor(Math.abs(tzMin) / 60));
+      const offM = pad(Math.abs(tzMin) % 60);
+      const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
+      const localDateStr = `${y}-${M}-${d}`;
       
       const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
       const attendanceData = {
         staff_uid: selectedStaff.uid,
         staff_name: selectedStaff.name,
+        date: localDateStr,
         location_lat: currentLocation.lat,
         location_lng: currentLocation.lng,
         location_address: locationAddress,
@@ -925,12 +942,20 @@ const AttendanceForm = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Check In:</span>
                       <span className="font-medium">
-                        {new Date(todayAttendance.check_in_time).toLocaleTimeString('id-ID', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                          hour12: true
-                        })}
+                        {(() => {
+                          try {
+                            const s = todayAttendance.check_in_time as string;
+                            if (!s) return '-';
+                            if (s.includes(' ') && s.includes('+')) {
+                              return s.split(' ')[1].split('+')[0]; // from "YYYY-MM-DD HH:mm:ss.sss+HH:MM"
+                            }
+                            if (/^\d{2}:\d{2}/.test(s)) return s; // e.g., "HH:mm WIB"
+                            const d = new Date(s.replace(' ', 'T'));
+                            return isNaN(d.getTime()) ? s : d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+                          } catch {
+                            return todayAttendance.check_in_time as string;
+                          }
+                        })()}
                       </span>
                     </div>
                   )}
@@ -938,12 +963,20 @@ const AttendanceForm = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Check Out:</span>
                       <span className="font-medium">
-                        {new Date(todayAttendance.check_out_time).toLocaleTimeString('id-ID', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                          hour12: true
-                        })}
+                        {(() => {
+                          try {
+                            const s = todayAttendance.check_out_time as string;
+                            if (!s) return '-';
+                            if (s.includes(' ') && s.includes('+')) {
+                              return s.split(' ')[1].split('+')[0];
+                            }
+                            if (/^\d{2}:\d{2}/.test(s)) return s;
+                            const d = new Date(s.replace(' ', 'T'));
+                            return isNaN(d.getTime()) ? s : d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+                          } catch {
+                            return todayAttendance.check_out_time as string;
+                          }
+                        })()}
                       </span>
                     </div>
                   )}
