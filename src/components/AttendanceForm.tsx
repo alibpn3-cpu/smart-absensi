@@ -138,14 +138,17 @@ const AttendanceForm = () => {
     }
   };
 
-  const formatTimeWithTimezone = (date: Date, tz: string) => {
+  const getTimezoneOffset = (tz: string): number => {
     const timeZoneOffsets = {
       'WIB': 7,   // UTC+7
       'WITA': 8,  // UTC+8  
       'WIT': 9    // UTC+9
     };
-    
-    const offset = timeZoneOffsets[tz as keyof typeof timeZoneOffsets] || 7;
+    return timeZoneOffsets[tz as keyof typeof timeZoneOffsets] || 7;
+  };
+
+  const formatTimeWithTimezone = (date: Date, tz: string) => {
+    const offset = getTimezoneOffset(tz);
     const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
     const localTime = new Date(utc + (offset * 3600000));
     
@@ -548,7 +551,25 @@ const AttendanceForm = () => {
       }
       console.log('✅ Photo uploaded:', uploadData.path);
 
-      // Save attendance record
+      // Save attendance record with correct timezone
+      const currentTime = new Date();
+      const offset = getTimezoneOffset(timezone);
+      const offsetHours = Math.floor(Math.abs(offset));
+      const offsetMins = Math.abs(offset) % 1 * 60;
+      const offsetSign = offset >= 0 ? '+' : '-';
+      const timezoneString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMins).padStart(2, '0')}`;
+      
+      // Format: YYYY-MM-DD HH:mm:ss.sss+HH:mm
+      const year = currentTime.getFullYear();
+      const month = String(currentTime.getMonth() + 1).padStart(2, '0');
+      const day = String(currentTime.getDate()).padStart(2, '0');
+      const hours = String(currentTime.getHours()).padStart(2, '0');
+      const minutes = String(currentTime.getMinutes()).padStart(2, '0');
+      const seconds = String(currentTime.getSeconds()).padStart(2, '0');
+      const milliseconds = String(currentTime.getMilliseconds()).padStart(3, '0');
+      
+      const timestampWithTz = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}${timezoneString}`;
+      
       const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
       const attendanceData = {
         staff_uid: selectedStaff.uid,
@@ -560,8 +581,8 @@ const AttendanceForm = () => {
         status: attendanceStatus,
         reason: reason || null,
         ...(isCheckOut 
-          ? { check_out_time: new Date().toISOString() }
-          : { check_in_time: new Date().toISOString() }
+          ? { check_out_time: timestampWithTz }
+          : { check_in_time: timestampWithTz }
         )
       };
 
@@ -573,7 +594,7 @@ const AttendanceForm = () => {
         const { error } = await supabase
           .from('attendance_records')
           .update({
-            check_out_time: new Date().toISOString(),
+            check_out_time: timestampWithTz,
             selfie_photo_url: uploadData.path
           })
           .eq('id', todayAttendance.id);
