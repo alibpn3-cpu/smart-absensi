@@ -9,31 +9,45 @@ const Index = () => {
   const navigate = useNavigate();
   const [logoUrl, setLogoUrl] = useState('');
   const [appTitle, setAppTitle] = useState('Digital Absensi');
-  const [timezone, setTimezone] = useState('WIB');
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Auto-detect timezone from device
+  const getDeviceTimezone = () => {
+    const stored = localStorage.getItem('user_timezone');
+    if (stored) return stored;
+
+    // Auto-detect based on device UTC offset
+    const offset = -new Date().getTimezoneOffset() / 60;
+    let detectedTz = 'WIB'; // Default
+    
+    if (offset >= 8.5) detectedTz = 'WIT';  // UTC+9
+    else if (offset >= 7.5) detectedTz = 'WITA'; // UTC+8
+    else detectedTz = 'WIB'; // UTC+7
+    
+    localStorage.setItem('user_timezone', detectedTz);
+    return detectedTz;
+  };
+
+  const [timezone, setTimezone] = useState(getDeviceTimezone());
+
   useEffect(() => {
-    // Fetch logo URL, app title and timezone from settings
+    // Fetch logo URL and app title from settings
     const fetchSettings = async () => {
       try {
         const { data } = await supabase
           .from('app_settings')
           .select('setting_key, setting_value')
-          .in('setting_key', ['app_logo_url', 'app_title', 'app_timezone']);
+          .in('setting_key', ['app_logo_url', 'app_title']);
         
         if (data && data.length > 0) {
           const logoSetting = data.find(item => item.setting_key === 'app_logo_url');
           const titleSetting = data.find(item => item.setting_key === 'app_title');
-          const timezoneSetting = data.find(item => item.setting_key === 'app_timezone');
           
           if (logoSetting?.setting_value) {
             setLogoUrl(logoSetting.setting_value);
           }
           if (titleSetting?.setting_value) {
             setAppTitle(titleSetting.setting_value);
-          }
-          if (timezoneSetting?.setting_value) {
-            setTimezone(timezoneSetting.setting_value);
           }
         }
       } catch (error) {

@@ -48,14 +48,30 @@ const AttendanceForm = () => {
   const [loading, setLoading] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [permissions, setPermissions] = useState<PermissionsState>({ location: false, camera: false });
-  const [timezone, setTimezone] = useState('WIB');
+  
+  // Auto-detect timezone from device
+  const getDeviceTimezone = () => {
+    const stored = localStorage.getItem('user_timezone');
+    if (stored) return stored;
+
+    const offset = -new Date().getTimezoneOffset() / 60;
+    let detectedTz = 'WIB';
+    
+    if (offset >= 8.5) detectedTz = 'WIT';
+    else if (offset >= 7.5) detectedTz = 'WITA';
+    else detectedTz = 'WIB';
+    
+    localStorage.setItem('user_timezone', detectedTz);
+    return detectedTz;
+  };
+
+  const [timezone] = useState(getDeviceTimezone());
   const [wfoLocationName, setWfoLocationName] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStaffUsers();
     checkStoredPermissions();
     loadSavedStaff();
-    fetchTimezone();
     
     // Update current time every second
     const timer = setInterval(() => {
@@ -122,21 +138,6 @@ const AttendanceForm = () => {
     }
   };
 
-  const fetchTimezone = async () => {
-    try {
-      const { data } = await supabase
-        .from('app_settings')
-        .select('setting_value')
-        .eq('setting_key', 'app_timezone')
-        .single();
-      
-      if (data?.setting_value) {
-        setTimezone(data.setting_value);
-      }
-    } catch (error) {
-      console.log('Timezone setting not found, using default WIB');
-    }
-  };
 
   const getTimezoneOffset = (tz: string): number => {
     const timeZoneOffsets = {
@@ -176,33 +177,6 @@ const AttendanceForm = () => {
     };
   };
 
-  const updateTimezone = async (newTimezone: string) => {
-    try {
-      const { error } = await supabase
-        .from('app_settings')
-        .upsert({
-          setting_key: 'app_timezone',
-          setting_value: newTimezone,
-          description: 'Application timezone for clock display'
-        }, {
-          onConflict: 'setting_key'
-        });
-
-      if (error) throw error;
-
-      setTimezone(newTimezone);
-      toast({
-        title: "Berhasil",
-        description: `Timezone berhasil diubah ke ${newTimezone}`
-      });
-    } catch (error) {
-      toast({
-        title: "Gagal",
-        description: "Gagal mengubah timezone",
-        variant: "destructive"
-      });
-    }
-  };
 
   const fetchTodayAttendance = async () => {
     if (!selectedStaff) return;
@@ -795,16 +769,6 @@ const AttendanceForm = () => {
                       {formatTimeWithTimezone(currentDateTime, timezone).split(' ')[1]}
                     </span>
                   </div>
-                  <Select value={timezone} onValueChange={updateTimezone}>
-                    <SelectTrigger className="p-1 h-8 w-8 border-0 bg-transparent hover:bg-accent rounded-full">
-                      <Globe className="h-4 w-4" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="WIB">WIB (UTC+7)</SelectItem>
-                      <SelectItem value="WITA">WITA (UTC+8)</SelectItem>
-                      <SelectItem value="WIT">WIT (UTC+9)</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
             </div>
