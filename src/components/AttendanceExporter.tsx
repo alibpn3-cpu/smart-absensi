@@ -126,27 +126,39 @@ const AttendanceExporter = () => {
     return data;
   };
 
-  const formatDateForExport = (dateString: string | null) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleString('id-ID', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+  const formatTimeForExport = (timeString: string | null) => {
+    if (!timeString) return '-';
+    try {
+      // Parse the stored time string (format: "YYYY-MM-DD HH:mm:ss.sss+HH:mm")
+      // Extract just the time portion for display
+      const parts = timeString.split(' ');
+      if (parts.length >= 2) {
+        const timePart = parts[1].split('+')[0]; // Remove timezone offset
+        return timePart;
+      }
+      return timeString;
+    } catch {
+      return timeString;
+    }
   };
 
   const calculateWorkHours = (checkIn: string | null, checkOut: string | null) => {
     if (!checkIn || !checkOut) return '-';
     
-    const start = new Date(checkIn);
-    const end = new Date(checkOut);
-    const diffMs = end.getTime() - start.getTime();
-    const diffHours = diffMs / (1000 * 60 * 60);
-    
-    return `${diffHours.toFixed(2)} jam`;
+    try {
+      // Parse the stored time strings (format: "YYYY-MM-DD HH:mm:ss.sss+HH:mm")
+      const start = new Date(checkIn.replace(' ', 'T'));
+      const end = new Date(checkOut.replace(' ', 'T'));
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return '-';
+      
+      const diffMs = end.getTime() - start.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      
+      return `${diffHours.toFixed(2)} jam`;
+    } catch {
+      return '-';
+    }
   };
 
   const exportToExcel = async () => {
@@ -211,16 +223,15 @@ const AttendanceExporter = () => {
           'Divisi': record.staff_users?.division || '-',
           'Tanggal': new Date(record.date).toLocaleDateString('id-ID'),
           'Status': record.status.toUpperCase(),
-          'Waktu Check In': formatDateForExport(record.check_in_time),
-          'Waktu Check Out': formatDateForExport(record.check_out_time),
+          'Waktu Check In': formatTimeForExport(record.check_in_time),
+          'Waktu Check Out': formatTimeForExport(record.check_out_time),
           'Total Jam Kerja': calculateWorkHours(record.check_in_time, record.check_out_time),
           'Alamat Lokasi': geofenceName || record.location_address || '-',
           'Koordinat': record.location_lat && record.location_lng 
             ? `${record.location_lat}, ${record.location_lng}` 
             : '-',
           'Foto': record.selfie_photo_url ? 'Lihat Foto' : '-',
-          'Alasan': record.reason || '-',
-          'Waktu Input': formatDateForExport(record.created_at)
+          'Alasan': record.reason || '-'
         };
       });
 
@@ -289,8 +300,7 @@ const AttendanceExporter = () => {
         { wch: 35 },  // Alamat
         { wch: 20 },  // Koordinat
         { wch: 15 },  // Foto
-        { wch: 20 },  // Alasan
-        { wch: 18 }   // Waktu Input
+        { wch: 20 }   // Alasan
       ];
       ws['!cols'] = colWidths;
 

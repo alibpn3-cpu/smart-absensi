@@ -350,12 +350,15 @@ const Dashboard = () => {
                             <p className="text-muted-foreground">Check In:</p>
                             <p className="font-medium text-foreground">
                               {record.check_in_time 
-                                ? new Date(record.check_in_time).toLocaleTimeString('id-ID', {
-                                    hour: '2-digit',
-                                    minute: '2-digit', 
-                                    second: '2-digit',
-                                    hour12: true
-                                  })
+                                ? (() => {
+                                    try {
+                                      // Parse the stored time string (format: "YYYY-MM-DD HH:mm:ss.sss+HH:mm")
+                                      const timeStr = record.check_in_time.split(' ')[1]?.split('+')[0] || record.check_in_time;
+                                      return timeStr;
+                                    } catch {
+                                      return record.check_in_time;
+                                    }
+                                  })()
                                 : '-'
                               }
                             </p>
@@ -364,12 +367,15 @@ const Dashboard = () => {
                             <p className="text-muted-foreground">Check Out:</p>
                             <p className="font-medium text-foreground">
                               {record.check_out_time 
-                                ? new Date(record.check_out_time).toLocaleTimeString('id-ID', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    second: '2-digit', 
-                                    hour12: true
-                                  })
+                                ? (() => {
+                                    try {
+                                      // Parse the stored time string (format: "YYYY-MM-DD HH:mm:ss.sss+HH:mm")
+                                      const timeStr = record.check_out_time.split(' ')[1]?.split('+')[0] || record.check_out_time;
+                                      return timeStr;
+                                    } catch {
+                                      return record.check_out_time;
+                                    }
+                                  })()
                                 : '-'
                               }
                             </p>
