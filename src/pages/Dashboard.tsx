@@ -16,7 +16,8 @@ import {
   Eye,
   UserPlus,
   Settings,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Cake
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -27,6 +28,7 @@ import EmployeeManager from '../components/EmployeeManager';
 import AdminManager from '../components/AdminManager';
 import AttendanceExporter from '../components/AttendanceExporter';
 import AppSettings from '../components/AppSettings';
+import BirthdayImporter from '../components/BirthdayImporter';
 
 interface AttendanceRecord {
   id: string;
@@ -253,7 +255,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 bg-muted h-auto p-1">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-7 gap-1 bg-muted h-auto p-1">
             <TabsTrigger value="attendance" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Attendance</span>
               <span className="sm:hidden">Absen</span>
@@ -262,6 +264,11 @@ const Dashboard = () => {
               <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Employees</span>
               <span className="sm:hidden">Staff</span>
+            </TabsTrigger>
+            <TabsTrigger value="birthdays" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+              <Cake className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Birthdays</span>
+              <span className="sm:hidden">Ultah</span>
             </TabsTrigger>
             <TabsTrigger value="admins" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
@@ -435,6 +442,10 @@ const Dashboard = () => {
 
           <TabsContent value="employees">
             <EmployeeManager />
+          </TabsContent>
+
+          <TabsContent value="birthdays">
+            <BirthdayImporter />
           </TabsContent>
 
           <TabsContent value="admins">
