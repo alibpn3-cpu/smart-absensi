@@ -81,18 +81,17 @@ const BirthdayCard = () => {
           </div>
 
           {/* Birthday Message */}
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-pink-700 dark:text-pink-300 mb-1">
+          <div className="flex-1 text-center">
+            <p className="text-sm font-semibold text-pink-700 dark:text-pink-300 mb-2">
               {isToday ? '🎉 Selamat Ulang Tahun! 🎉' : '🎂 Ulang Tahun Minggu Ini'}
             </p>
-            <div className="flex flex-wrap gap-1">
-              {upcomingBirthdays.map((birthday, index) => (
+            <div className="flex flex-col gap-1">
+              {upcomingBirthdays.map((birthday) => (
                 <span
                   key={birthday.id}
                   className="text-sm font-bold text-pink-600 dark:text-pink-400"
                 >
                   {birthday.nama} ({birthday.lokasi})
-                  {index < upcomingBirthdays.length - 1 && ','}
                 </span>
               ))}
             </div>
