@@ -121,6 +121,33 @@ export type Database = {
           },
         ]
       }
+      birthdays: {
+        Row: {
+          created_at: string
+          id: string
+          level: string | null
+          lokasi: string | null
+          nama: string
+          tanggal: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          level?: string | null
+          lokasi?: string | null
+          nama: string
+          tanggal: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          level?: string | null
+          lokasi?: string | null
+          nama?: string
+          tanggal?: string
+        }
+        Relationships: []
+      }
       geofence_areas: {
         Row: {
           center_lat: number | null

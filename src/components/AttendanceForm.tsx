@@ -10,7 +10,9 @@ import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Globe, User } from
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import CameraCapture from './CameraCapture';
+import BirthdayCard from './BirthdayCard';
 import { format } from 'date-fns';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface StaffUser {
   uid: string;
@@ -49,6 +51,9 @@ const AttendanceForm = () => {
   const [loading, setLoading] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [permissions, setPermissions] = useState<PermissionsState>({ location: false, camera: false });
+  const [showCheckoutReasonDialog, setShowCheckoutReasonDialog] = useState(false);
+  const [checkoutReason, setCheckoutReason] = useState('');
+  const [pendingCheckoutLocation, setPendingCheckoutLocation] = useState<{ lat: number; lng: number; address: string; coordinates: string } | null>(null);
   
   // Auto-detect timezone from device
   const getDeviceTimezone = () => {
@@ -492,27 +497,37 @@ const AttendanceForm = () => {
     try {
       // Check geofence for WFO status and get geofence name
       let locationAddress = currentLocation.address;
+      const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
+      
       if (attendanceStatus === 'wfo') {
         console.log('🏢 Checking WFO geofence for location:', currentLocation.lat, currentLocation.lng);
         const geofenceResult = await checkGeofence(currentLocation.lat, currentLocation.lng);
         console.log('📍 Geofence check result:', geofenceResult);
         
-        if (!geofenceResult.isInGeofence) {
-          console.error('❌ Not in geofence area');
+        // For CHECK-IN: Must be inside geofence
+        if (!isCheckOut && !geofenceResult.isInGeofence) {
+          console.error('❌ Not in geofence area for check-in');
           toast({
             title: "Error Lokasi",
-            description: "Anda harus berada di dalam area kantor untuk absen WFO",
+            description: "Anda harus berada di dalam area kantor untuk check in WFO",
             variant: "destructive"
           });
           setLoading(false);
           return;
         }
-        // CRITICAL: Use ONLY geofence name for WFO - no fallback to address
-        if (geofenceResult.geofenceName) {
-          locationAddress = geofenceResult.geofenceName;
-          console.log('✅ Using geofence name:', locationAddress);
+        
+        // For CHECK-OUT: If outside geofence, use the stored reason from dialog
+        if (isCheckOut && !geofenceResult.isInGeofence) {
+          console.log('📝 Checkout outside geofence, using reason:', checkoutReason);
+          // Use the reason provided in the dialog
         } else {
-          console.warn('⚠️ No geofence name found, using address');
+          // Inside geofence, use geofence name
+          if (geofenceResult.geofenceName) {
+            locationAddress = geofenceResult.geofenceName;
+            console.log('✅ Using geofence name:', locationAddress);
+          } else {
+            console.warn('⚠️ No geofence name found, using address');
+          }
         }
       }
 
@@ -546,7 +561,9 @@ const AttendanceForm = () => {
       const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
       const localDateStr = `${y}-${M}-${d}`;
       
-      const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
+      // Use the checkout reason if it was set (for WFO checkout outside geofence)
+      const finalReason = checkoutReason || reason || null;
+      
       const attendanceData = {
         staff_uid: selectedStaff.uid,
         staff_name: selectedStaff.name,
@@ -556,7 +573,7 @@ const AttendanceForm = () => {
         location_address: locationAddress,
         selfie_photo_url: uploadData.path,
         status: attendanceStatus,
-        reason: reason || null,
+        reason: finalReason,
         ...(isCheckOut 
           ? { check_out_time: formattedTime }
           : { check_in_time: formattedTime }
@@ -603,6 +620,8 @@ const AttendanceForm = () => {
 
       setShowCamera(false);
       setReason('');
+      setCheckoutReason('');
+      setPendingCheckoutLocation(null);
       fetchTodayAttendance();
     } catch (error) {
       console.error('❌ CRITICAL ERROR saving attendance:', error);
@@ -629,6 +648,22 @@ const AttendanceForm = () => {
 
     try {
       const location = await requestLocationPermission();
+      
+      // Check if this is WFO checkout and if we're outside geofence
+      const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
+      
+      if (attendanceStatus === 'wfo' && isCheckOut) {
+        const geofenceResult = await checkGeofence(location.lat, location.lng);
+        
+        if (!geofenceResult.isInGeofence) {
+          // Outside geofence for WFO checkout - show reason dialog
+          setPendingCheckoutLocation(location);
+          setShowCheckoutReasonDialog(true);
+          return;
+        }
+      }
+      
+      // Normal flow - inside geofence or not WFO checkout
       setCurrentLocation(location);
       setShowCamera(true);
     } catch (error) {
@@ -638,6 +673,21 @@ const AttendanceForm = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const handleCheckoutReasonSubmit = () => {
+    if (!checkoutReason.trim()) {
+      toast({
+        title: "Alasan Diperlukan",
+        description: "Silakan masukkan alasan checkout WFO di luar kantor",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setShowCheckoutReasonDialog(false);
+    setCurrentLocation(pendingCheckoutLocation);
+    setShowCamera(true);
   };
 
   // Clear app cache/cookies and SW, then reload
@@ -716,6 +766,9 @@ const AttendanceForm = () => {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-md mx-auto space-y-6 animate-fade-in">
+        {/* Birthday Card - Shows only when there are birthdays today */}
+        <BirthdayCard />
+        
         {/* Header with Date/Time */}
         <Card className="bg-card border shadow-lg">
           <CardHeader className="pb-4">
@@ -881,14 +934,15 @@ const AttendanceForm = () => {
             {selectedStaff && (
               <div className="bg-muted/30 p-4 rounded-lg space-y-3 border">
                 <div className="flex gap-3">
-                  {/* Staff Photo */}
+                  {/* Staff Photo - Box Frame */}
                   <div className="flex-shrink-0">
-                    <Avatar className="w-10 h-10 border-2 border-primary">
-                      <AvatarImage src={selectedStaff.photo_url} alt={selectedStaff.name} />
-                      <AvatarFallback className="bg-primary/10">
+                    <div className="w-10 h-10 border-2 border-primary rounded overflow-hidden bg-primary/10 flex items-center justify-center">
+                      {selectedStaff.photo_url ? (
+                        <img src={selectedStaff.photo_url} alt={selectedStaff.name} className="w-full h-full object-cover" />
+                      ) : (
                         <User className="w-5 h-5 text-primary" />
-                      </AvatarFallback>
-                    </Avatar>
+                      )}
+                    </div>
                   </div>
                   
                   {/* Staff Details */}
@@ -1019,6 +1073,39 @@ const AttendanceForm = () => {
             Update (Hapus Cache)
           </Button>
         </div>
+
+        {/* Checkout Reason Dialog - WFO outside geofence */}
+        <AlertDialog open={showCheckoutReasonDialog} onOpenChange={setShowCheckoutReasonDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Checkout WFO di Luar Area Kantor</AlertDialogTitle>
+              <AlertDialogDescription>
+                Anda berada di luar area geofence kantor. Silakan masukkan alasan checkout WFO di luar kantor.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-2">
+              <Textarea
+                placeholder="Masukkan alasan checkout di luar kantor..."
+                value={checkoutReason}
+                onChange={(e) => setCheckoutReason(e.target.value)}
+                rows={4}
+                className="w-full"
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => {
+                setShowCheckoutReasonDialog(false);
+                setCheckoutReason('');
+                setPendingCheckoutLocation(null);
+              }}>
+                Batal
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleCheckoutReasonSubmit}>
+                Lanjutkan
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Camera Modal */}
         {showCamera && (

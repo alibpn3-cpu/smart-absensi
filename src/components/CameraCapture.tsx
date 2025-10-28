@@ -181,7 +181,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose, loadi
 
           {/* Camera View */}
           <div className="relative mb-4">
-            <div className="relative w-full aspect-square rounded-full overflow-hidden border-4 border-primary bg-black">
+            <div className="relative w-full aspect-square rounded-lg overflow-hidden border-4 border-primary bg-black">
               <video
                 ref={videoRef}
                 autoPlay
