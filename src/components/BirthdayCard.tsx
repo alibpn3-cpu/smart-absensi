@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
 import { Cake } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Birthday {
   id: string;
@@ -17,23 +17,25 @@ const BirthdayCard = () => {
   }, []);
 
   const fetchTodayBirthdays = async () => {
-    const now = new Date();
-    const day = now.getDate().toString().padStart(2, '0');
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const todayFormat = `${day}/${month}`;
+    try {
+      const now = new Date();
+      const todayDate = now.getDate().toString().padStart(2, '0');
+      const todayMonth = (now.getMonth() + 1).toString().padStart(2, '0');
+      const todayDDMM = `${todayDate}/${todayMonth}`;
 
-    const { data, error } = await supabase
-      .from('birthdays')
-      .select('*');
+      const { data, error } = await supabase
+        .from('birthdays')
+        .select('*');
 
-    if (error) {
+      if (error) throw error;
+
+      if (data) {
+        const birthdaysToday = data.filter((b) => b.tanggal === todayDDMM);
+        setTodayBirthdays(birthdaysToday);
+      }
+    } catch (error) {
       console.error('Error fetching birthdays:', error);
-      return;
     }
-
-    // Filter birthdays that match today's date/month
-    const matches = (data || []).filter((b: Birthday) => b.tanggal === todayFormat);
-    setTodayBirthdays(matches);
   };
 
   if (todayBirthdays.length === 0) {
@@ -46,21 +48,24 @@ const BirthdayCard = () => {
         <div className="flex items-center gap-3">
           {/* Birthday Cake Icon */}
           <div className="flex-shrink-0">
-            <div className="w-16 h-16 flex items-center justify-center bg-pink-100 dark:bg-pink-900/30 rounded-lg animate-pulse">
-              <Cake className="w-10 h-10 text-pink-500 dark:text-pink-400" />
+            <div className="w-12 h-12 flex items-center justify-center bg-pink-100 dark:bg-pink-900/30 rounded-lg">
+              <Cake className="w-8 h-8 text-pink-500 dark:text-pink-400 animate-pulse" />
             </div>
           </div>
 
           {/* Birthday Message */}
           <div className="flex-1">
-            <h3 className="text-sm font-bold text-pink-700 dark:text-pink-300 mb-1">
-              🎉 Selamat Ulang Tahun! 🎂
-            </h3>
-            <div className="text-sm font-semibold text-pink-900 dark:text-pink-100 flex flex-wrap gap-1">
+            <p className="text-sm font-semibold text-pink-700 dark:text-pink-300 mb-1">
+              🎉 Selamat Ulang Tahun! 🎉
+            </p>
+            <div className="flex flex-wrap gap-1">
               {todayBirthdays.map((birthday, index) => (
-                <span key={birthday.id}>
+                <span
+                  key={birthday.id}
+                  className="text-sm font-bold text-pink-600 dark:text-pink-400"
+                >
                   {birthday.nama}
-                  {index < todayBirthdays.length - 1 && ', '}
+                  {index < todayBirthdays.length - 1 && ','}
                 </span>
               ))}
             </div>

@@ -6,13 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Globe, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import CameraCapture from './CameraCapture';
 import BirthdayCard from './BirthdayCard';
 import { format } from 'date-fns';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface StaffUser {
   uid: string;
@@ -1075,15 +1075,15 @@ const AttendanceForm = () => {
         </div>
 
         {/* Checkout Reason Dialog - WFO outside geofence */}
-        <AlertDialog open={showCheckoutReasonDialog} onOpenChange={setShowCheckoutReasonDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Checkout WFO di Luar Area Kantor</AlertDialogTitle>
-              <AlertDialogDescription>
+        <Dialog open={showCheckoutReasonDialog} onOpenChange={setShowCheckoutReasonDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Checkout WFO di Luar Area Kantor</DialogTitle>
+              <DialogDescription>
                 Anda berada di luar area geofence kantor. Silakan masukkan alasan checkout WFO di luar kantor.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="space-y-2">
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-4">
               <Textarea
                 placeholder="Masukkan alasan checkout di luar kantor..."
                 value={checkoutReason}
@@ -1092,26 +1092,30 @@ const AttendanceForm = () => {
                 className="w-full"
               />
             </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => {
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
                 setShowCheckoutReasonDialog(false);
                 setCheckoutReason('');
                 setPendingCheckoutLocation(null);
               }}>
                 Batal
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={handleCheckoutReasonSubmit}>
+              </Button>
+              <Button onClick={handleCheckoutReasonSubmit}>
                 Lanjutkan
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Camera Modal */}
         {showCamera && (
           <CameraCapture
             onCapture={handlePhotoCapture}
-            onClose={() => setShowCamera(false)}
+            onClose={() => {
+              setShowCamera(false);
+              setCheckoutReason('');
+              setPendingCheckoutLocation(null);
+            }}
             loading={loading}
           />
         )}
