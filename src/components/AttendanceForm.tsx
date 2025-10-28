@@ -764,8 +764,8 @@ const AttendanceForm = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-md mx-auto space-y-3 animate-fade-in">
+    <div className="min-h-screen bg-background p-4 pt-2">
+      <div className="max-w-md mx-auto space-y-2 animate-fade-in">
         {/* Birthday Card - Shows only when there are birthdays today */}
         <BirthdayCard />
         

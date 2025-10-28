@@ -93,8 +93,8 @@ const Index = () => {
       </div>
 
       {/* Header */}
-      <div className="relative z-10 flex flex-col items-center text-center p-4 sm:p-6 space-y-6">
-        <div className="flex flex-col items-center space-y-4">
+      <div className="relative z-10 flex flex-col items-center text-center p-4 sm:p-6 pb-2 space-y-2">
+        <div className="flex flex-col items-center space-y-2">
           <div className="flex items-center justify-between w-full max-w-md gap-3">
             <div className="flex items-center gap-3 flex-1 justify-center">
               {logoUrl && (
@@ -128,7 +128,7 @@ const Index = () => {
 
 
       {/* Main Attendance Form */}
-      <div className="relative z-10 flex items-center justify-center px-4 py-8">
+      <div className="relative z-10 flex items-center justify-center px-4 pt-2">
         <div className="w-full max-w-md">
           <AttendanceForm />
         </div>
