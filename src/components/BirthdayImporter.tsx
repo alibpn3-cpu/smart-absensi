@@ -47,15 +47,34 @@ const BirthdayImporter = () => {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json<BirthdayData>(worksheet);
+      const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
 
-      // Validate and format data
-      const formattedData = jsonData.map((row) => ({
-        nama: row.nama || '',
-        tanggal: row.tanggal || '',
-        lokasi: row.lokasi || '',
-        level: row.level || ''
-      }));
+      const formatDDMM = (input: any) => {
+        if (input == null) return '';
+        let str = String(input).trim();
+        // Replace common separators with /
+        str = str.replace(/[.\-]/g, '/');
+        const parts = str.split('/').filter(Boolean);
+        const day = (parts[0] || '').padStart(2, '0').slice(-2);
+        const month = (parts[1] || '').padStart(2, '0').slice(-2);
+        if (!day || !month) return '';
+        return `${day}/${month}`;
+      };
+
+      // Validate and format data (case-insensitive headers)
+      const formattedData: BirthdayData[] = jsonData.map((row) => {
+        const getVal = (key: string) => {
+          const found = Object.keys(row).find(k => k.toLowerCase().trim() === key);
+          return row[found as keyof typeof row] ?? '';
+        };
+        return {
+          nama: String(getVal('nama')).trim(),
+          tanggal: formatDDMM(getVal('tanggal')),
+          lokasi: String(getVal('lokasi')).trim(),
+          level: String(getVal('level')).trim(),
+        } as BirthdayData;
+      }).filter(r => r.nama && r.tanggal);
+
 
       // Insert data to Supabase
       const { error } = await supabase
