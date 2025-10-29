@@ -1011,15 +1011,15 @@ const AttendanceForm = () => {
             </div>
             {/* Staff Info Display */}
             {selectedStaff && (
-              <div className="bg-muted/30 p-4 rounded-lg space-y-3 border">
+              <div className="bg-muted/30 p-4 rounded-lg space-y-3">
                 <div className="flex gap-3">
-                  {/* Staff Photo - Box Frame */}
+                  {/* Staff Photo - No Border */}
                   <div className="flex-shrink-0">
-                    <div className="w-10 h-10 border-2 border-primary rounded overflow-hidden bg-primary/10 flex items-center justify-center">
+                    <div className="overflow-hidden bg-muted flex items-center justify-center" style={{ width: '400px', height: '120px' }}>
                       {selectedStaff.photo_url ? (
                         <img src={selectedStaff.photo_url} alt={selectedStaff.name} className="w-full h-full object-cover" />
                       ) : (
-                        <User className="w-5 h-5 text-primary" />
+                        <User className="w-12 h-12 text-muted-foreground" />
                       )}
                     </div>
                   </div>
