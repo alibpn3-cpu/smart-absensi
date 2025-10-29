@@ -1015,7 +1015,7 @@ const AttendanceForm = () => {
                 <div className="flex gap-3">
                   {/* Staff Photo - No Border */}
                   <div className="flex-shrink-0">
-                    <div className="overflow-hidden flex items-center justify-center w-[80px] h-[50px]">
+                    <div className="overflow-hidden flex items-center justify-center w-[50px] h-[80px]">
                       {selectedStaff.photo_url ? (
                         <img src={selectedStaff.photo_url} alt={selectedStaff.name} className="w-full h-full object-cover" />
                       ) : (
