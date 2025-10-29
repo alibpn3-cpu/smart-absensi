@@ -901,11 +901,12 @@ const EmployeeManager = () => {
                     <img 
                       src={employee.photo_url} 
                       alt={employee.name}
-                      className="w-12 h-12 rounded-full object-cover border-2 border-primary"
+                      className="w-[302px] h-[75px] object-cover"
+                      style={{ width: '302px', height: '75px' }}
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center">
-                      <User className="w-6 h-6 text-primary" />
+                    <div className="w-[302px] h-[75px] bg-muted flex items-center justify-center">
+                      <User className="w-8 h-8 text-muted-foreground" />
                     </div>
                   )}
                 </div>

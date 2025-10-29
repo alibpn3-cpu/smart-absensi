@@ -153,9 +153,20 @@ const AttendanceExporter = () => {
       if (isNaN(start.getTime()) || isNaN(end.getTime())) return '-';
       
       const diffMs = end.getTime() - start.getTime();
-      const diffHours = diffMs / (1000 * 60 * 60);
       
-      return `${diffHours.toFixed(2)} jam`;
+      // Convert to hours, minutes, seconds
+      const totalSeconds = Math.floor(diffMs / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      
+      // Format output
+      const parts = [];
+      if (hours > 0) parts.push(`${hours} jam`);
+      if (minutes > 0) parts.push(`${minutes} menit`);
+      if (seconds > 0 && hours === 0) parts.push(`${seconds} detik`); // Show seconds only if less than 1 hour
+      
+      return parts.length > 0 ? parts.join(' ') : '0 detik';
     } catch {
       return '-';
     }

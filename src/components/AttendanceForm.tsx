@@ -485,6 +485,62 @@ const AttendanceForm = () => {
     }
   };
 
+  const compressThumbnail = (blob: Blob): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(blob);
+      
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement('canvas');
+        
+        // Set thumbnail size to very small for storage efficiency
+        const maxWidth = 200;
+        const maxHeight = 200;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height / width) * maxWidth;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width / height) * maxHeight;
+            height = maxHeight;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Convert to JPEG with low quality for small file size
+        canvas.toBlob(
+          (thumbnailBlob) => {
+            if (thumbnailBlob) {
+              resolve(thumbnailBlob);
+            } else {
+              reject(new Error('Failed to create thumbnail'));
+            }
+          },
+          'image/jpeg',
+          0.3 // 30% quality for very small file size
+        );
+      };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Failed to load image'));
+      };
+      
+      img.src = url;
+    });
+  };
+
   const handlePhotoCapture = async (photoBlob: Blob) => {
     if (!selectedStaff || !currentLocation) {
       console.error('❌ Missing required data:', { selectedStaff, currentLocation });
@@ -531,18 +587,28 @@ const AttendanceForm = () => {
         }
       }
 
-      // Upload photo to Supabase Storage
-      const fileName = `${selectedStaff.uid}_${Date.now()}.jpg`;
-      console.log('📤 Uploading photo:', fileName);
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('attendance-photos')
-        .upload(fileName, photoBlob);
+      // Upload photo to Supabase Storage (only for WFH and Dinas)
+      let photoPath = null;
+      if (attendanceStatus === 'wfh' || attendanceStatus === 'dinas') {
+        console.log('📸 Compressing thumbnail for WFH/Dinas...');
+        const thumbnailBlob = await compressThumbnail(photoBlob);
+        console.log(`📉 Thumbnail size: ${(thumbnailBlob.size / 1024).toFixed(2)}KB (original: ${(photoBlob.size / 1024).toFixed(2)}KB)`);
+        
+        const fileName = `${selectedStaff.uid}_${Date.now()}.jpg`;
+        console.log('📤 Uploading thumbnail:', fileName);
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('attendance-photos')
+          .upload(fileName, thumbnailBlob);
 
-      if (uploadError) {
-        console.error('❌ Photo upload error:', uploadError);
-        throw uploadError;
+        if (uploadError) {
+          console.error('❌ Photo upload error:', uploadError);
+          throw uploadError;
+        }
+        photoPath = uploadData.path;
+        console.log('✅ Thumbnail uploaded:', photoPath);
+      } else {
+        console.log('🏢 WFO mode: Skipping photo upload');
       }
-      console.log('✅ Photo uploaded:', uploadData.path);
 
       // Save attendance record with full local timestamp including timezone offset, e.g. 2025-10-03 10:02:40.123+08:00
       const now = new Date();
@@ -571,7 +637,7 @@ const AttendanceForm = () => {
         location_lat: currentLocation.lat,
         location_lng: currentLocation.lng,
         location_address: locationAddress,
-        selfie_photo_url: uploadData.path,
+        selfie_photo_url: photoPath,
         status: attendanceStatus,
         reason: finalReason,
         ...(isCheckOut 
@@ -585,12 +651,18 @@ const AttendanceForm = () => {
       if (todayAttendance && isCheckOut) {
         // Update existing record for check-out
         console.log('📝 Updating check-out for record:', todayAttendance.id);
+        const updateData: any = {
+          check_out_time: formattedTime
+        };
+        
+        // Only update photo for WFH/Dinas
+        if (photoPath) {
+          updateData.selfie_photo_url = photoPath;
+        }
+        
         const { error } = await supabase
           .from('attendance_records')
-          .update({
-            check_out_time: formattedTime,
-            selfie_photo_url: uploadData.path
-          })
+          .update(updateData)
           .eq('id', todayAttendance.id);
 
         if (error) {
@@ -652,20 +724,27 @@ const AttendanceForm = () => {
       // Check if this is WFO checkout and if we're outside geofence
       const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
       
-      if (attendanceStatus === 'wfo' && isCheckOut) {
-        const geofenceResult = await checkGeofence(location.lat, location.lng);
-        
-        if (!geofenceResult.isInGeofence) {
-          // Outside geofence for WFO checkout - show reason dialog
-          setPendingCheckoutLocation(location);
-          setShowCheckoutReasonDialog(true);
-          return;
+      if (attendanceStatus === 'wfo') {
+        // WFO mode: No selfie needed, just location
+        if (isCheckOut) {
+          const geofenceResult = await checkGeofence(location.lat, location.lng);
+          
+          if (!geofenceResult.isInGeofence) {
+            // Outside geofence for WFO checkout - show reason dialog
+            setPendingCheckoutLocation(location);
+            setShowCheckoutReasonDialog(true);
+            return;
+          }
         }
+        
+        // WFO: Process without camera
+        setCurrentLocation(location);
+        handlePhotoCapture(new Blob()); // Pass empty blob for WFO
+      } else {
+        // WFH/Dinas: Normal flow with camera for thumbnail
+        setCurrentLocation(location);
+        setShowCamera(true);
       }
-      
-      // Normal flow - inside geofence or not WFO checkout
-      setCurrentLocation(location);
-      setShowCamera(true);
     } catch (error) {
       toast({
         title: "Error Lokasi", 
