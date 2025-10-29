@@ -893,7 +893,7 @@ const EmployeeManager = () => {
               .map((employee) => (
               <div
                 key={employee.id}
-                className="border rounded-lg p-4 flex items-center gap-4 hover:bg-muted/50 hover:text-foreground transition-colors"
+                className="rounded-lg p-4 flex items-center gap-4 hover:bg-muted/50 transition-colors"
               >
                 {/* Employee Photo */}
                 <div className="flex-shrink-0">
@@ -901,12 +901,12 @@ const EmployeeManager = () => {
                     <img 
                       src={employee.photo_url} 
                       alt={employee.name}
-                      className="w-[302px] h-[75px] object-cover"
-                      style={{ width: '302px', height: '75px' }}
+                      className="object-cover"
+                      style={{ width: '400px', height: '120px' }}
                     />
                   ) : (
-                    <div className="w-[302px] h-[75px] bg-muted flex items-center justify-center">
-                      <User className="w-8 h-8 text-muted-foreground" />
+                    <div className="bg-muted flex items-center justify-center" style={{ width: '400px', height: '120px' }}>
+                      <User className="w-12 h-12 text-muted-foreground" />
                     </div>
                   )}
                 </div>
