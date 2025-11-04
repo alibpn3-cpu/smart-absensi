@@ -27,9 +27,12 @@ interface AttendanceRecord {
   check_in_time: string | null;
   check_out_time: string | null;
   status: 'wfo' | 'wfh' | 'dinas';
-  location_address: string | null;
-  location_lat: number | null;
-  location_lng: number | null;
+  checkin_location_address: string | null;
+  checkin_location_lat: number | null;
+  checkin_location_lng: number | null;
+  checkout_location_address: string | null;
+  checkout_location_lat: number | null;
+  checkout_location_lng: number | null;
 }
 
 interface PermissionsState {
@@ -634,15 +637,22 @@ const AttendanceForm = () => {
         staff_uid: selectedStaff.uid,
         staff_name: selectedStaff.name,
         date: localDateStr,
-        location_lat: currentLocation.lat,
-        location_lng: currentLocation.lng,
-        location_address: locationAddress,
         selfie_photo_url: photoPath,
         status: attendanceStatus,
         reason: finalReason,
         ...(isCheckOut 
-          ? { check_out_time: formattedTime }
-          : { check_in_time: formattedTime }
+          ? { 
+              check_out_time: formattedTime,
+              checkout_location_lat: currentLocation.lat,
+              checkout_location_lng: currentLocation.lng,
+              checkout_location_address: locationAddress
+            }
+          : { 
+              check_in_time: formattedTime,
+              checkin_location_lat: currentLocation.lat,
+              checkin_location_lng: currentLocation.lng,
+              checkin_location_address: locationAddress
+            }
         )
       };
 
@@ -799,14 +809,14 @@ const AttendanceForm = () => {
   // Compute geofence name for today attendance display (WFO)
   useEffect(() => {
     const run = async () => {
-      if (todayAttendance?.status === 'wfo' && todayAttendance.location_lat && todayAttendance.location_lng) {
+      if (todayAttendance?.status === 'wfo' && todayAttendance.checkin_location_lat && todayAttendance.checkin_location_lng) {
         const { data: geofences } = await supabase
           .from('geofence_areas')
           .select('*')
           .eq('is_active', true);
         if (geofences && geofences.length) {
-          const lat = Number(todayAttendance.location_lat);
-          const lng = Number(todayAttendance.location_lng);
+          const lat = Number(todayAttendance.checkin_location_lat);
+          const lng = Number(todayAttendance.checkin_location_lng);
           for (const g of geofences as any[]) {
             if (g.center_lat && g.center_lng && g.radius) {
               const d = calculateDistance(
@@ -1099,27 +1109,52 @@ const AttendanceForm = () => {
                       </span>
                     </div>
                   )}
-                  {todayAttendance.location_address && (
+                  {todayAttendance.checkin_location_address && (
                     <div>
-                      <span className="text-muted-foreground block">Lokasi:</span>
+                      <span className="text-muted-foreground block">Lokasi Check In:</span>
                       <span className="font-medium text-xs mb-2 block">
-                        {todayAttendance.status === 'wfo' && wfoLocationName ? wfoLocationName : (todayAttendance.location_address || '-')}
+                        {todayAttendance.status === 'wfo' && wfoLocationName ? wfoLocationName : (todayAttendance.checkin_location_address || '-')}
                       </span>
                       <span className="text-muted-foreground block text-xs">Koordinat:</span>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
-                          📍 {todayAttendance.location_lat}, {todayAttendance.location_lng}
+                          📍 {todayAttendance.checkin_location_lat}, {todayAttendance.checkin_location_lng}
                         </span>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => window.open(
-                            `https://www.google.com/maps?q=${todayAttendance.location_lat},${todayAttendance.location_lng}`,
+                            `https://www.google.com/maps?q=${todayAttendance.checkin_location_lat},${todayAttendance.checkin_location_lng}`,
                             '_blank'
                           )}
                           className="text-xs h-6"
                         >
-                          🗺️ Lihat di Maps
+                          🗺️ Maps
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {todayAttendance.checkout_location_address && (
+                    <div className="mt-2">
+                      <span className="text-muted-foreground block">Lokasi Check Out:</span>
+                      <span className="font-medium text-xs mb-2 block">
+                        {todayAttendance.checkout_location_address || '-'}
+                      </span>
+                      <span className="text-muted-foreground block text-xs">Koordinat:</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          📍 {todayAttendance.checkout_location_lat}, {todayAttendance.checkout_location_lng}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(
+                            `https://www.google.com/maps?q=${todayAttendance.checkout_location_lat},${todayAttendance.checkout_location_lng}`,
+                            '_blank'
+                          )}
+                          className="text-xs h-6"
+                        >
+                          🗺️ Maps
                         </Button>
                       </div>
                     </div>
@@ -1135,13 +1170,22 @@ const AttendanceForm = () => {
               className="w-full h-14 text-lg font-semibold gradient-primary border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]"
               size="lg"
             >
-              <Camera className="h-5 w-5 mr-3" />
-              {isCompleted 
-                ? "✅ Absen Hari Ini Selesai" 
-                : isCheckedIn 
-                  ? "📤 Check Out" 
-                  : "📥 Check In"
-              }
+              {loading && attendanceStatus === 'wfo' ? (
+                <>
+                  <MapPin className="h-5 w-5 mr-3 animate-pulse" />
+                  Mengambil Koordinat...
+                </>
+              ) : (
+                <>
+                  <Camera className="h-5 w-5 mr-3" />
+                  {isCompleted 
+                    ? "✅ Absen Hari Ini Selesai" 
+                    : isCheckedIn 
+                      ? "📤 Check Out" 
+                      : "📥 Check In"
+                  }
+                </>
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -1186,8 +1230,8 @@ const AttendanceForm = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Camera Modal */}
-        {showCamera && (
+        {/* Camera Modal - Only for WFH and Dinas */}
+        {showCamera && attendanceStatus !== 'wfo' && (
           <CameraCapture
             onCapture={handlePhotoCapture}
             onClose={() => {

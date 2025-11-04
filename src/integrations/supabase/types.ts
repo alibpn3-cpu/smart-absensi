@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_images: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          image_url: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order: number
+          id?: string
+          image_url: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          image_url?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       admin_accounts: {
         Row: {
           created_at: string
@@ -66,12 +93,15 @@ export type Database = {
         Row: {
           check_in_time: string | null
           check_out_time: string | null
+          checkin_location_address: string | null
+          checkin_location_lat: number | null
+          checkin_location_lng: number | null
+          checkout_location_address: string | null
+          checkout_location_lat: number | null
+          checkout_location_lng: number | null
           created_at: string
           date: string
           id: string
-          location_address: string | null
-          location_lat: number | null
-          location_lng: number | null
           reason: string | null
           selfie_photo_url: string | null
           staff_name: string
@@ -82,12 +112,15 @@ export type Database = {
         Insert: {
           check_in_time?: string | null
           check_out_time?: string | null
+          checkin_location_address?: string | null
+          checkin_location_lat?: number | null
+          checkin_location_lng?: number | null
+          checkout_location_address?: string | null
+          checkout_location_lat?: number | null
+          checkout_location_lng?: number | null
           created_at?: string
           date?: string
           id?: string
-          location_address?: string | null
-          location_lat?: number | null
-          location_lng?: number | null
           reason?: string | null
           selfie_photo_url?: string | null
           staff_name: string
@@ -98,12 +131,15 @@ export type Database = {
         Update: {
           check_in_time?: string | null
           check_out_time?: string | null
+          checkin_location_address?: string | null
+          checkin_location_lat?: number | null
+          checkin_location_lng?: number | null
+          checkout_location_address?: string | null
+          checkout_location_lat?: number | null
+          checkout_location_lng?: number | null
           created_at?: string
           date?: string
           id?: string
-          location_address?: string | null
-          location_lat?: number | null
-          location_lng?: number | null
           reason?: string | null
           selfie_photo_url?: string | null
           staff_name?: string

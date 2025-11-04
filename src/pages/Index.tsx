@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Settings, MapPin, Users, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import AttendanceForm from '../components/AttendanceForm';
+import AdPopup from '../components/AdPopup';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -85,6 +86,9 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Ad Popup */}
+      <AdPopup />
+      
       {/* Animated background elements */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-20 left-20 w-32 h-32 bg-primary/20 rounded-full blur-3xl animate-pulse"></div>

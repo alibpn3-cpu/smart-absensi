@@ -17,7 +17,8 @@ import {
   UserPlus,
   Settings,
   FileSpreadsheet,
-  Cake
+  Cake,
+  ImageIcon
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -29,6 +30,7 @@ import AdminManager from '../components/AdminManager';
 import AttendanceExporter from '../components/AttendanceExporter';
 import AppSettings from '../components/AppSettings';
 import BirthdayImporter from '../components/BirthdayImporter';
+import AdManager from '../components/AdManager';
 
 interface AttendanceRecord {
   id: string;
@@ -36,9 +38,12 @@ interface AttendanceRecord {
   staff_name: string;
   check_in_time: string | null;
   check_out_time: string | null;
-  location_address: string | null;
-  location_lat: number | null;
-  location_lng: number | null;
+  checkin_location_address: string | null;
+  checkin_location_lat: number | null;
+  checkin_location_lng: number | null;
+  checkout_location_address: string | null;
+  checkout_location_lat: number | null;
+  checkout_location_lng: number | null;
   status: 'wfo' | 'wfh' | 'dinas';
   reason: string | null;
   date: string;
@@ -290,6 +295,11 @@ const Dashboard = () => {
               <span className="hidden sm:inline">Settings</span>
               <span className="sm:hidden">Config</span>
             </TabsTrigger>
+            <TabsTrigger value="ads" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+              <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Ads</span>
+              <span className="sm:hidden">Iklan</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="attendance" className="space-y-4 sm:space-y-6">
@@ -389,24 +399,47 @@ const Dashboard = () => {
                           </div>
                         </div>
 
-                        {record.location_address && (
+                        {record.checkin_location_address && (
                           <div>
-                            <p className="text-sm text-muted-foreground">Lokasi:</p>
-                            <p className="text-sm text-foreground mb-2">{record.location_address}</p>
+                            <p className="text-sm text-muted-foreground">Lokasi Check In:</p>
+                            <p className="text-sm text-foreground mb-2">{record.checkin_location_address}</p>
                             <div className="flex items-center justify-between">
                               <p className="text-xs text-muted-foreground">
-                                📍 Koordinat: {record.location_lat}, {record.location_lng}
+                                📍 Koordinat: {record.checkin_location_lat}, {record.checkin_location_lng}
                               </p>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => window.open(
-                                  `https://www.google.com/maps?q=${record.location_lat},${record.location_lng}`,
+                                  `https://www.google.com/maps?q=${record.checkin_location_lat},${record.checkin_location_lng}`,
                                   '_blank'
                                 )}
                                 className="text-xs h-6"
                               >
-                                🗺️ Lihat di Maps
+                                🗺️ Maps
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {record.checkout_location_address && (
+                          <div className="mt-2">
+                            <p className="text-sm text-muted-foreground">Lokasi Check Out:</p>
+                            <p className="text-sm text-foreground mb-2">{record.checkout_location_address}</p>
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-muted-foreground">
+                                📍 Koordinat: {record.checkout_location_lat}, {record.checkout_location_lng}
+                              </p>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(
+                                  `https://www.google.com/maps?q=${record.checkout_location_lat},${record.checkout_location_lng}`,
+                                  '_blank'
+                                )}
+                                className="text-xs h-6"
+                              >
+                                🗺️ Maps
                               </Button>
                             </div>
                           </div>
@@ -469,6 +502,10 @@ const Dashboard = () => {
 
           <TabsContent value="settings">
             <AppSettings />
+          </TabsContent>
+
+          <TabsContent value="ads">
+            <AdManager />
           </TabsContent>
         </Tabs>
       </div>

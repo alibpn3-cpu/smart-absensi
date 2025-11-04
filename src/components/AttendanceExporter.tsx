@@ -222,9 +222,14 @@ const AttendanceExporter = () => {
       };
 
       const excelData = attendanceData.map((record: any, index: number) => {
-        const geofenceName = record.status === 'wfo' && record.location_lat && record.location_lng
-          ? findGeofenceName(Number(record.location_lat), Number(record.location_lng))
+        const geofenceName = record.status === 'wfo' && record.checkin_location_lat && record.checkin_location_lng
+          ? findGeofenceName(Number(record.checkin_location_lat), Number(record.checkin_location_lng))
           : null;
+        
+        const checkoutGeofenceName = record.status === 'wfo' && record.checkout_location_lat && record.checkout_location_lng
+          ? findGeofenceName(Number(record.checkout_location_lat), Number(record.checkout_location_lng))
+          : null;
+          
         return {
           'No': index + 1,
           'UID Karyawan': record.staff_uid,
@@ -237,9 +242,13 @@ const AttendanceExporter = () => {
           'Waktu Check In': formatTimeForExport(record.check_in_time),
           'Waktu Check Out': formatTimeForExport(record.check_out_time),
           'Total Jam Kerja': calculateWorkHours(record.check_in_time, record.check_out_time),
-          'Alamat Lokasi': geofenceName || record.location_address || '-',
-          'Koordinat': record.location_lat && record.location_lng 
-            ? `${record.location_lat}, ${record.location_lng}` 
+          'Alamat Lokasi Check In': geofenceName || record.checkin_location_address || '-',
+          'Koordinat Check In': record.checkin_location_lat && record.checkin_location_lng 
+            ? `${record.checkin_location_lat}, ${record.checkin_location_lng}` 
+            : '-',
+          'Alamat Lokasi Check Out': checkoutGeofenceName || record.checkout_location_address || '-',
+          'Koordinat Check Out': record.checkout_location_lat && record.checkout_location_lng 
+            ? `${record.checkout_location_lat}, ${record.checkout_location_lng}` 
             : '-',
           'Foto': record.selfie_photo_url ? 'Lihat Foto' : '-',
           'Alasan': record.reason || '-'
@@ -272,21 +281,32 @@ const AttendanceExporter = () => {
       attendanceData.forEach((record: any, index: number) => {
         const rowIndex = index + 2; // +2 because row 1 is header and Excel is 1-indexed
         
-        // Add coordinate hyperlink
-        if (record.location_lat && record.location_lng) {
-          const coordCell = `M${rowIndex}`; // Column M is Koordinat
-          const mapsUrl = `https://www.google.com/maps?q=${record.location_lat},${record.location_lng}`;
+        // Add check-in coordinate hyperlink
+        if (record.checkin_location_lat && record.checkin_location_lng) {
+          const coordCell = `M${rowIndex}`; // Column M is Koordinat Check In
+          const mapsUrl = `https://www.google.com/maps?q=${record.checkin_location_lat},${record.checkin_location_lng}`;
           ws[coordCell] = {
             t: 's',
-            v: `${record.location_lat}, ${record.location_lng}`,
-            l: { Target: mapsUrl, Tooltip: 'Buka lokasi di Google Maps' }
+            v: `${record.checkin_location_lat}, ${record.checkin_location_lng}`,
+            l: { Target: mapsUrl, Tooltip: 'Buka lokasi check-in di Google Maps' }
+          };
+        }
+        
+        // Add check-out coordinate hyperlink
+        if (record.checkout_location_lat && record.checkout_location_lng) {
+          const coordCell = `O${rowIndex}`; // Column O is Koordinat Check Out
+          const mapsUrl = `https://www.google.com/maps?q=${record.checkout_location_lat},${record.checkout_location_lng}`;
+          ws[coordCell] = {
+            t: 's',
+            v: `${record.checkout_location_lat}, ${record.checkout_location_lng}`,
+            l: { Target: mapsUrl, Tooltip: 'Buka lokasi check-out di Google Maps' }
           };
         }
         
         // Add photo hyperlink (signed URL)
         const signedUrl = signedPhotoUrls[index];
         if (signedUrl) {
-          const photoCell = `N${rowIndex}`; // Column N is Foto
+          const photoCell = `P${rowIndex}`; // Column P is Foto
           ws[photoCell] = {
             t: 's',
             v: 'Lihat Foto',
@@ -308,8 +328,10 @@ const AttendanceExporter = () => {
         { wch: 18 },  // Check In
         { wch: 18 },  // Check Out
         { wch: 12 },  // Total Jam
-        { wch: 35 },  // Alamat
-        { wch: 20 },  // Koordinat
+        { wch: 35 },  // Alamat Check In
+        { wch: 20 },  // Koordinat Check In
+        { wch: 35 },  // Alamat Check Out
+        { wch: 20 },  // Koordinat Check Out
         { wch: 15 },  // Foto
         { wch: 20 }   // Alasan
       ];
