@@ -18,7 +18,8 @@ import {
   Settings,
   FileSpreadsheet,
   Cake,
-  ImageIcon
+  ImageIcon,
+  History
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -31,6 +32,7 @@ import AttendanceExporter from '../components/AttendanceExporter';
 import AppSettings from '../components/AppSettings';
 import BirthdayImporter from '../components/BirthdayImporter';
 import AdManager from '../components/AdManager';
+import ActivityLogViewer from '../components/ActivityLogViewer';
 import { PieChart as RePieChart, Pie, Cell } from 'recharts';
 
 interface AttendanceRecord {
@@ -310,7 +312,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-7 gap-1 bg-muted h-auto p-1">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-8 gap-1 bg-muted h-auto p-1">
             <TabsTrigger value="attendance" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Attendance</span>
               <span className="sm:hidden">Absen</span>
@@ -329,6 +331,11 @@ const Dashboard = () => {
               <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Admins</span>
               <span className="sm:hidden">Admin</span>
+            </TabsTrigger>
+            <TabsTrigger value="logs" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+              <History className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Activity Logs</span>
+              <span className="sm:hidden">Log</span>
             </TabsTrigger>
             <TabsTrigger value="export" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
@@ -533,6 +540,10 @@ const Dashboard = () => {
 
           <TabsContent value="admins">
             <AdminManager />
+          </TabsContent>
+
+          <TabsContent value="logs">
+            <ActivityLogViewer />
           </TabsContent>
 
           <TabsContent value="export">

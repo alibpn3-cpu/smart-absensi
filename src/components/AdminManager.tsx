@@ -96,6 +96,24 @@ const AdminManager = () => {
     return await bcrypt.hash(password, saltRounds);
   };
 
+  const logActivity = async (actionType: string, targetName: string, details?: any) => {
+    try {
+      const sessionData = localStorage.getItem('adminSession');
+      if (!sessionData) return;
+      
+      const session = JSON.parse(sessionData);
+      await supabase.from('admin_activity_logs').insert({
+        admin_username: session.username,
+        action_type: actionType,
+        target_type: 'admin',
+        target_name: targetName,
+        details: details || {}
+      });
+    } catch (error) {
+      console.error('Error logging activity:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -136,6 +154,8 @@ const AdminManager = () => {
 
         if (error) throw error;
         
+        await logActivity('update', formData.username, { action: 'Edit username' });
+        
         toast({
           title: "Berhasil",
           description: "Akun admin berhasil diperbarui"
@@ -167,6 +187,8 @@ const AdminManager = () => {
           }]);
 
         if (error) throw error;
+        
+        await logActivity('create', formData.username, { action: 'Create new admin' });
         
         toast({
           title: "Berhasil",
@@ -226,6 +248,8 @@ const AdminManager = () => {
 
       if (error) throw error;
 
+      await logActivity('update', editingAdmin?.username || '', { action: 'Change password' });
+
       toast({
         title: "Berhasil",
         description: "Password berhasil diperbarui"
@@ -258,6 +282,8 @@ const AdminManager = () => {
         .eq('id', admin.id);
 
       if (error) throw error;
+
+      await logActivity('delete', admin.username, { action: 'Delete admin account' });
 
       toast({
         title: "Berhasil",

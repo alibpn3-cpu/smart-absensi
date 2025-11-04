@@ -62,6 +62,36 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_activity_logs: {
+        Row: {
+          action_type: string
+          admin_username: string
+          created_at: string
+          details: Json | null
+          id: string
+          target_name: string
+          target_type: string
+        }
+        Insert: {
+          action_type: string
+          admin_username: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_name: string
+          target_type: string
+        }
+        Update: {
+          action_type?: string
+          admin_username?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_name?: string
+          target_type?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           created_at: string

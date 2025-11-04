@@ -54,6 +54,24 @@ const EmployeeManager = () => {
     fetchDropdownData();
   }, []);
 
+  const logActivity = async (actionType: string, targetName: string, details?: any) => {
+    try {
+      const sessionData = localStorage.getItem('adminSession');
+      if (!sessionData) return;
+      
+      const session = JSON.parse(sessionData);
+      await supabase.from('admin_activity_logs').insert({
+        admin_username: session.username,
+        action_type: actionType,
+        target_type: 'employee',
+        target_name: targetName,
+        details: details || {}
+      });
+    } catch (error) {
+      console.error('Error logging activity:', error);
+    }
+  };
+
   const fetchDropdownData = async () => {
     try {
       // Fetch positions
@@ -330,6 +348,8 @@ const EmployeeManager = () => {
 
         if (error) throw error;
         
+        await logActivity('update', formData.name, { uid: formData.uid, position: formData.position });
+        
         toast({
           title: "Berhasil",
           description: "Karyawan berhasil diperbarui"
@@ -357,6 +377,8 @@ const EmployeeManager = () => {
           .insert([employeeData]);
 
         if (error) throw error;
+        
+        await logActivity('create', formData.name, { uid: formData.uid, position: formData.position });
         
         toast({
           title: "Berhasil",
@@ -408,6 +430,8 @@ const EmployeeManager = () => {
         .eq('id', employee.id);
 
       if (error) throw error;
+
+      await logActivity('delete', employee.name, { uid: employee.uid });
 
       toast({
         title: "Berhasil",

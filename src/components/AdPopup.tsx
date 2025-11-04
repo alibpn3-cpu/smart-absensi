@@ -23,30 +23,40 @@ const AdPopup = () => {
   useEffect(() => {
     if (ads.length === 0 || hasShownInitial) return;
 
+    // Show first ad after 1 second
     const timer = window.setTimeout(() => {
       setIsVisible(true);
       setHasShownInitial(true);
-
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      intervalRef.current = window.setInterval(() => {
-        setIsVisible(true);
-        if (ads.length > 1) {
-          setCurrentIndex((prev) => {
-            let newIndex = prev;
-            do {
-              newIndex = Math.floor(Math.random() * ads.length);
-            } while (newIndex === prev && ads.length > 1);
-            return newIndex;
-          });
-        }
-      }, 2 * 60 * 1000); // 2 minutes
     }, 1000);
 
     return () => {
       clearTimeout(timer);
-      if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [ads, hasShownInitial]);
+
+  useEffect(() => {
+    if (!hasShownInitial || ads.length === 0) return;
+
+    // Set up interval to show ads every 2 minutes
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    
+    intervalRef.current = window.setInterval(() => {
+      setIsVisible(true);
+      if (ads.length > 1) {
+        setCurrentIndex((prev) => {
+          let newIndex = prev;
+          do {
+            newIndex = Math.floor(Math.random() * ads.length);
+          } while (newIndex === prev && ads.length > 1);
+          return newIndex;
+        });
+      }
+    }, 120000); // 2 minutes = 120000ms
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [ads.length, hasShownInitial]);
 
 
   const fetchAds = async () => {
