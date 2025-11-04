@@ -117,8 +117,7 @@ const AttendanceExporter = () => {
       if (uids.length === 0) {
         return [];
       }
-      // @ts-expect-error supabase js supports in()
-      query = query.in('staff_uid', uids as any);
+      query = query.in('staff_uid', uids);
     }
 
     const { data, error } = await query;
