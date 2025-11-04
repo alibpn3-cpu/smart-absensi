@@ -237,6 +237,10 @@ const AttendanceExporter = () => {
         const checkoutGeofenceName = record.status === 'wfo' && record.checkout_location_lat && record.checkout_location_lng
           ? findGeofenceName(Number(record.checkout_location_lat), Number(record.checkout_location_lng))
           : null;
+        
+        const checkoutLat = record.checkout_location_lat ?? (record.check_out_time ? record.checkin_location_lat : null);
+        const checkoutLng = record.checkout_location_lng ?? (record.check_out_time ? record.checkin_location_lng : null);
+        const checkoutAddress = checkoutGeofenceName || record.checkout_location_address || (record.check_out_time ? record.checkin_location_address : null);
           
         const emp = allEmployees.find((s: any) => s.uid === record.staff_uid);
         
@@ -256,9 +260,9 @@ const AttendanceExporter = () => {
           'Koordinat Check In': record.checkin_location_lat && record.checkin_location_lng 
             ? `${record.checkin_location_lat}, ${record.checkin_location_lng}` 
             : '-',
-          'Alamat Lokasi Check Out': checkoutGeofenceName || record.checkout_location_address || '-',
-          'Koordinat Check Out': record.checkout_location_lat && record.checkout_location_lng 
-            ? `${record.checkout_location_lat}, ${record.checkout_location_lng}` 
+          'Alamat Lokasi Check Out': checkoutAddress || '-',
+          'Koordinat Check Out': checkoutLat && checkoutLng 
+            ? `${checkoutLat}, ${checkoutLng}` 
             : '-',
           'Foto Check In': record.selfie_checkin_url || record.selfie_photo_url ? 'Lihat Foto' : '-',
           'Foto Check Out': record.selfie_checkout_url ? 'Lihat Foto' : '-',
@@ -322,13 +326,15 @@ const AttendanceExporter = () => {
           };
         }
         
-        // Add check-out coordinate hyperlink
-        if (record.checkout_location_lat && record.checkout_location_lng) {
+        // Add check-out coordinate hyperlink (with fallback to check-in if needed)
+        const cLat = record.checkout_location_lat ?? (record.check_out_time ? record.checkin_location_lat : null);
+        const cLng = record.checkout_location_lng ?? (record.check_out_time ? record.checkin_location_lng : null);
+        if (cLat && cLng) {
           const coordCell = `O${rowIndex}`; // Column O is Koordinat Check Out
-          const mapsUrl = `https://www.google.com/maps?q=${record.checkout_location_lat},${record.checkout_location_lng}`;
+          const mapsUrl = `https://www.google.com/maps?q=${cLat},${cLng}`;
           ws[coordCell] = {
             t: 's',
-            v: `${record.checkout_location_lat}, ${record.checkout_location_lng}`,
+            v: `${cLat}, ${cLng}`,
             l: { Target: mapsUrl, Tooltip: 'Buka lokasi check-out di Google Maps' }
           };
         }

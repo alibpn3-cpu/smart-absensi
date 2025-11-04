@@ -222,14 +222,24 @@ const Dashboard = () => {
               <CardTitle className="text-xs sm:text-sm font-medium text-foreground">Hadir Hari Ini</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-foreground">{summary.presentToday}</div>
-              <p className="text-xs text-muted-foreground">
-                {summary.totalStaff > 0 
-                  ? `${Math.round((summary.presentToday / summary.totalStaff) * 100)}% kehadiran`
-                  : '0% kehadiran'
-                }
-              </p>
+            <CardContent className="flex items-center justify-between">
+              <div>
+                <div className="text-xl sm:text-2xl font-bold text-foreground">{summary.presentToday}</div>
+                <p className="text-xs text-muted-foreground">
+                  {summary.totalStaff > 0 
+                    ? `${Math.round((summary.presentToday / summary.totalStaff) * 100)}% kehadiran`
+                    : '0% kehadiran'
+                  }
+                </p>
+              </div>
+              <div className="w-10 h-10">
+                <RePieChart width={40} height={40}>
+                  <Pie data={attendancePie} dataKey="value" innerRadius={14} outerRadius={20}>
+                    <Cell fill="hsl(var(--primary))" />
+                    <Cell fill="hsl(var(--destructive))" />
+                  </Pie>
+                </RePieChart>
+              </div>
             </CardContent>
           </Card>
 
@@ -247,7 +257,7 @@ const Dashboard = () => {
                     { name: 'Lainnya', value: Math.max(summary.presentToday - summary.wfoCount, 0) },
                   ]} dataKey="value" innerRadius={14} outerRadius={20}>
                     <Cell fill="hsl(var(--primary))" />
-                    <Cell fill="hsl(var(--muted))" />
+                    <Cell fill="hsl(var(--destructive))" />
                   </Pie>
                 </RePieChart>
               </div>
@@ -268,7 +278,7 @@ const Dashboard = () => {
                     { name: 'Lainnya', value: Math.max(summary.presentToday - summary.wfhCount, 0) },
                   ]} dataKey="value" innerRadius={14} outerRadius={20}>
                     <Cell fill="hsl(var(--primary))" />
-                    <Cell fill="hsl(var(--muted))" />
+                    <Cell fill="hsl(var(--destructive))" />
                   </Pie>
                 </RePieChart>
               </div>
@@ -289,7 +299,7 @@ const Dashboard = () => {
                     { name: 'Lainnya', value: Math.max(summary.presentToday - summary.dinasCount, 0) },
                   ]} dataKey="value" innerRadius={14} outerRadius={20}>
                     <Cell fill="hsl(var(--primary))" />
-                    <Cell fill="hsl(var(--muted))" />
+                    <Cell fill="hsl(var(--destructive))" />
                   </Pie>
                 </RePieChart>
               </div>
@@ -297,20 +307,6 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Kehadiran Pie Chart */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-title-primary">Kehadiran Hari Ini (%)</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center justify-center">
-            <RePieChart width={180} height={180}>
-              <Pie data={attendancePie} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80}>
-                <Cell fill="hsl(var(--primary))" />
-                <Cell fill="hsl(var(--muted))" />
-              </Pie>
-            </RePieChart>
-          </CardContent>
-        </Card>
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -14,54 +14,40 @@ const AdPopup = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [hasShownInitial, setHasShownInitial] = useState(false);
 
+  const intervalRef = useRef<number | null>(null);
+
   useEffect(() => {
     fetchAds();
   }, []);
 
   useEffect(() => {
-    if (ads.length > 0 && !hasShownInitial) {
-      // Show popup 1 second after page load
-      const timer = setTimeout(() => {
+    if (ads.length === 0 || hasShownInitial) return;
+
+    const timer = window.setTimeout(() => {
+      setIsVisible(true);
+      setHasShownInitial(true);
+
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = window.setInterval(() => {
         setIsVisible(true);
-        setHasShownInitial(true);
-        
-        // Start repeating timer for subsequent displays (2 minutes)
-        const repeatInterval = setInterval(() => {
-          setIsVisible(true);
-          // If multiple ads, pick random
-          if (ads.length > 1) {
-            let newIndex;
+        if (ads.length > 1) {
+          setCurrentIndex((prev) => {
+            let newIndex = prev;
             do {
               newIndex = Math.floor(Math.random() * ads.length);
-            } while (newIndex === currentIndex);
-            setCurrentIndex(newIndex);
-          }
-        }, 2 * 60 * 1000); // 2 minutes
-        
-        return () => clearInterval(repeatInterval);
-      }, 1000);
+            } while (newIndex === prev && ads.length > 1);
+            return newIndex;
+          });
+        }
+      }, 2 * 60 * 1000); // 2 minutes
+    }, 1000);
 
-      return () => clearTimeout(timer);
-    }
-  }, [ads, hasShownInitial, currentIndex]);
+    return () => {
+      clearTimeout(timer);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [ads, hasShownInitial]);
 
-  useEffect(() => {
-    if (!isVisible || ads.length <= 1) return;
-
-    // Change to next ad every 2 minutes (random selection)
-    const interval = setInterval(() => {
-      if (ads.length > 1) {
-        // Select a random index different from current
-        let newIndex;
-        do {
-          newIndex = Math.floor(Math.random() * ads.length);
-        } while (newIndex === currentIndex && ads.length > 1);
-        setCurrentIndex(newIndex);
-      }
-    }, 2 * 60 * 1000); // 2 minutes
-
-    return () => clearInterval(interval);
-  }, [isVisible, ads.length, currentIndex]);
 
   const fetchAds = async () => {
     const { data, error } = await supabase
