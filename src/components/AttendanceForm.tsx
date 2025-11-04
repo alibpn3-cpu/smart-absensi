@@ -663,13 +663,15 @@ const AttendanceForm = () => {
               check_out_time: formattedTime,
               checkout_location_lat: currentLocation.lat,
               checkout_location_lng: currentLocation.lng,
-              checkout_location_address: locationAddress
+              checkout_location_address: locationAddress,
+              selfie_checkout_url: photoPath
             }
           : { 
               check_in_time: formattedTime,
               checkin_location_lat: currentLocation.lat,
               checkin_location_lng: currentLocation.lng,
-              checkin_location_address: locationAddress
+              checkin_location_address: locationAddress,
+              selfie_checkin_url: photoPath
             }
         )
       };
@@ -680,12 +682,20 @@ const AttendanceForm = () => {
         // Update existing record for check-out
         console.log('📝 Updating check-out for record:', todayAttendance.id);
         const updateData: any = {
-          check_out_time: formattedTime
+          check_out_time: formattedTime,
+          checkout_location_lat: currentLocation.lat,
+          checkout_location_lng: currentLocation.lng,
+          checkout_location_address: locationAddress
         };
         
-        // Only update photo for WFH/Dinas
+        // Only update photo for WFH/Dinas and save to checkout column
         if (photoPath) {
-          updateData.selfie_photo_url = photoPath;
+          updateData.selfie_checkout_url = photoPath;
+        }
+        
+        // Update checkout reason if provided (for WFO outside geofence)
+        if (checkoutReason) {
+          updateData.reason = checkoutReason;
         }
         
         const { error } = await supabase

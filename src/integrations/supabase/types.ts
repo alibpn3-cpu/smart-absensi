@@ -103,6 +103,8 @@ export type Database = {
           date: string
           id: string
           reason: string | null
+          selfie_checkin_url: string | null
+          selfie_checkout_url: string | null
           selfie_photo_url: string | null
           staff_name: string
           staff_uid: string
@@ -122,6 +124,8 @@ export type Database = {
           date?: string
           id?: string
           reason?: string | null
+          selfie_checkin_url?: string | null
+          selfie_checkout_url?: string | null
           selfie_photo_url?: string | null
           staff_name: string
           staff_uid: string
@@ -141,6 +145,8 @@ export type Database = {
           date?: string
           id?: string
           reason?: string | null
+          selfie_checkin_url?: string | null
+          selfie_checkout_url?: string | null
           selfie_photo_url?: string | null
           staff_name?: string
           staff_uid?: string

@@ -182,7 +182,7 @@ const AdManager = () => {
           Manajemen Iklan Pop-up
         </CardTitle>
         <p className="text-sm text-gray-600">
-          Kelola hingga 5 gambar iklan yang akan ditampilkan sebagai pop-up. Pop-up muncul 1 detik setelah halaman dimuat dan berganti setiap 10 menit.
+          Kelola hingga 5 gambar iklan yang akan ditampilkan sebagai pop-up. Pop-up muncul 1 detik setelah halaman dimuat dan muncul kembali setiap 2 menit dengan iklan acak.
         </p>
       </CardHeader>
       <CardContent className="space-y-6">

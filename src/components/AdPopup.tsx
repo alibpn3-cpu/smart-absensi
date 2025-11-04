@@ -24,11 +24,26 @@ const AdPopup = () => {
       const timer = setTimeout(() => {
         setIsVisible(true);
         setHasShownInitial(true);
+        
+        // Start repeating timer for subsequent displays (2 minutes)
+        const repeatInterval = setInterval(() => {
+          setIsVisible(true);
+          // If multiple ads, pick random
+          if (ads.length > 1) {
+            let newIndex;
+            do {
+              newIndex = Math.floor(Math.random() * ads.length);
+            } while (newIndex === currentIndex);
+            setCurrentIndex(newIndex);
+          }
+        }, 2 * 60 * 1000); // 2 minutes
+        
+        return () => clearInterval(repeatInterval);
       }, 1000);
 
       return () => clearTimeout(timer);
     }
-  }, [ads, hasShownInitial]);
+  }, [ads, hasShownInitial, currentIndex]);
 
   useEffect(() => {
     if (!isVisible || ads.length <= 1) return;

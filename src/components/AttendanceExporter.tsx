@@ -32,6 +32,7 @@ const AttendanceExporter = () => {
     workArea: 'all'
   });
   const [employees, setEmployees] = useState<StaffUser[]>([]);
+  const [allEmployees, setAllEmployees] = useState<StaffUser[]>([]);
   const [workAreas, setWorkAreas] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
@@ -68,6 +69,7 @@ const AttendanceExporter = () => {
     } else {
       const staff = data || [];
       setEmployees(staff);
+      setAllEmployees(staff);
       
       // Extract unique work areas
       const areas = [...new Set(staff.map((s: any) => s.work_area))].sort();
@@ -250,7 +252,8 @@ const AttendanceExporter = () => {
           'Koordinat Check Out': record.checkout_location_lat && record.checkout_location_lng 
             ? `${record.checkout_location_lat}, ${record.checkout_location_lng}` 
             : '-',
-          'Foto': record.selfie_photo_url ? 'Lihat Foto' : '-',
+          'Foto Check In': record.selfie_checkin_url || record.selfie_photo_url ? 'Lihat Foto' : '-',
+          'Foto Check Out': record.selfie_checkout_url ? 'Lihat Foto' : '-',
           'Alasan': record.reason || '-'
         };
       });
@@ -259,21 +262,40 @@ const AttendanceExporter = () => {
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(excelData);
 
-      // Generate signed URLs for private photos
+      // Generate signed URLs for private photos (both check-in and check-out)
       const signedPhotoUrls = await Promise.all(
         attendanceData.map(async (record: any) => {
-          if (record.selfie_photo_url) {
+          const checkinUrl = record.selfie_checkin_url || record.selfie_photo_url;
+          const checkoutUrl = record.selfie_checkout_url;
+          
+          let checkinSigned = null;
+          let checkoutSigned = null;
+          
+          if (checkinUrl) {
             try {
               const { data } = await supabase
                 .storage
                 .from('attendance-photos')
-                .createSignedUrl(record.selfie_photo_url, 60 * 60 * 24 * 14); // 14 days
-              return data?.signedUrl || null;
+                .createSignedUrl(checkinUrl, 60 * 60 * 24 * 14); // 14 days
+              checkinSigned = data?.signedUrl || null;
             } catch (e) {
-              return null;
+              console.error('Error generating check-in signed URL:', e);
             }
           }
-          return null;
+          
+          if (checkoutUrl) {
+            try {
+              const { data } = await supabase
+                .storage
+                .from('attendance-photos')
+                .createSignedUrl(checkoutUrl, 60 * 60 * 24 * 14); // 14 days
+              checkoutSigned = data?.signedUrl || null;
+            } catch (e) {
+              console.error('Error generating check-out signed URL:', e);
+            }
+          }
+          
+          return { checkin: checkinSigned, checkout: checkoutSigned };
         })
       );
 
@@ -303,14 +325,26 @@ const AttendanceExporter = () => {
           };
         }
         
-        // Add photo hyperlink (signed URL)
-        const signedUrl = signedPhotoUrls[index];
-        if (signedUrl) {
-          const photoCell = `P${rowIndex}`; // Column P is Foto
-          ws[photoCell] = {
+        // Add photo hyperlinks (signed URLs)
+        const photoUrls = signedPhotoUrls[index];
+        
+        // Check-in photo
+        if (photoUrls?.checkin) {
+          const checkinPhotoCell = `P${rowIndex}`; // Column P is Foto Check In
+          ws[checkinPhotoCell] = {
             t: 's',
             v: 'Lihat Foto',
-            l: { Target: signedUrl, Tooltip: 'Buka foto selfie' }
+            l: { Target: photoUrls.checkin, Tooltip: 'Buka foto check-in' }
+          };
+        }
+        
+        // Check-out photo
+        if (photoUrls?.checkout) {
+          const checkoutPhotoCell = `Q${rowIndex}`; // Column Q is Foto Check Out
+          ws[checkoutPhotoCell] = {
+            t: 's',
+            v: 'Lihat Foto',
+            l: { Target: photoUrls.checkout, Tooltip: 'Buka foto check-out' }
           };
         }
       });
@@ -332,7 +366,8 @@ const AttendanceExporter = () => {
         { wch: 20 },  // Koordinat Check In
         { wch: 35 },  // Alamat Check Out
         { wch: 20 },  // Koordinat Check Out
-        { wch: 15 },  // Foto
+        { wch: 15 },  // Foto Check In
+        { wch: 15 },  // Foto Check Out
         { wch: 20 }   // Alasan
       ];
       ws['!cols'] = colWidths;
@@ -451,7 +486,7 @@ const AttendanceExporter = () => {
               </Select>
             </div>
 
-            {/* Employee Filter */}
+            {/* Employee Filter with Search */}
             <div className="space-y-2">
               <Label htmlFor="employee">Karyawan</Label>
               <Select 
@@ -460,9 +495,26 @@ const AttendanceExporter = () => {
                 disabled={loadingEmployees}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Pilih karyawan..." />
                 </SelectTrigger>
                 <SelectContent>
+                  <div className="p-2">
+                    <Input 
+                      placeholder="Cari nama karyawan..." 
+                      onChange={(e) => {
+                        const search = e.target.value.toLowerCase();
+                        if (!search) {
+                          setEmployees(allEmployees);
+                        } else {
+                          const filtered = allEmployees.filter(emp => 
+                            emp.name.toLowerCase().includes(search)
+                          );
+                          setEmployees(filtered);
+                        }
+                      }}
+                      className="mb-2"
+                    />
+                  </div>
                   <SelectItem value="all">Semua Karyawan</SelectItem>
                   {employees.map((employee) => (
                     <SelectItem key={employee.uid} value={employee.uid}>
