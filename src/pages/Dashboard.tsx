@@ -31,6 +31,7 @@ import AttendanceExporter from '../components/AttendanceExporter';
 import AppSettings from '../components/AppSettings';
 import BirthdayImporter from '../components/BirthdayImporter';
 import AdManager from '../components/AdManager';
+import { PieChart as RePieChart, Pie, Cell } from 'recharts';
 
 interface AttendanceRecord {
   id: string;
@@ -122,6 +123,11 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
+
+  const attendancePie = React.useMemo(() => ([
+    { name: 'Hadir', value: summary.presentToday },
+    { name: 'Tidak Hadir', value: Math.max(summary.totalStaff - summary.presentToday, 0) }
+  ]), [summary.presentToday, summary.totalStaff]);
 
   const handleLogout = async () => {
     try {
@@ -232,8 +238,19 @@ const Dashboard = () => {
               <CardTitle className="text-xs sm:text-sm font-medium text-foreground">WFO</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex items-center justify-between">
               <div className="text-xl sm:text-2xl font-bold text-foreground">{summary.wfoCount}</div>
+              <div className="w-10 h-10">
+                <RePieChart width={40} height={40}>
+                  <Pie data={[
+                    { name: 'WFO', value: summary.wfoCount },
+                    { name: 'Lainnya', value: Math.max(summary.presentToday - summary.wfoCount, 0) },
+                  ]} dataKey="value" innerRadius={14} outerRadius={20}>
+                    <Cell fill="hsl(var(--primary))" />
+                    <Cell fill="hsl(var(--muted))" />
+                  </Pie>
+                </RePieChart>
+              </div>
             </CardContent>
           </Card>
 
@@ -242,8 +259,19 @@ const Dashboard = () => {
               <CardTitle className="text-xs sm:text-sm font-medium text-foreground">WFH</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex items-center justify-between">
               <div className="text-xl sm:text-2xl font-bold text-foreground">{summary.wfhCount}</div>
+              <div className="w-10 h-10">
+                <RePieChart width={40} height={40}>
+                  <Pie data={[
+                    { name: 'WFH', value: summary.wfhCount },
+                    { name: 'Lainnya', value: Math.max(summary.presentToday - summary.wfhCount, 0) },
+                  ]} dataKey="value" innerRadius={14} outerRadius={20}>
+                    <Cell fill="hsl(var(--primary))" />
+                    <Cell fill="hsl(var(--muted))" />
+                  </Pie>
+                </RePieChart>
+              </div>
             </CardContent>
           </Card>
 
@@ -252,11 +280,37 @@ const Dashboard = () => {
               <CardTitle className="text-xs sm:text-sm font-medium text-foreground">Dinas</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex items-center justify-between">
               <div className="text-xl sm:text-2xl font-bold text-foreground">{summary.dinasCount}</div>
+              <div className="w-10 h-10">
+                <RePieChart width={40} height={40}>
+                  <Pie data={[
+                    { name: 'Dinas', value: summary.dinasCount },
+                    { name: 'Lainnya', value: Math.max(summary.presentToday - summary.dinasCount, 0) },
+                  ]} dataKey="value" innerRadius={14} outerRadius={20}>
+                    <Cell fill="hsl(var(--primary))" />
+                    <Cell fill="hsl(var(--muted))" />
+                  </Pie>
+                </RePieChart>
+              </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Kehadiran Pie Chart */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-title-primary">Kehadiran Hari Ini (%)</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center">
+            <RePieChart width={180} height={180}>
+              <Pie data={attendancePie} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80}>
+                <Cell fill="hsl(var(--primary))" />
+                <Cell fill="hsl(var(--muted))" />
+              </Pie>
+            </RePieChart>
+          </CardContent>
+        </Card>
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">

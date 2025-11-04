@@ -21,6 +21,9 @@ interface ExportFilters {
 interface StaffUser {
   uid: string;
   name: string;
+  work_area?: string;
+  position?: string;
+  division?: string;
 }
 
 const AttendanceExporter = () => {
@@ -56,7 +59,7 @@ const AttendanceExporter = () => {
     setLoadingEmployees(true);
     const { data, error } = await supabase
       .from('staff_users')
-      .select('uid, name, work_area')
+      .select('uid, name, work_area, position, division')
       .eq('is_active', true)
       .order('name');
 
@@ -90,10 +93,7 @@ const AttendanceExporter = () => {
 
     let query = supabase
       .from('attendance_records')
-      .select(`
-        *,
-        staff_users!inner(name, position, work_area, division)
-      `)
+      .select('*')
       .gte('date', filters.startDate)
       .lte('date', filters.endDate)
       .order('date', { ascending: false })
@@ -111,7 +111,14 @@ const AttendanceExporter = () => {
 
     // Apply work area filter
     if (filters.workArea !== 'all') {
-      query = query.eq('staff_users.work_area', filters.workArea);
+      const uids = allEmployees
+        .filter((s) => s.work_area === filters.workArea)
+        .map((s) => s.uid);
+      if (uids.length === 0) {
+        return [];
+      }
+      // @ts-expect-error supabase js supports in()
+      query = query.in('staff_uid', uids as any);
     }
 
     const { data, error } = await query;
@@ -232,13 +239,15 @@ const AttendanceExporter = () => {
           ? findGeofenceName(Number(record.checkout_location_lat), Number(record.checkout_location_lng))
           : null;
           
+        const emp = allEmployees.find((s: any) => s.uid === record.staff_uid);
+        
         return {
           'No': index + 1,
           'UID Karyawan': record.staff_uid,
           'Nama Karyawan': record.staff_name,
-          'Jabatan': record.staff_users?.position || '-',
-          'Area Kerja': record.staff_users?.work_area || '-',
-          'Divisi': record.staff_users?.division || '-',
+          'Jabatan': emp?.position || '-',
+          'Area Kerja': emp?.work_area || '-',
+          'Divisi': emp?.division || '-',
           'Tanggal': new Date(record.date).toLocaleDateString('id-ID'),
           'Status': record.status.toUpperCase(),
           'Waktu Check In': formatTimeForExport(record.check_in_time),
