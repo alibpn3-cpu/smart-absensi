@@ -141,6 +141,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose, loadi
     // Convert canvas to blob
     canvas.toBlob((blob) => {
       if (blob) {
+        // Stop camera immediately after capture
+        stopCamera();
         onCapture(blob);
       }
     }, 'image/jpeg', 0.8);

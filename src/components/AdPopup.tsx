@@ -33,13 +33,20 @@ const AdPopup = () => {
   useEffect(() => {
     if (!isVisible || ads.length <= 1) return;
 
-    // Change to next ad every 10 minutes
+    // Change to next ad every 2 minutes (random selection)
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % ads.length);
-    }, 10 * 60 * 1000); // 10 minutes
+      if (ads.length > 1) {
+        // Select a random index different from current
+        let newIndex;
+        do {
+          newIndex = Math.floor(Math.random() * ads.length);
+        } while (newIndex === currentIndex && ads.length > 1);
+        setCurrentIndex(newIndex);
+      }
+    }, 2 * 60 * 1000); // 2 minutes
 
     return () => clearInterval(interval);
-  }, [isVisible, ads.length]);
+  }, [isVisible, ads.length, currentIndex]);
 
   const fetchAds = async () => {
     const { data, error } = await supabase

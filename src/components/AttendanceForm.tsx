@@ -81,14 +81,32 @@ const AttendanceForm = () => {
     fetchStaffUsers();
     checkStoredPermissions();
     loadSavedStaff();
+  }, []);
+
+  useEffect(() => {
+    // Store current date for comparison
+    let lastDate = new Date().toDateString();
     
-    // Update current time every second
+    // Update current time every second and check for date change
     const timer = setInterval(() => {
-      setCurrentDateTime(new Date());
+      const now = new Date();
+      setCurrentDateTime(now);
+      
+      // Check if date has changed (midnight reset)
+      const currentDate = now.toDateString();
+      if (currentDate !== lastDate) {
+        console.log('🔄 Date changed, resetting attendance...');
+        lastDate = currentDate;
+        // Reset attendance data
+        setTodayAttendance(null);
+        if (selectedStaff) {
+          fetchTodayAttendance();
+        }
+      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [selectedStaff]);
 
   useEffect(() => {
     if (selectedStaff) {
