@@ -31,7 +31,7 @@ import AdminManager from '../components/AdminManager';
 import AttendanceExporter from '../components/AttendanceExporter';
 import AppSettings from '../components/AppSettings';
 import BirthdayImporter from '../components/BirthdayImporter';
-import AdManager from '../components/AdManager';
+const AdManager = React.lazy(() => import('../components/AdManager'));
 import ActivityLogViewer from '../components/ActivityLogViewer';
 import { PieChart as RePieChart, Pie, Cell } from 'recharts';
 
@@ -566,7 +566,9 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="ads">
-            <AdManager />
+            <React.Suspense fallback={<div className="text-center py-8">Loading...</div>}>
+              <AdManager />
+            </React.Suspense>
           </TabsContent>
         </Tabs>
       </div>
