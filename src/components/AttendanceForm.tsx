@@ -746,6 +746,22 @@ const AttendanceForm = () => {
     }
   };
 
+  const checkCameraPermission = async (): Promise<boolean> => {
+    try {
+      const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
+      return result.state === 'granted';
+    } catch (error) {
+      // Fallback: try to access camera directly
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(track => track.stop());
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  };
+
   const handleAttendanceAction = async () => {
     if (!selectedStaff) {
       toast({
@@ -754,6 +770,37 @@ const AttendanceForm = () => {
         variant: "destructive"
       });
       return;
+    }
+
+    // Check location permission first
+    let hasLocationPermission = false;
+    try {
+      const permResult = await navigator.permissions.query({ name: 'geolocation' });
+      hasLocationPermission = permResult.state === 'granted' || permResult.state === 'prompt';
+    } catch {
+      hasLocationPermission = true; // Assume available if query fails
+    }
+
+    if (!hasLocationPermission) {
+      toast({
+        title: "Izin Lokasi Diperlukan",
+        description: "Silakan izinkan akses lokasi di pengaturan browser Anda untuk melanjutkan absensi",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check camera permission for WFH/Dinas
+    if (attendanceStatus !== 'wfo') {
+      const hasCameraPermission = await checkCameraPermission();
+      if (!hasCameraPermission) {
+        toast({
+          title: "Izin Kamera Diperlukan",
+          description: "Silakan izinkan akses kamera di pengaturan browser Anda untuk melanjutkan absensi WFH/Dinas",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     try {
