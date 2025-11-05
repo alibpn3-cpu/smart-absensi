@@ -51,7 +51,7 @@ const AdPopup = () => {
           return newIndex;
         });
       }
-    }, 10000); // 10 seconds = 10000ms
+    }, 20000); // 20 seconds = 20000ms
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
