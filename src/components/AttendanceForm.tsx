@@ -772,22 +772,23 @@ const AttendanceForm = () => {
       return;
     }
 
-    // Check location permission first
-    let hasLocationPermission = false;
-    try {
-      const permResult = await navigator.permissions.query({ name: 'geolocation' });
-      hasLocationPermission = permResult.state === 'granted' || permResult.state === 'prompt';
-    } catch {
-      hasLocationPermission = true; // Assume available if query fails
-    }
-
-    if (!hasLocationPermission) {
-      toast({
-        title: "Izin Lokasi Diperlukan",
-        description: "Silakan izinkan akses lokasi di pengaturan browser Anda untuk melanjutkan absensi",
-        variant: "destructive"
-      });
-      return;
+    // Determine location: use detected coordinates if available; otherwise request permission
+    let resolvedLocation: { lat: number; lng: number; address: string; coordinates: string } | null = null;
+    if (currentLocation) {
+      console.log('📍 Using cached coordinates');
+      resolvedLocation = currentLocation;
+    } else {
+      try {
+        resolvedLocation = await requestLocationPermission();
+      } catch (err) {
+        console.error('❌ Failed to obtain location:', err);
+        toast({
+          title: "Izin Lokasi Diperlukan",
+          description: "Silakan izinkan akses lokasi untuk melanjutkan absensi",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     // Check camera permission for WFH/Dinas
@@ -804,7 +805,7 @@ const AttendanceForm = () => {
     }
 
     try {
-      const location = await requestLocationPermission();
+      const location = resolvedLocation!;
       
       // Check if this is check-out
       const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
