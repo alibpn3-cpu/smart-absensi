@@ -49,14 +49,14 @@ const AttendanceForm = () => {
   const [attendanceStatus, setAttendanceStatus] = useState<'wfo' | 'wfh' | 'dinas'>('wfo');
   const [reason, setReason] = useState('');
   const [showCamera, setShowCamera] = useState(false);
-  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number; address: string; coordinates: string } | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number; address: string; coordinates: string; accuracy?: number } | null>(null);
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [permissions, setPermissions] = useState<PermissionsState>({ location: false, camera: false });
   const [showCheckoutReasonDialog, setShowCheckoutReasonDialog] = useState(false);
   const [checkoutReason, setCheckoutReason] = useState('');
-  const [pendingCheckoutLocation, setPendingCheckoutLocation] = useState<{ lat: number; lng: number; address: string; coordinates: string } | null>(null);
+  const [pendingCheckoutLocation, setPendingCheckoutLocation] = useState<{ lat: number; lng: number; address: string; coordinates: string; accuracy?: number } | null>(null);
   
   // Auto-detect timezone from device
   const getDeviceTimezone = () => {
@@ -446,7 +446,7 @@ const AttendanceForm = () => {
     }
   };
 
-  const checkGeofence = async (lat: number, lng: number): Promise<{ isInGeofence: boolean; geofenceName?: string }> => {
+  const checkGeofence = async (lat: number, lng: number, accuracy?: number): Promise<{ isInGeofence: boolean; geofenceName?: string }> => {
     if (attendanceStatus !== 'wfo') return { isInGeofence: true };
 
     const { data: geofences, error } = await supabase
@@ -456,6 +456,11 @@ const AttendanceForm = () => {
 
     if (error || !geofences) return { isInGeofence: true };
 
+    // Add tolerance for low accuracy (desktop browsers typically have 50-1000m accuracy)
+    // If accuracy is poor (>50m), add extra radius tolerance
+    const accuracyTolerance = accuracy && accuracy > 50 ? Math.min(accuracy * 0.8, 500) : 0;
+    console.log(`📏 Accuracy: ${accuracy}m, adding tolerance: ${accuracyTolerance}m`);
+
     for (const geofence of geofences) {
       if (geofence.center_lat && geofence.center_lng && geofence.radius) {
         const distance = calculateDistance(
@@ -464,7 +469,10 @@ const AttendanceForm = () => {
           parseFloat(geofence.center_lng.toString())
         );
         
-        if (distance <= geofence.radius) {
+        const effectiveRadius = geofence.radius + accuracyTolerance;
+        console.log(`📍 Distance to ${geofence.name}: ${distance.toFixed(2)}m (radius: ${geofence.radius}m + tolerance: ${accuracyTolerance.toFixed(0)}m = ${effectiveRadius.toFixed(0)}m)`);
+        
+        if (distance <= effectiveRadius) {
           return { isInGeofence: true, geofenceName: geofence.name };
         }
       }
@@ -572,13 +580,15 @@ const AttendanceForm = () => {
     console.log('📸 Starting attendance submission for:', selectedStaff.name);
     
     try {
+      // Check if this is check-out
+      const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
+      
       // Check geofence for WFO status and get geofence name
       let locationAddress = currentLocation.address;
-      const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
       
       if (attendanceStatus === 'wfo') {
         console.log('🏢 Checking WFO geofence for location:', currentLocation.lat, currentLocation.lng);
-        const geofenceResult = await checkGeofence(currentLocation.lat, currentLocation.lng);
+        const geofenceResult = await checkGeofence(currentLocation.lat, currentLocation.lng, currentLocation.accuracy);
         console.log('📍 Geofence check result:', geofenceResult);
         
         // For CHECK-IN: Must be inside geofence
@@ -773,7 +783,7 @@ const AttendanceForm = () => {
     }
 
     // Determine location: use detected coordinates if available; otherwise request permission
-    let resolvedLocation: { lat: number; lng: number; address: string; coordinates: string } | null = null;
+    let resolvedLocation: { lat: number; lng: number; address: string; coordinates: string; accuracy?: number } | null = null;
     if (currentLocation) {
       console.log('📍 Using cached coordinates');
       resolvedLocation = currentLocation;
@@ -813,7 +823,7 @@ const AttendanceForm = () => {
       if (attendanceStatus === 'wfo') {
         // WFO mode: Check geofence for both check-in and check-out
         console.log('🏢 Checking WFO geofence for location:', location.lat, location.lng);
-        const geofenceResult = await checkGeofence(location.lat, location.lng);
+        const geofenceResult = await checkGeofence(location.lat, location.lng, location.accuracy);
         console.log('📍 Geofence check result:', geofenceResult);
         
         if (!geofenceResult.isInGeofence) {
