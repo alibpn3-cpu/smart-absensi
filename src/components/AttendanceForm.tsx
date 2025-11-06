@@ -806,23 +806,35 @@ const AttendanceForm = () => {
     try {
       const location = await requestLocationPermission();
       
-      // Check if this is WFO checkout and if we're outside geofence
+      // Check if this is check-out
       const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
       
       if (attendanceStatus === 'wfo') {
-        // WFO mode: No selfie needed, just location
-        if (isCheckOut) {
-          const geofenceResult = await checkGeofence(location.lat, location.lng);
-          
-          if (!geofenceResult.isInGeofence) {
+        // WFO mode: Check geofence for both check-in and check-out
+        console.log('🏢 Checking WFO geofence for location:', location.lat, location.lng);
+        const geofenceResult = await checkGeofence(location.lat, location.lng);
+        console.log('📍 Geofence check result:', geofenceResult);
+        
+        if (!geofenceResult.isInGeofence) {
+          if (isCheckOut) {
             // Outside geofence for WFO checkout - show reason dialog
             setPendingCheckoutLocation(location);
             setShowCheckoutReasonDialog(true);
             return;
+          } else {
+            // Outside geofence for WFO check-in - show error
+            console.error('❌ Not in geofence area for check-in');
+            toast({
+              title: "Di Luar Area Kantor",
+              description: "Anda harus berada di area kantor untuk check in WFO. Silakan pilih status WFH atau Dinas jika bekerja di luar kantor.",
+              variant: "destructive"
+            });
+            return;
           }
         }
         
-        // WFO: Process without camera
+        // Inside geofence: Process without camera
+        console.log('✅ Inside geofence, processing WFO attendance');
         setCurrentLocation(location);
         handlePhotoCapture(new Blob()); // Pass empty blob for WFO
       } else {
@@ -831,6 +843,7 @@ const AttendanceForm = () => {
         setShowCamera(true);
       }
     } catch (error) {
+      console.error('❌ Location error:', error);
       toast({
         title: "Error Lokasi", 
         description: "Silakan aktifkan akses lokasi untuk melanjutkan",
