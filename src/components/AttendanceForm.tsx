@@ -839,7 +839,7 @@ const AttendanceForm = () => {
     }
   };
 
-  const handleCheckoutReasonSubmit = () => {
+  const handleCheckoutReasonSubmit = async () => {
     if (!checkoutReason.trim()) {
       toast({
         title: "Alasan Diperlukan",
@@ -850,8 +850,19 @@ const AttendanceForm = () => {
     }
     
     setShowCheckoutReasonDialog(false);
-    setCurrentLocation(pendingCheckoutLocation);
-    setShowCamera(true);
+    
+    // For WFO, directly process checkout without camera since no photo needed
+    if (attendanceStatus === 'wfo' && pendingCheckoutLocation) {
+      setCurrentLocation(pendingCheckoutLocation);
+      // Use setTimeout to ensure state is updated before calling handlePhotoCapture
+      setTimeout(async () => {
+        await handlePhotoCapture(null as any);
+      }, 100);
+    } else {
+      // For WFH/Dinas, show camera
+      setCurrentLocation(pendingCheckoutLocation);
+      setShowCamera(true);
+    }
   };
 
   // Clear app cache/cookies and SW, then reload
