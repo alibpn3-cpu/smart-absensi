@@ -1001,22 +1001,22 @@ const AttendanceForm = () => {
         <Card className="bg-card border shadow-lg">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-start gap-6 px-4">
-              {/* Analog Clock - Modern Design with Black Color */}
-              <div className="relative w-28 h-28 rounded-full border-4 border-black/90 bg-gradient-to-br from-gray-50 to-gray-100 shadow-xl flex-shrink-0 animate-scale-in">
+              {/* Analog Clock - Modern Design with Dark Blue Color */}
+              <div className="relative w-24 h-24 rounded-full border-4 border-blue-900 bg-gradient-to-br from-gray-50 to-gray-100 shadow-xl flex-shrink-0 animate-scale-in">
                 {/* Gradient overlay for depth */}
                 <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/40 to-transparent pointer-events-none" />
                 
                 {/* Clock tick marks */}
                 {[...Array(12)].map((_, i) => {
                   const angle = (i * 30 - 90) * (Math.PI / 180);
-                  const radius = 48;
+                  const radius = 40;
                   const x = radius * Math.cos(angle);
                   const y = radius * Math.sin(angle);
                   const isMainHour = [0, 3, 6, 9].includes(i);
                   return (
                     <div
                       key={i}
-                      className={`absolute ${isMainHour ? 'w-1 h-3' : 'w-0.5 h-2'} bg-black/80 rounded-full`}
+                      className={`absolute ${isMainHour ? 'w-1 h-3' : 'w-0.5 h-2'} bg-blue-900/80 rounded-full`}
                       style={{
                         left: `calc(50% + ${x}px)`,
                         top: `calc(50% + ${y}px)`,
@@ -1029,13 +1029,13 @@ const AttendanceForm = () => {
                 {/* Clock numbers - only 12, 3, 6, 9 */}
                 {[12, 3, 6, 9].map((hour) => {
                   const angle = ((hour === 12 ? 0 : hour) * 30 - 90) * (Math.PI / 180);
-                  const radius = 34;
+                  const radius = 28;
                   const x = radius * Math.cos(angle);
                   const y = radius * Math.sin(angle);
                   return (
                     <div
                       key={hour}
-                      className="absolute text-xs font-bold text-black/90"
+                      className="absolute text-xs font-bold text-blue-900/90"
                       style={{
                         left: `calc(50% + ${x}px)`,
                         top: `calc(50% + ${y}px)`,
@@ -1048,21 +1048,21 @@ const AttendanceForm = () => {
                 })}
                 
                 {/* Center dot with glow effect */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-black rounded-full z-10 shadow-lg" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-black/30 rounded-full z-10 animate-ping" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-blue-900 rounded-full z-10 shadow-lg" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-blue-900/30 rounded-full z-10 animate-ping" />
                 
-                {/* Hour hand - thicker and black */}
+                {/* Hour hand - thicker and dark blue */}
                 <div 
-                  className="absolute top-1/2 left-1/2 w-1.5 bg-black rounded-full origin-bottom transition-all duration-500 ease-out shadow-md"
+                  className="absolute top-1/2 left-1/2 w-1.5 bg-blue-900 rounded-full origin-bottom transition-all duration-500 ease-out shadow-md"
                   style={{ 
                     height: '28%',
                     transform: `translate(-50%, -100%) rotate(${((getTimeForTimezone(currentDateTime, timezone).hours % 12) * 30) + (getTimeForTimezone(currentDateTime, timezone).minutes * 0.5)}deg)`
                   }}
                 />
                 
-                {/* Minute hand - medium thickness and black */}
+                {/* Minute hand - medium thickness and dark blue */}
                 <div 
-                  className="absolute top-1/2 left-1/2 w-1 bg-black rounded-full origin-bottom transition-all duration-500 ease-out shadow-md"
+                  className="absolute top-1/2 left-1/2 w-1 bg-blue-900 rounded-full origin-bottom transition-all duration-500 ease-out shadow-md"
                   style={{ 
                     height: '40%',
                     transform: `translate(-50%, -100%) rotate(${getTimeForTimezone(currentDateTime, timezone).minutes * 6}deg)`
@@ -1078,7 +1078,7 @@ const AttendanceForm = () => {
                     transition: 'transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)'
                   }}
                 >
-                  <div className="w-full h-3/4 bg-black rounded-full" />
+                  <div className="w-full h-3/4 bg-blue-900 rounded-full" />
                   <div className="w-full h-1/4 bg-red-600 rounded-full" />
                 </div>
               </div>
