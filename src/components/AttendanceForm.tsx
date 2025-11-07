@@ -57,6 +57,26 @@ const AttendanceForm = () => {
   const [showCheckoutReasonDialog, setShowCheckoutReasonDialog] = useState(false);
   const [checkoutReason, setCheckoutReason] = useState('');
   const [pendingCheckoutLocation, setPendingCheckoutLocation] = useState<{ lat: number; lng: number; address: string; coordinates: string; accuracy?: number } | null>(null);
+  const [isButtonProcessing, setIsButtonProcessing] = useState(false);
+  
+  // Audio for button click
+  const playClickSound = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.1);
+  };
   
   // Auto-detect timezone from device
   const getDeviceTimezone = () => {
@@ -773,6 +793,8 @@ const AttendanceForm = () => {
   };
 
   const handleAttendanceAction = async () => {
+    if (isButtonProcessing) return; // Prevent multiple clicks
+    
     if (!selectedStaff) {
       toast({
         title: "Gagal",
@@ -781,6 +803,10 @@ const AttendanceForm = () => {
       });
       return;
     }
+    
+    // Play click sound
+    playClickSound();
+    setIsButtonProcessing(true);
 
     // Determine location: use detected coordinates if available; otherwise request permission
     let resolvedLocation: { lat: number; lng: number; address: string; coordinates: string; accuracy?: number } | null = null;
@@ -831,6 +857,7 @@ const AttendanceForm = () => {
             // Outside geofence for WFO checkout - show reason dialog
             setPendingCheckoutLocation(location);
             setShowCheckoutReasonDialog(true);
+            setIsButtonProcessing(false); // Reset processing state
             return;
           } else {
             // Outside geofence for WFO check-in - show error
@@ -860,6 +887,8 @@ const AttendanceForm = () => {
         description: "Silakan aktifkan akses lokasi untuk melanjutkan",
         variant: "destructive"
       });
+    } finally {
+      setIsButtonProcessing(false);
     }
   };
 
@@ -972,19 +1001,41 @@ const AttendanceForm = () => {
         <Card className="bg-card border shadow-lg">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-start gap-6 px-4">
-              {/* Analog Clock - Left aligned */}
-              <div className="relative w-24 h-24 rounded-full border-2 border-primary bg-card shadow-sm flex-shrink-0">
-                {/* Clock numbers 1-12 */}
+              {/* Analog Clock - Modern Design with Black Color */}
+              <div className="relative w-28 h-28 rounded-full border-4 border-black/90 bg-gradient-to-br from-gray-50 to-gray-100 shadow-xl flex-shrink-0 animate-scale-in">
+                {/* Gradient overlay for depth */}
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/40 to-transparent pointer-events-none" />
+                
+                {/* Clock tick marks */}
                 {[...Array(12)].map((_, i) => {
-                  const hour = i + 1;
-                  const angle = (hour * 30 - 90) * (Math.PI / 180);
-                  const radius = 36;
+                  const angle = (i * 30 - 90) * (Math.PI / 180);
+                  const radius = 48;
+                  const x = radius * Math.cos(angle);
+                  const y = radius * Math.sin(angle);
+                  const isMainHour = [0, 3, 6, 9].includes(i);
+                  return (
+                    <div
+                      key={i}
+                      className={`absolute ${isMainHour ? 'w-1 h-3' : 'w-0.5 h-2'} bg-black/80 rounded-full`}
+                      style={{
+                        left: `calc(50% + ${x}px)`,
+                        top: `calc(50% + ${y}px)`,
+                        transform: `translate(-50%, -50%) rotate(${i * 30}deg)`
+                      }}
+                    />
+                  );
+                })}
+                
+                {/* Clock numbers - only 12, 3, 6, 9 */}
+                {[12, 3, 6, 9].map((hour) => {
+                  const angle = ((hour === 12 ? 0 : hour) * 30 - 90) * (Math.PI / 180);
+                  const radius = 34;
                   const x = radius * Math.cos(angle);
                   const y = radius * Math.sin(angle);
                   return (
                     <div
                       key={hour}
-                      className="absolute text-[8px] font-semibold text-primary"
+                      className="absolute text-xs font-bold text-black/90"
                       style={{
                         left: `calc(50% + ${x}px)`,
                         top: `calc(50% + ${y}px)`,
@@ -996,35 +1047,40 @@ const AttendanceForm = () => {
                   );
                 })}
                 
-                {/* Center dot */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full z-10" />
+                {/* Center dot with glow effect */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-black rounded-full z-10 shadow-lg" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-black/30 rounded-full z-10 animate-ping" />
                 
-                {/* Hour hand */}
+                {/* Hour hand - thicker and black */}
                 <div 
-                  className="absolute top-1/2 left-1/2 w-1 bg-primary rounded-full origin-bottom transition-transform duration-1000"
+                  className="absolute top-1/2 left-1/2 w-1.5 bg-black rounded-full origin-bottom transition-all duration-500 ease-out shadow-md"
                   style={{ 
-                    height: '35%',
+                    height: '28%',
                     transform: `translate(-50%, -100%) rotate(${((getTimeForTimezone(currentDateTime, timezone).hours % 12) * 30) + (getTimeForTimezone(currentDateTime, timezone).minutes * 0.5)}deg)`
                   }}
                 />
                 
-                {/* Minute hand */}
+                {/* Minute hand - medium thickness and black */}
                 <div 
-                  className="absolute top-1/2 left-1/2 w-1 bg-primary rounded-full origin-bottom transition-transform duration-1000"
+                  className="absolute top-1/2 left-1/2 w-1 bg-black rounded-full origin-bottom transition-all duration-500 ease-out shadow-md"
                   style={{ 
-                    height: '45%',
+                    height: '40%',
                     transform: `translate(-50%, -100%) rotate(${getTimeForTimezone(currentDateTime, timezone).minutes * 6}deg)`
                   }}
                 />
                 
-                {/* Second hand */}
+                {/* Second hand - thin with smooth animation and red tip */}
                 <div 
-                  className="absolute top-1/2 left-1/2 w-px bg-destructive rounded-full origin-bottom transition-transform duration-1000"
+                  className="absolute top-1/2 left-1/2 w-0.5 origin-bottom"
                   style={{ 
-                    height: '45%',
-                    transform: `translate(-50%, -100%) rotate(${getTimeForTimezone(currentDateTime, timezone).seconds * 6}deg)`
+                    height: '42%',
+                    transform: `translate(-50%, -100%) rotate(${getTimeForTimezone(currentDateTime, timezone).seconds * 6}deg)`,
+                    transition: 'transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)'
                   }}
-                />
+                >
+                  <div className="w-full h-3/4 bg-black rounded-full" />
+                  <div className="w-full h-1/4 bg-red-600 rounded-full" />
+                </div>
               </div>
 
               {/* Date and Digital Time - Stacked vertically */}
@@ -1276,8 +1332,8 @@ const AttendanceForm = () => {
             {/* Action Button */}
             <Button 
               onClick={handleAttendanceAction}
-              disabled={!selectedStaff || loading || !!isCompleted}
-              className="w-full h-14 text-lg font-semibold gradient-primary border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]"
+              disabled={!selectedStaff || loading || !!isCompleted || isButtonProcessing}
+              className="w-full h-14 text-lg font-semibold gradient-primary border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               size="lg"
             >
               {loading && attendanceStatus === 'wfo' ? (
@@ -1330,6 +1386,7 @@ const AttendanceForm = () => {
                 setShowCheckoutReasonDialog(false);
                 setCheckoutReason('');
                 setPendingCheckoutLocation(null);
+                setIsButtonProcessing(false);
               }}>
                 Batal
               </Button>
@@ -1348,6 +1405,7 @@ const AttendanceForm = () => {
               setShowCamera(false);
               setCheckoutReason('');
               setPendingCheckoutLocation(null);
+              setIsButtonProcessing(false);
             }}
             loading={loading}
           />

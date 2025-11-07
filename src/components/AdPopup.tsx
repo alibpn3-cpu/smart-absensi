@@ -13,11 +13,41 @@ const AdPopup = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const [hasShownInitial, setHasShownInitial] = useState(false);
+  const [isUserActive, setIsUserActive] = useState(true);
 
   const intervalRef = useRef<number | null>(null);
+  const activityTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     fetchAds();
+    
+    // Activity detection - mark user as active on mouse/touch events
+    const handleActivity = () => {
+      setIsUserActive(true);
+      
+      // Reset activity timeout
+      if (activityTimeoutRef.current) clearTimeout(activityTimeoutRef.current);
+      
+      // Mark as inactive after 30 seconds of no activity
+      activityTimeoutRef.current = window.setTimeout(() => {
+        setIsUserActive(false);
+      }, 30000);
+    };
+    
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('mousedown', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+    window.addEventListener('touchstart', handleActivity);
+    window.addEventListener('scroll', handleActivity);
+    
+    return () => {
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('mousedown', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('touchstart', handleActivity);
+      window.removeEventListener('scroll', handleActivity);
+      if (activityTimeoutRef.current) clearTimeout(activityTimeoutRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -37,26 +67,29 @@ const AdPopup = () => {
   useEffect(() => {
     if (!hasShownInitial || ads.length === 0) return;
 
-    // Set up interval to show ads every 40 seconds
+    // Set up interval to show ads every 50 seconds
     if (intervalRef.current) clearInterval(intervalRef.current);
     
     intervalRef.current = window.setInterval(() => {
-      setIsVisible(true);
-      if (ads.length > 1) {
-        setCurrentIndex((prev) => {
-          let newIndex = prev;
-          do {
-            newIndex = Math.floor(Math.random() * ads.length);
-          } while (newIndex === prev && ads.length > 1);
-          return newIndex;
-        });
+      // Only show ad if user is active
+      if (isUserActive) {
+        setIsVisible(true);
+        if (ads.length > 1) {
+          setCurrentIndex((prev) => {
+            let newIndex = prev;
+            do {
+              newIndex = Math.floor(Math.random() * ads.length);
+            } while (newIndex === prev && ads.length > 1);
+            return newIndex;
+          });
+        }
       }
-    }, 40000); // 40 seconds = 40000ms
+    }, 50000); // 50 seconds = 50000ms
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [ads.length, hasShownInitial]);
+  }, [ads.length, hasShownInitial, isUserActive]);
 
 
   const fetchAds = async () => {
