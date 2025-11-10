@@ -53,11 +53,11 @@ const AdPopup = () => {
   useEffect(() => {
     if (ads.length === 0 || hasShownInitial) return;
 
-    // Show first ad after 5 minutes
+    // Show first ad after 1 second
     const timer = window.setTimeout(() => {
       setIsVisible(true);
       setHasShownInitial(true);
-    }, 300000); // 5 minutes = 300000ms
+    }, 1000); // 1 second = 1000ms
 
     return () => {
       clearTimeout(timer);

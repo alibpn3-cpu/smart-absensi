@@ -23,7 +23,11 @@ const PermissionIndicators: React.FC<PermissionIndicatorsProps> = ({
     // Request location permission
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject);
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
       });
       newPermissions.location = true;
     } catch (error) {
@@ -87,6 +91,8 @@ const PermissionIndicators: React.FC<PermissionIndicatorsProps> = ({
       }
     }
     
+    // Save to localStorage
+    localStorage.setItem('attendance_permissions', JSON.stringify(newPermissions));
     onPermissionsUpdate(newPermissions);
     
     // Only show success if BOTH granted

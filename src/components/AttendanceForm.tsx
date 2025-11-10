@@ -155,11 +155,40 @@ const AttendanceForm = () => {
   }, [todayAttendance]);
 
 
-  const checkStoredPermissions = () => {
-    const storedPermissions = localStorage.getItem('attendance_permissions');
-    if (storedPermissions) {
-      setPermissions(JSON.parse(storedPermissions));
+  const checkStoredPermissions = async () => {
+    // Check actual browser permissions, not just localStorage
+    const actualPermissions = { location: false, camera: false };
+    
+    // Check location permission
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { 
+          timeout: 5000, 
+          maximumAge: 300000 
+        });
+      });
+      actualPermissions.location = true;
+      console.log('✅ Location permission granted');
+    } catch (error) {
+      console.log('❌ Location permission not available');
     }
+    
+    // Check camera permission
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
+      if (permissionStatus.state === 'granted') {
+        actualPermissions.camera = true;
+        console.log('✅ Camera permission granted');
+      } else {
+        console.log('❌ Camera permission not granted:', permissionStatus.state);
+      }
+    } catch (error) {
+      console.log('❌ Camera permission check failed:', error);
+    }
+    
+    // Update state and save to localStorage
+    setPermissions(actualPermissions);
+    localStorage.setItem('attendance_permissions', JSON.stringify(actualPermissions));
   };
 
   const savePermissions = (newPermissions: PermissionsState) => {
