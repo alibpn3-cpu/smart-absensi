@@ -7,11 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera, CheckSquare, Square } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera, CheckSquare, Square, ChevronsUpDown, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
 
 interface StaffUser {
   id: string;
@@ -24,6 +27,89 @@ interface StaffUser {
   created_at: string;
   photo_url?: string;
 }
+
+// Combobox component for editable dropdowns with auto-uppercase
+const ComboboxField = ({ 
+  value, 
+  onValueChange, 
+  options, 
+  placeholder, 
+  emptyText = "No option found." 
+}: { 
+  value: string; 
+  onValueChange: (value: string) => void; 
+  options: string[]; 
+  placeholder: string;
+  emptyText?: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(value);
+
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const upperValue = e.target.value.toUpperCase();
+    setInputValue(upperValue);
+    onValueChange(upperValue);
+  };
+
+  const handleSelect = (selectedValue: string) => {
+    const upperValue = selectedValue.toUpperCase();
+    setInputValue(upperValue);
+    onValueChange(upperValue);
+    setOpen(false);
+  };
+
+  return (
+    <div className="flex gap-2">
+      <Input
+        value={inputValue}
+        onChange={handleInputChange}
+        placeholder={placeholder}
+        className="flex-1"
+      />
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-10 p-0 shrink-0"
+          >
+            <ChevronsUpDown className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[300px] p-0">
+          <Command>
+            <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
+            <CommandList>
+              <CommandEmpty>{emptyText}</CommandEmpty>
+              <CommandGroup>
+                {options.filter(Boolean).map((option) => (
+                  <CommandItem
+                    key={option}
+                    value={option}
+                    onSelect={() => handleSelect(option)}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === option ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {option}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+};
 
 const EmployeeManager = () => {
   const [employees, setEmployees] = useState<StaffUser[]>([]);
@@ -57,6 +143,7 @@ const EmployeeManager = () => {
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [isBatchUpdateDialogOpen, setIsBatchUpdateDialogOpen] = useState(false);
   const [batchUpdateData, setBatchUpdateData] = useState({
+    position: '',
     work_area: '',
     division: ''
   });
@@ -520,7 +607,7 @@ const EmployeeManager = () => {
   const handleBatchUpdate = async () => {
     if (selectedEmployees.size === 0) return;
 
-    if (!batchUpdateData.work_area && !batchUpdateData.division) {
+    if (!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division) {
       toast({
         title: "Gagal",
         description: "Pilih minimal satu field untuk diupdate",
@@ -531,6 +618,7 @@ const EmployeeManager = () => {
 
     try {
       const updatePayload: any = {};
+      if (batchUpdateData.position) updatePayload.position = batchUpdateData.position;
       if (batchUpdateData.work_area) updatePayload.work_area = batchUpdateData.work_area;
       if (batchUpdateData.division) updatePayload.division = batchUpdateData.division;
 
@@ -557,7 +645,7 @@ const EmployeeManager = () => {
       });
 
       setIsBatchUpdateDialogOpen(false);
-      setBatchUpdateData({ work_area: '', division: '' });
+      setBatchUpdateData({ position: '', work_area: '', division: '' });
       setSelectedEmployees(new Set());
       fetchEmployees();
       fetchDropdownData();
@@ -937,59 +1025,32 @@ const EmployeeManager = () => {
                   
                   <div className="space-y-2">
                     <Label htmlFor="position">Position *</Label>
-                    <Select
+                    <ComboboxField
                       value={formData.position}
                       onValueChange={(value) => setFormData({...formData, position: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select position" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {positions.filter(Boolean).map((position) => (
-                          <SelectItem key={position} value={position}>
-                            {position}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={positions}
+                      placeholder="Pilih atau ketik position baru"
+                    />
                   </div>
                   
                   <div className="space-y-2">
                     <Label htmlFor="work_area">Work Area *</Label>
-                    <Select
+                    <ComboboxField
                       value={formData.work_area}
                       onValueChange={(value) => setFormData({...formData, work_area: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select work area" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {workAreas.filter(Boolean).map((workArea) => (
-                          <SelectItem key={workArea} value={workArea}>
-                            {workArea}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={workAreas}
+                      placeholder="Pilih atau ketik work area baru"
+                    />
                   </div>
                   
                   <div className="space-y-2">
                     <Label htmlFor="division">Division (Optional)</Label>
-                    <Select
+                    <ComboboxField
                       value={formData.division}
                       onValueChange={(value) => setFormData({...formData, division: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select division" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {divisions.filter(Boolean).map((division) => (
-                          <SelectItem key={division} value={division}>
-                            {division}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={divisions}
+                      placeholder="Pilih atau ketik division baru"
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -1361,46 +1422,38 @@ const EmployeeManager = () => {
           <DialogHeader>
             <DialogTitle>Batch Update ({selectedEmployees.size} Karyawan)</DialogTitle>
             <DialogDescription>
-              Update Work Area dan/atau Division untuk {selectedEmployees.size} karyawan yang dipilih
+              Update Position, Work Area, dan/atau Division untuk {selectedEmployees.size} karyawan yang dipilih
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="batch-position">Position (Optional)</Label>
+              <ComboboxField
+                value={batchUpdateData.position}
+                onValueChange={(value) => setBatchUpdateData({...batchUpdateData, position: value})}
+                options={positions}
+                placeholder="Pilih atau ketik position baru (tidak diubah jika kosong)"
+              />
+            </div>
+            
+            <div className="space-y-2">
               <Label htmlFor="batch-work-area">Work Area (Optional)</Label>
-              <Select
+              <ComboboxField
                 value={batchUpdateData.work_area}
                 onValueChange={(value) => setBatchUpdateData({...batchUpdateData, work_area: value})}
-              >
-                <SelectTrigger id="batch-work-area">
-                  <SelectValue placeholder="Pilih work area (tidak diubah jika kosong)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {workAreas.filter(Boolean).map((workArea) => (
-                    <SelectItem key={workArea} value={workArea}>
-                      {workArea}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={workAreas}
+                placeholder="Pilih atau ketik work area baru (tidak diubah jika kosong)"
+              />
             </div>
             
             <div className="space-y-2">
               <Label htmlFor="batch-division">Division (Optional)</Label>
-              <Select
+              <ComboboxField
                 value={batchUpdateData.division}
                 onValueChange={(value) => setBatchUpdateData({...batchUpdateData, division: value})}
-              >
-                <SelectTrigger id="batch-division">
-                  <SelectValue placeholder="Pilih division (tidak diubah jika kosong)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {divisions.filter(Boolean).map((division) => (
-                    <SelectItem key={division} value={division}>
-                      {division}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={divisions}
+                placeholder="Pilih atau ketik division baru (tidak diubah jika kosong)"
+              />
             </div>
             
             <div className="p-3 bg-muted rounded-lg">
@@ -1413,7 +1466,7 @@ const EmployeeManager = () => {
               <Button 
                 onClick={handleBatchUpdate}
                 className="flex-1"
-                disabled={!batchUpdateData.work_area && !batchUpdateData.division}
+                disabled={!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division}
               >
                 Update {selectedEmployees.size} Karyawan
               </Button>
@@ -1422,7 +1475,7 @@ const EmployeeManager = () => {
                 variant="outline" 
                 onClick={() => {
                   setIsBatchUpdateDialogOpen(false);
-                  setBatchUpdateData({ work_area: '', division: '' });
+                  setBatchUpdateData({ position: '', work_area: '', division: '' });
                 }}
               >
                 Batal
