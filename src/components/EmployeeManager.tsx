@@ -1375,7 +1375,6 @@ const EmployeeManager = () => {
                   <SelectValue placeholder="Pilih work area (tidak diubah jika kosong)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tidak Diubah</SelectItem>
                   {workAreas.map((workArea) => (
                     <SelectItem key={workArea} value={workArea}>
                       {workArea}
@@ -1395,7 +1394,6 @@ const EmployeeManager = () => {
                   <SelectValue placeholder="Pilih division (tidak diubah jika kosong)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tidak Diubah</SelectItem>
                   {divisions.map((division) => (
                     <SelectItem key={division} value={division}>
                       {division}
