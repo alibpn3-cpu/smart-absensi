@@ -5,7 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Cake, Upload, Trash2, Plus, Edit } from 'lucide-react';
+import { Cake, Upload, Trash2, Plus, Edit, Download, Search } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
@@ -29,6 +31,15 @@ const BirthdayImporter = () => {
     lokasi: '',
     level: ''
   });
+  const [searchName, setSearchName] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
+  const [batchFormData, setBatchFormData] = useState({
+    lokasi: '',
+    level: ''
+  });
+  const [uniqueLokasi, setUniqueLokasi] = useState<string[]>([]);
+  const [uniqueLevel, setUniqueLevel] = useState<string[]>([]);
 
   const fetchBirthdays = async () => {
     const { data, error } = await supabase
@@ -43,7 +54,14 @@ const BirthdayImporter = () => {
         variant: "destructive"
       });
     } else {
-      setBirthdays(data || []);
+      const birthdayData = data || [];
+      setBirthdays(birthdayData);
+      
+      // Extract unique lokasi and level
+      const lokasi = [...new Set(birthdayData.map(b => b.lokasi).filter(Boolean))].sort();
+      const level = [...new Set(birthdayData.map(b => b.level).filter(Boolean))].sort();
+      setUniqueLokasi(lokasi);
+      setUniqueLevel(level);
     }
   };
 
@@ -261,6 +279,127 @@ const BirthdayImporter = () => {
     }
   };
 
+  const handleBatchDelete = async () => {
+    if (selectedIds.length === 0) {
+      toast({
+        title: "Tidak Ada Data",
+        description: "Pilih data yang akan dihapus",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.length} data ulang tahun?`)) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('birthdays')
+        .delete()
+        .in('id', selectedIds);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: `${selectedIds.length} data berhasil dihapus`
+      });
+
+      setSelectedIds([]);
+      fetchBirthdays();
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: "Gagal menghapus data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBatchEdit = async () => {
+    if (selectedIds.length === 0) {
+      toast({
+        title: "Tidak Ada Data",
+        description: "Pilih data yang akan diubah",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!batchFormData.lokasi && !batchFormData.level) {
+      toast({
+        title: "Gagal",
+        description: "Isi minimal satu field untuk batch edit",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const updateData: any = {};
+      if (batchFormData.lokasi) updateData.lokasi = batchFormData.lokasi;
+      if (batchFormData.level) updateData.level = batchFormData.level;
+
+      const { error } = await supabase
+        .from('birthdays')
+        .update(updateData)
+        .in('id', selectedIds);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: `${selectedIds.length} data berhasil diperbarui`
+      });
+
+      setIsBatchEditOpen(false);
+      setSelectedIds([]);
+      setBatchFormData({ lokasi: '', level: '' });
+      fetchBirthdays();
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: "Gagal memperbarui data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const template = [
+      { nama: 'JOHN DOE', tanggal: '15/08', lokasi: 'JAKARTA', level: 'STAFF' },
+      { nama: 'JANE SMITH', tanggal: '20/12', lokasi: 'BANDUNG', level: 'MANAGER' }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    XLSX.writeFile(wb, 'template_ulang_tahun.xlsx');
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredBirthdays.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredBirthdays.map(b => b.id!));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const filteredBirthdays = birthdays.filter(b => 
+    b.nama.toLowerCase().includes(searchName.toLowerCase())
+  );
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -346,6 +485,15 @@ const BirthdayImporter = () => {
             
             <Button
               variant="outline"
+              onClick={downloadTemplate}
+              disabled={loading}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Template
+            </Button>
+
+            <Button
+              variant="outline"
               onClick={() => document.getElementById('birthday-file-input')?.click()}
               disabled={loading}
             >
@@ -372,6 +520,44 @@ const BirthdayImporter = () => {
         />
       </CardHeader>
       <CardContent>
+        {/* Search and Batch Actions */}
+        <div className="mb-4 space-y-3">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Cari nama..."
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          {selectedIds.length > 0 && (
+            <div className="flex gap-2 items-center bg-muted/50 p-2 rounded-lg">
+              <span className="text-sm text-muted-foreground">{selectedIds.length} dipilih</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsBatchEditOpen(true)}
+              >
+                <Edit className="h-3 w-3 mr-1" />
+                Batch Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBatchDelete}
+                className="text-destructive"
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Hapus
+              </Button>
+            </div>
+          )}
+        </div>
+
         <div className="mb-4 p-4 bg-muted rounded-lg">
           <p className="text-sm font-semibold mb-2">Format Excel yang diperlukan:</p>
           <ul className="text-sm space-y-1 text-muted-foreground">
@@ -382,25 +568,40 @@ const BirthdayImporter = () => {
           </ul>
         </div>
 
-        {birthdays.length === 0 ? (
+        {filteredBirthdays.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             Belum ada data ulang tahun. Silakan import file XLSX.
           </div>
         ) : (
           <div className="space-y-2">
-            <p className="text-sm font-semibold mb-2">Total: {birthdays.length} data</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold">Total: {filteredBirthdays.length} data</p>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={selectedIds.length === filteredBirthdays.length && filteredBirthdays.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <span className="text-sm text-muted-foreground">Pilih Semua</span>
+              </div>
+            </div>
             <div className="max-h-96 overflow-y-auto space-y-2">
-              {birthdays.map((birthday: any) => (
+              {filteredBirthdays.map((birthday: any) => (
                 <div
                   key={birthday.id}
                   className="border rounded-lg p-3 hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex justify-between items-start gap-2">
-                    <div className="flex-1">
-                      <h4 className="font-semibold">{birthday.nama}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        📅 {birthday.tanggal} | 📍 {birthday.lokasi} | {birthday.level}
-                      </p>
+                    <div className="flex items-start gap-2 flex-1">
+                      <Checkbox
+                        checked={selectedIds.includes(birthday.id)}
+                        onCheckedChange={() => toggleSelect(birthday.id)}
+                      />
+                      <div className="flex-1">
+                        <h4 className="font-semibold">{birthday.nama}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          📅 {birthday.tanggal} | 📍 {birthday.lokasi} | {birthday.level}
+                        </p>
+                      </div>
                     </div>
                     
                     <div className="flex gap-1">
@@ -448,6 +649,70 @@ const BirthdayImporter = () => {
             </div>
           </div>
         )}
+
+        {/* Batch Edit Dialog */}
+        <Dialog open={isBatchEditOpen} onOpenChange={setIsBatchEditOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Batch Edit ({selectedIds.length} data)</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="batch-lokasi">Lokasi</Label>
+                <Select
+                  value={batchFormData.lokasi}
+                  onValueChange={(value) => setBatchFormData({...batchFormData, lokasi: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih lokasi..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border shadow-lg z-50">
+                    {uniqueLokasi.map((lok) => (
+                      <SelectItem key={lok} value={lok} className="cursor-pointer">
+                        {lok}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="batch-level">Level/Jabatan</Label>
+                <Select
+                  value={batchFormData.level}
+                  onValueChange={(value) => setBatchFormData({...batchFormData, level: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih level..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border shadow-lg z-50">
+                    {uniqueLevel.map((lv) => (
+                      <SelectItem key={lv} value={lv} className="cursor-pointer">
+                        {lv}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex gap-2 pt-4">
+                <Button onClick={handleBatchEdit} className="flex-1 gradient-primary" disabled={loading}>
+                  Update
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsBatchEditOpen(false);
+                    setBatchFormData({ lokasi: '', level: '' });
+                  }}
+                >
+                  Batal
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

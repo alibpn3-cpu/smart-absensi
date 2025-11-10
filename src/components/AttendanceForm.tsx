@@ -1068,23 +1068,26 @@ const AttendanceForm = () => {
         {/* Header with Date/Time */}
         <Card className="bg-card border shadow-lg">
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-start gap-6 px-4">
-              {/* Analog Clock - Modern Design with Dark Blue Color */}
-              <div className="relative w-24 h-24 rounded-full border-4 border-blue-900 bg-gradient-to-br from-gray-50 to-gray-100 shadow-xl flex-shrink-0 animate-scale-in">
+            <div className="flex items-center justify-center gap-6 px-4">
+              {/* Analog Clock - Modern Design with Gradient Colors */}
+              <div className="relative w-32 h-32 rounded-full border-[5px] border-gradient-to-br from-blue-600 via-purple-600 to-pink-600 bg-gradient-to-br from-slate-50 via-white to-slate-100 shadow-2xl flex-shrink-0 animate-scale-in" style={{ borderImage: 'linear-gradient(135deg, #2563eb, #9333ea, #ec4899) 1' }}>
                 {/* Gradient overlay for depth */}
-                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/40 to-transparent pointer-events-none" />
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/60 via-transparent to-slate-100/30 pointer-events-none" />
+                
+                {/* Subtle inner glow */}
+                <div className="absolute inset-2 rounded-full shadow-inner opacity-20" />
                 
                 {/* Clock tick marks */}
                 {[...Array(12)].map((_, i) => {
                   const angle = (i * 30 - 90) * (Math.PI / 180);
-                  const radius = 40;
+                  const radius = 54;
                   const x = radius * Math.cos(angle);
                   const y = radius * Math.sin(angle);
                   const isMainHour = [0, 3, 6, 9].includes(i);
                   return (
                     <div
                       key={i}
-                      className={`absolute ${isMainHour ? 'w-1 h-3' : 'w-0.5 h-2'} bg-blue-900/80 rounded-full`}
+                      className={`absolute ${isMainHour ? 'w-1 h-4 bg-gradient-to-b from-blue-700 to-purple-700' : 'w-0.5 h-2.5 bg-slate-400'} rounded-full`}
                       style={{
                         left: `calc(50% + ${x}px)`,
                         top: `calc(50% + ${y}px)`,
@@ -1094,16 +1097,16 @@ const AttendanceForm = () => {
                   );
                 })}
                 
-                {/* Clock numbers - only 12, 3, 6, 9 */}
-                {[12, 3, 6, 9].map((hour) => {
+                {/* Clock numbers - all 12 numbers */}
+                {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((hour) => {
                   const angle = ((hour === 12 ? 0 : hour) * 30 - 90) * (Math.PI / 180);
-                  const radius = 28;
+                  const radius = 38;
                   const x = radius * Math.cos(angle);
                   const y = radius * Math.sin(angle);
                   return (
                     <div
                       key={hour}
-                      className="absolute text-xs font-bold text-blue-900/90"
+                      className="absolute text-[10px] font-bold bg-gradient-to-br from-blue-700 to-purple-700 bg-clip-text text-transparent"
                       style={{
                         left: `calc(50% + ${x}px)`,
                         top: `calc(50% + ${y}px)`,
@@ -1116,58 +1119,68 @@ const AttendanceForm = () => {
                 })}
                 
                 {/* Center dot with glow effect */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-blue-900 rounded-full z-10 shadow-lg" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-blue-900/30 rounded-full z-10 animate-ping" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full z-10 shadow-xl" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500/40 rounded-full z-10 animate-ping" />
                 
-                {/* Hour hand - thicker and dark blue */}
+                {/* Hour hand - gradient with shadow */}
                 <div 
-                  className="absolute top-1/2 left-1/2 w-1.5 bg-blue-900 rounded-full origin-bottom transition-all duration-500 ease-out shadow-md"
+                  className="absolute top-1/2 left-1/2 w-2 bg-gradient-to-t from-blue-800 to-blue-600 rounded-full origin-bottom transition-all duration-500 ease-out shadow-lg"
                   style={{ 
-                    height: '28%',
+                    height: '30%',
                     transform: `translate(-50%, -100%) rotate(${((getTimeForTimezone(currentDateTime, timezone).hours % 12) * 30) + (getTimeForTimezone(currentDateTime, timezone).minutes * 0.5)}deg)`
                   }}
                 />
                 
-                {/* Minute hand - medium thickness and dark blue */}
+                {/* Minute hand - gradient with shadow */}
                 <div 
-                  className="absolute top-1/2 left-1/2 w-1 bg-blue-900 rounded-full origin-bottom transition-all duration-500 ease-out shadow-md"
+                  className="absolute top-1/2 left-1/2 w-1.5 bg-gradient-to-t from-purple-800 to-purple-600 rounded-full origin-bottom transition-all duration-500 ease-out shadow-lg"
                   style={{ 
-                    height: '40%',
+                    height: '42%',
                     transform: `translate(-50%, -100%) rotate(${getTimeForTimezone(currentDateTime, timezone).minutes * 6}deg)`
                   }}
                 />
                 
-                {/* Second hand - thin with smooth animation and red tip */}
+                {/* Second hand - thin with smooth animation and gradient tip */}
                 <div 
                   className="absolute top-1/2 left-1/2 w-0.5 origin-bottom"
                   style={{ 
-                    height: '42%',
+                    height: '45%',
                     transform: `translate(-50%, -100%) rotate(${getTimeForTimezone(currentDateTime, timezone).seconds * 6}deg)`,
                     transition: 'transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)'
                   }}
                 >
-                  <div className="w-full h-3/4 bg-blue-900 rounded-full" />
-                  <div className="w-full h-1/4 bg-red-600 rounded-full" />
+                  <div className="w-full h-3/4 bg-slate-600 rounded-full" />
+                  <div className="w-full h-1/4 bg-gradient-to-t from-red-600 to-pink-500 rounded-full shadow-md" />
                 </div>
               </div>
 
-              {/* Date and Digital Time - Stacked vertically */}
-              <div className="flex flex-col gap-2">
+              {/* Date and Digital Time - Centered and Responsive */}
+              <div className="flex flex-col gap-2 items-center text-center flex-1">
                 {/* Date */}
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  {currentDateTime.toLocaleDateString('id-ID', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
+                <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline">
+                    {currentDateTime.toLocaleDateString('id-ID', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </span>
+                  <span className="sm:hidden">
+                    {currentDateTime.toLocaleDateString('id-ID', { 
+                      weekday: 'short', 
+                      day: 'numeric', 
+                      month: 'short',
+                      year: 'numeric'
+                    })}
+                  </span>
                 </div>
 
                 {/* Digital Time */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-xl font-bold text-primary">
+                <div className="flex items-center justify-center gap-3">
+                  <div className="flex items-baseline gap-1.5 justify-center">
+                    <span className="text-xl sm:text-2xl font-bold text-primary">
                       {formatTimeWithTimezone(currentDateTime, timezone).split(' ')[0]}
                     </span>
                     <span className="text-xs font-medium text-muted-foreground">
