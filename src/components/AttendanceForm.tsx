@@ -7,11 +7,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Globe, User } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Globe, User, ChevronsUpDown, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import CameraCapture from './CameraCapture';
 import BirthdayCard from './BirthdayCard';
+import PermissionIndicators from './PermissionIndicators';
 import { format } from 'date-fns';
 
 interface StaffUser {
@@ -1157,33 +1161,53 @@ const AttendanceForm = () => {
                 )}
               </div>
               
-              <Select
-                onValueChange={handleStaffSelect} 
-                value={selectedStaff?.uid || ''}
-              >
-                <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
-                  <SelectValue placeholder="Pilih nama staff..." />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border shadow-lg max-h-60 overflow-hidden z-50">
-                  <div className="max-h-40 overflow-y-auto">
-                    {filteredStaffUsers.length === 0 ? (
-                      <div className="p-3 text-center text-muted-foreground text-sm">
-                        {selectedWorkArea === 'all' ? 'Tidak ada data staff' : `Tidak ada staff di area ${selectedWorkArea}`}
-                      </div>
-                    ) : (
-                      filteredStaffUsers.map((staff) => (
-                        <SelectItem 
-                          key={staff.uid} 
-                          value={staff.uid}
-                          className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground"
-                        >
-                          {staff.name} - {staff.position}
-                        </SelectItem>
-                      ))
-                    )}
-                  </div>
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="h-12 w-full justify-between border-2 hover:border-primary transition-colors"
+                  >
+                    {selectedStaff 
+                      ? `${selectedStaff.name} - ${selectedStaff.position}`
+                      : "Pilih nama staff..."
+                    }
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Cari nama staff..." className="h-9" />
+                    <CommandEmpty>Tidak ada staff ditemukan.</CommandEmpty>
+                    <CommandList>
+                      <CommandGroup>
+                        {filteredStaffUsers.length === 0 ? (
+                          <div className="p-3 text-center text-muted-foreground text-sm">
+                            {selectedWorkArea === 'all' ? 'Tidak ada data staff' : `Tidak ada staff di area ${selectedWorkArea}`}
+                          </div>
+                        ) : (
+                          filteredStaffUsers.map((staff) => (
+                            <CommandItem
+                              key={staff.uid}
+                              value={`${staff.name} ${staff.position}`}
+                              onSelect={() => handleStaffSelect(staff.uid)}
+                              className="cursor-pointer"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedStaff?.uid === staff.uid ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {staff.name} - {staff.position}
+                            </CommandItem>
+                          ))
+                        )}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             {/* Staff Info Display */}
             {selectedStaff && (
@@ -1358,9 +1382,15 @@ const AttendanceForm = () => {
 
         <div className="text-center text-xs text-muted-foreground mt-2 space-y-2">
           <div>Versi Aplikasi: v1.0.5 IT Dept. 2025</div>
-          <Button variant="outline" size="sm" onClick={handleClearCache}>
-            Update (Hapus Cache)
-          </Button>
+          <div className="flex items-center justify-center gap-3">
+            <Button variant="outline" size="sm" onClick={handleClearCache}>
+              Update (Hapus Cache)
+            </Button>
+            <PermissionIndicators 
+              permissions={permissions} 
+              onPermissionsUpdate={savePermissions}
+            />
+          </div>
         </div>
 
         {/* Checkout Reason Dialog - WFO outside geofence */}

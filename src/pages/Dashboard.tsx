@@ -72,11 +72,20 @@ const Dashboard = () => {
     dinasCount: 0
   });
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   
   const [loading, setLoading] = useState(true);
 
+  // Calculate pagination
+  const totalPages = Math.ceil(attendanceRecords.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentRecords = attendanceRecords.slice(startIndex, endIndex);
+
   useEffect(() => {
     fetchDashboardData();
+    setCurrentPage(1); // Reset to first page when date changes
   }, [selectedDate]);
 
   const fetchDashboardData = async () => {
@@ -405,126 +414,151 @@ const Dashboard = () => {
                     No attendance records found for selected date
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {attendanceRecords.map((record) => (
-                      <div
-                        key={record.id}
-                        className="border border-border rounded-lg p-4 space-y-3 bg-muted/30"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-semibold text-foreground">{record.staff_name}</h3>
-                            <p className="text-sm text-muted-foreground">ID: {record.staff_uid}</p>
+                  <>
+                    <div className="space-y-2">
+                      {currentRecords.map((record) => (
+                        <div
+                          key={record.id}
+                          className="border border-border rounded-lg p-2 space-y-1.5 bg-muted/30"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h3 className="font-semibold text-sm text-foreground">{record.staff_name}</h3>
+                              <p className="text-xs text-muted-foreground">ID: {record.staff_uid}</p>
+                            </div>
+                            {getStatusBadge(record.status)}
                           </div>
-                          {getStatusBadge(record.status)}
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Check In:</p>
-                            <p className="font-medium text-foreground">
-                              {record.check_in_time 
-                                ? (() => {
-                                    try {
-                                      // Parse the stored time string (format: "YYYY-MM-DD HH:mm:ss.sss+HH:mm")
-                                      const timeStr = record.check_in_time.split(' ')[1]?.split('+')[0] || record.check_in_time;
-                                      return timeStr;
-                                    } catch {
-                                      return record.check_in_time;
-                                    }
-                                  })()
-                                : '-'
-                              }
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Check Out:</p>
-                            <p className="font-medium text-foreground">
-                              {record.check_out_time 
-                                ? (() => {
-                                    try {
-                                      // Parse the stored time string (format: "YYYY-MM-DD HH:mm:ss.sss+HH:mm")
-                                      const timeStr = record.check_out_time.split(' ')[1]?.split('+')[0] || record.check_out_time;
-                                      return timeStr;
-                                    } catch {
-                                      return record.check_out_time;
-                                    }
-                                  })()
-                                : '-'
-                              }
-                            </p>
-                          </div>
-                        </div>
-
-                        {record.checkin_location_address && (
-                          <div>
-                            <p className="text-sm text-muted-foreground">Lokasi Check In:</p>
-                            <p className="text-sm text-foreground mb-2">{record.checkin_location_address}</p>
-                            <div className="flex items-center justify-between">
-                              <p className="text-xs text-muted-foreground">
-                                📍 Koordinat: {record.checkin_location_lat}, {record.checkin_location_lng}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <p className="text-muted-foreground">Check In:</p>
+                              <p className="font-medium text-foreground">
+                                {record.check_in_time 
+                                  ? (() => {
+                                      try {
+                                        const timeStr = record.check_in_time.split(' ')[1]?.split('+')[0] || record.check_in_time;
+                                        return timeStr;
+                                      } catch {
+                                        return record.check_in_time;
+                                      }
+                                    })()
+                                  : '-'
+                                }
                               </p>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.open(
-                                  `https://www.google.com/maps?q=${record.checkin_location_lat},${record.checkin_location_lng}`,
-                                  '_blank'
-                                )}
-                                className="text-xs h-6"
-                              >
-                                🗺️ Maps
-                              </Button>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Check Out:</p>
+                              <p className="font-medium text-foreground">
+                                {record.check_out_time 
+                                  ? (() => {
+                                      try {
+                                        const timeStr = record.check_out_time.split(' ')[1]?.split('+')[0] || record.check_out_time;
+                                        return timeStr;
+                                      } catch {
+                                        return record.check_out_time;
+                                      }
+                                    })()
+                                  : '-'
+                                }
+                              </p>
                             </div>
                           </div>
-                        )}
 
-                        {record.checkout_location_address && (
-                          <div className="mt-2">
-                            <p className="text-sm text-muted-foreground">Lokasi Check Out:</p>
-                            <p className="text-sm text-foreground mb-2">{record.checkout_location_address}</p>
-                            <div className="flex items-center justify-between">
-                              <p className="text-xs text-muted-foreground">
-                                📍 Koordinat: {record.checkout_location_lat}, {record.checkout_location_lng}
-                              </p>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.open(
-                                  `https://www.google.com/maps?q=${record.checkout_location_lat},${record.checkout_location_lng}`,
-                                  '_blank'
-                                )}
-                                className="text-xs h-6"
-                              >
-                                🗺️ Maps
-                              </Button>
+                          {record.checkin_location_address && (
+                            <div>
+                              <p className="text-xs text-muted-foreground">Lokasi Check In:</p>
+                              <p className="text-xs text-foreground mb-1">{record.checkin_location_address}</p>
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs text-muted-foreground">
+                                  📍 {record.checkin_location_lat}, {record.checkin_location_lng}
+                                </p>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => window.open(
+                                    `https://www.google.com/maps?q=${record.checkin_location_lat},${record.checkin_location_lng}`,
+                                    '_blank'
+                                  )}
+                                  className="text-xs h-5 px-2"
+                                >
+                                  🗺️ Maps
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        {record.reason && (
-                          <div>
-                            <p className="text-sm text-muted-foreground">Reason:</p>
-                            <p className="text-sm text-foreground">{record.reason}</p>
-                          </div>
-                        )}
+                          {record.checkout_location_address && (
+                            <div className="mt-1">
+                              <p className="text-xs text-muted-foreground">Lokasi Check Out:</p>
+                              <p className="text-xs text-foreground mb-1">{record.checkout_location_address}</p>
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs text-muted-foreground">
+                                  📍 {record.checkout_location_lat}, {record.checkout_location_lng}
+                                </p>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => window.open(
+                                    `https://www.google.com/maps?q=${record.checkout_location_lat},${record.checkout_location_lng}`,
+                                    '_blank'
+                                  )}
+                                  className="text-xs h-5 px-2"
+                                >
+                                  🗺️ Maps
+                                </Button>
+                              </div>
+                            </div>
+                          )}
 
-                        {record.selfie_photo_url && (
-                          <div className="flex justify-end">
+                          {record.reason && (
+                            <div className="mt-1">
+                              <p className="text-xs text-muted-foreground">Alasan:</p>
+                              <p className="text-xs text-foreground">{record.reason}</p>
+                            </div>
+                          )}
+
+                          {record.selfie_photo_url && (
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => viewPhoto(record.selfie_photo_url!)}
-                              className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20"
+                              className="w-full mt-1 text-xs h-6"
                             >
-                              <Eye className="h-4 w-4 mr-2" />
+                              <Eye className="h-3 w-3 mr-1" />
                               View Photo
                             </Button>
-                          </div>
-                        )}
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+                        <div className="text-sm text-muted-foreground">
+                          Halaman {currentPage} dari {totalPages} (Total: {attendanceRecords.length} records)
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                          >
+                            Sebelumnya
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage === totalPages}
+                          >
+                            Selanjutnya
+                          </Button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

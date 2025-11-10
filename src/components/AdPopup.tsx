@@ -53,11 +53,11 @@ const AdPopup = () => {
   useEffect(() => {
     if (ads.length === 0 || hasShownInitial) return;
 
-    // Show first ad after 1 second
+    // Show first ad after 5 minutes
     const timer = window.setTimeout(() => {
       setIsVisible(true);
       setHasShownInitial(true);
-    }, 1000);
+    }, 300000); // 5 minutes = 300000ms
 
     return () => {
       clearTimeout(timer);
@@ -67,12 +67,12 @@ const AdPopup = () => {
   useEffect(() => {
     if (!hasShownInitial || ads.length === 0) return;
 
-    // Set up interval to show ads every 50 seconds
+    // Set up interval to show ads every 10 minutes
     if (intervalRef.current) clearInterval(intervalRef.current);
     
     intervalRef.current = window.setInterval(() => {
-      // Only show ad if user is active
-      if (isUserActive) {
+      // Only show ad if user is NOT active (inactive for 30 seconds)
+      if (!isUserActive) {
         setIsVisible(true);
         if (ads.length > 1) {
           setCurrentIndex((prev) => {
@@ -84,7 +84,7 @@ const AdPopup = () => {
           });
         }
       }
-    }, 50000); // 50 seconds = 50000ms
+    }, 600000); // 10 minutes = 600000ms
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
