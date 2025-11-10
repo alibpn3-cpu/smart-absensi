@@ -30,5 +30,11 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    // Force single React instance to prevent "Cannot read properties of null (reading 'useRef')" error
+    dedupe: ['react', 'react-dom'],
+  },
+  optimizeDeps: {
+    // Pre-bundle these dependencies to ensure consistent React instance
+    include: ['react', 'react-dom', '@radix-ui/react-tooltip'],
   },
 }));
