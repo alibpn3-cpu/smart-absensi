@@ -30,11 +30,33 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    // Force single React instance to prevent "Cannot read properties of null (reading 'useRef')" error
-    dedupe: ['react', 'react-dom'],
+    // Force single React instance across all dependencies
+    dedupe: [
+      'react', 
+      'react-dom',
+      'react/jsx-runtime',
+      '@tanstack/react-query',
+      '@radix-ui/react-tooltip',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-select',
+      '@radix-ui/react-dropdown-menu'
+    ],
   },
   optimizeDeps: {
-    // Pre-bundle these dependencies to ensure consistent React instance
-    include: ['react', 'react-dom', '@radix-ui/react-tooltip'],
+    // Pre-bundle and force re-optimization
+    include: [
+      'react', 
+      'react-dom',
+      'react/jsx-runtime',
+      '@tanstack/react-query',
+      '@radix-ui/react-tooltip'
+    ],
+    esbuildOptions: {
+      // Ensure single React instance at build level
+      conditions: ['module'],
+    },
   },
+  // Clear cache on server start
+  cacheDir: '.vite',
 }));
