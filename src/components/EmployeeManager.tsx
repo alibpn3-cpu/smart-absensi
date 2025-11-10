@@ -7,10 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera, CheckSquare, Square } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface StaffUser {
   id: string;
@@ -53,6 +54,12 @@ const EmployeeManager = () => {
     userName: string;
     mismatches: string[];
   }>>([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
+  const [isBatchUpdateDialogOpen, setIsBatchUpdateDialogOpen] = useState(false);
+  const [batchUpdateData, setBatchUpdateData] = useState({
+    work_area: '',
+    division: ''
+  });
 
   useEffect(() => {
     fetchEmployees();
@@ -450,6 +457,151 @@ const EmployeeManager = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const toggleSelectEmployee = (employeeId: string) => {
+    const newSelected = new Set(selectedEmployees);
+    if (newSelected.has(employeeId)) {
+      newSelected.delete(employeeId);
+    } else {
+      newSelected.add(employeeId);
+    }
+    setSelectedEmployees(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    const filteredEmployees = employees.filter(emp => {
+      const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
+      return matchesSearch && matchesWorkArea;
+    });
+
+    if (selectedEmployees.size === filteredEmployees.length) {
+      setSelectedEmployees(new Set());
+    } else {
+      setSelectedEmployees(new Set(filteredEmployees.map(emp => emp.id)));
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedEmployees.size === 0) return;
+
+    try {
+      const { error } = await supabase
+        .from('staff_users')
+        .delete()
+        .in('id', Array.from(selectedEmployees));
+
+      if (error) throw error;
+
+      const deletedNames = employees
+        .filter(emp => selectedEmployees.has(emp.id))
+        .map(emp => emp.name)
+        .join(', ');
+
+      await logActivity('batch_delete', deletedNames, { count: selectedEmployees.size });
+
+      toast({
+        title: "Berhasil",
+        description: `${selectedEmployees.size} karyawan berhasil dihapus`
+      });
+
+      setSelectedEmployees(new Set());
+      fetchEmployees();
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: "Gagal menghapus karyawan",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleBatchUpdate = async () => {
+    if (selectedEmployees.size === 0) return;
+
+    if (!batchUpdateData.work_area && !batchUpdateData.division) {
+      toast({
+        title: "Gagal",
+        description: "Pilih minimal satu field untuk diupdate",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const updatePayload: any = {};
+      if (batchUpdateData.work_area) updatePayload.work_area = batchUpdateData.work_area;
+      if (batchUpdateData.division) updatePayload.division = batchUpdateData.division;
+
+      const { error } = await supabase
+        .from('staff_users')
+        .update(updatePayload)
+        .in('id', Array.from(selectedEmployees));
+
+      if (error) throw error;
+
+      const updatedNames = employees
+        .filter(emp => selectedEmployees.has(emp.id))
+        .map(emp => emp.name)
+        .join(', ');
+
+      await logActivity('batch_update', updatedNames, { 
+        count: selectedEmployees.size, 
+        updates: updatePayload 
+      });
+
+      toast({
+        title: "Berhasil",
+        description: `${selectedEmployees.size} karyawan berhasil diupdate`
+      });
+
+      setIsBatchUpdateDialogOpen(false);
+      setBatchUpdateData({ work_area: '', division: '' });
+      setSelectedEmployees(new Set());
+      fetchEmployees();
+      fetchDropdownData();
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: "Gagal mengupdate karyawan",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const downloadEmployeesExcel = () => {
+    let employeesToExport = employees;
+
+    // If there are selected employees, export only those
+    if (selectedEmployees.size > 0) {
+      employeesToExport = employees.filter(emp => selectedEmployees.has(emp.id));
+    }
+
+    const exportData = employeesToExport.map(emp => ({
+      'UID': emp.uid,
+      'Name': emp.name,
+      'Position': emp.position,
+      'Work Area': emp.work_area,
+      'Division': emp.division || '',
+      'Status': emp.is_active ? 'Active' : 'Inactive',
+      'Created At': new Date(emp.created_at).toLocaleDateString('id-ID')
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+
+    const fileName = selectedEmployees.size > 0 
+      ? `employees_selected_${selectedEmployees.size}.xlsx`
+      : `employees_all_${employees.length}.xlsx`;
+    
+    XLSX.writeFile(wb, fileName);
+    
+    toast({
+      title: "Download Berhasil",
+      description: `${employeesToExport.length} data karyawan telah didownload`
+    });
   };
 
   const exportTemplate = (format: 'xlsx' | 'csv') => {
@@ -943,18 +1095,92 @@ const EmployeeManager = () => {
             </div>
           </div>
           
-          {/* Total Count */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Users className="h-4 w-4" />
-            <span>
-              Total Employee: <strong className="text-foreground">
-                {employees.filter(emp => {
-                  const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
-                  const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
-                  return matchesSearch && matchesWorkArea;
-                }).length}
-              </strong> dari {employees.length}
-            </span>
+          {/* Total Count and Actions */}
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="select-all"
+                  checked={selectedEmployees.size > 0 && selectedEmployees.size === employees.filter(emp => {
+                    const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
+                    const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
+                    return matchesSearch && matchesWorkArea;
+                  }).length}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <Label htmlFor="select-all" className="text-sm cursor-pointer">
+                  Pilih Semua
+                </Label>
+              </div>
+              
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Users className="h-4 w-4" />
+                <span>
+                  Total Employee: <strong className="text-foreground">
+                    {employees.filter(emp => {
+                      const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
+                      const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
+                      return matchesSearch && matchesWorkArea;
+                    }).length}
+                  </strong> dari {employees.length}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={downloadEmployeesExcel}
+                  className="ml-2"
+                >
+                  <Download className="h-3 w-3 mr-1" />
+                  Excel
+                </Button>
+              </div>
+              
+              {selectedEmployees.size > 0 && (
+                <Badge variant="secondary" className="text-sm">
+                  {selectedEmployees.size} dipilih
+                </Badge>
+              )}
+            </div>
+
+            {/* Batch Actions */}
+            {selectedEmployees.size > 0 && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsBatchUpdateDialogOpen(true)}
+                >
+                  <Edit className="h-3 w-3 mr-1" />
+                  Batch Update
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Batch Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete {selectedEmployees.size} Karyawan?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Apakah Anda yakin ingin menghapus {selectedEmployees.size} karyawan yang dipilih? 
+                        Tindakan ini tidak dapat dibatalkan dan akan menghapus semua data absensi mereka.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Batal</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleBatchDelete}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Hapus Semua
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
           </div>
         </div>
 
@@ -977,6 +1203,14 @@ const EmployeeManager = () => {
                 key={employee.id}
                 className="rounded-lg p-4 flex items-center gap-4 hover:bg-muted/50 transition-colors"
               >
+                {/* Checkbox */}
+                <div className="flex-shrink-0">
+                  <Checkbox
+                    checked={selectedEmployees.has(employee.id)}
+                    onCheckedChange={() => toggleSelectEmployee(employee.id)}
+                  />
+                </div>
+                
                 {/* Employee Photo */}
                 <div className="flex-shrink-0">
                   {employee.photo_url ? (
@@ -1117,6 +1351,85 @@ const EmployeeManager = () => {
             <Button onClick={() => setIsMismatchDialogOpen(false)}>
               Tutup
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Update Dialog */}
+      <Dialog open={isBatchUpdateDialogOpen} onOpenChange={setIsBatchUpdateDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Batch Update ({selectedEmployees.size} Karyawan)</DialogTitle>
+            <DialogDescription>
+              Update Work Area dan/atau Division untuk {selectedEmployees.size} karyawan yang dipilih
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="batch-work-area">Work Area (Optional)</Label>
+              <Select
+                value={batchUpdateData.work_area}
+                onValueChange={(value) => setBatchUpdateData({...batchUpdateData, work_area: value})}
+              >
+                <SelectTrigger id="batch-work-area">
+                  <SelectValue placeholder="Pilih work area (tidak diubah jika kosong)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Tidak Diubah</SelectItem>
+                  {workAreas.map((workArea) => (
+                    <SelectItem key={workArea} value={workArea}>
+                      {workArea}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="batch-division">Division (Optional)</Label>
+              <Select
+                value={batchUpdateData.division}
+                onValueChange={(value) => setBatchUpdateData({...batchUpdateData, division: value})}
+              >
+                <SelectTrigger id="batch-division">
+                  <SelectValue placeholder="Pilih division (tidak diubah jika kosong)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Tidak Diubah</SelectItem>
+                  {divisions.map((division) => (
+                    <SelectItem key={division} value={division}>
+                      {division}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                💡 Field yang tidak dipilih tidak akan diubah. Pilih minimal satu field untuk update.
+              </p>
+            </div>
+            
+            <div className="flex gap-2 pt-4">
+              <Button 
+                onClick={handleBatchUpdate}
+                className="flex-1"
+                disabled={!batchUpdateData.work_area && !batchUpdateData.division}
+              >
+                Update {selectedEmployees.size} Karyawan
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setIsBatchUpdateDialogOpen(false);
+                  setBatchUpdateData({ work_area: '', division: '' });
+                }}
+              >
+                Batal
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
