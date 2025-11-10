@@ -533,11 +533,15 @@ const Dashboard = () => {
                     </div>
                     
                     {/* Pagination Controls */}
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-                        <div className="text-sm text-muted-foreground">
-                          Halaman {currentPage} dari {totalPages} (Total: {attendanceRecords.length} records)
-                        </div>
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+                      <div className="text-sm text-muted-foreground">
+                        {totalPages > 1 ? (
+                          <>Halaman {currentPage} dari {totalPages} (Total: {attendanceRecords.length} records)</>
+                        ) : (
+                          <>Total: {attendanceRecords.length} records</>
+                        )}
+                      </div>
+                      {totalPages > 1 && (
                         <div className="flex gap-2">
                           <Button
                             variant="outline"
@@ -556,8 +560,8 @@ const Dashboard = () => {
                             Selanjutnya
                           </Button>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </>
                 )}
               </CardContent>
