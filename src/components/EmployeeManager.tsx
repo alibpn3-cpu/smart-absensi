@@ -147,11 +147,18 @@ const EmployeeManager = () => {
     work_area: '',
     division: ''
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     fetchEmployees();
     fetchDropdownData();
   }, []);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, workAreaFilter]);
 
   const logActivity = async (actionType: string, targetName: string, details?: any) => {
     try {
@@ -1251,15 +1258,22 @@ const EmployeeManager = () => {
           <div className="text-center py-8 text-muted-foreground">
             No employees found. Add your first employee to get started.
           </div>
-        ) : (
-          <div className="space-y-4">
-            {employees
-              .filter(emp => {
-                const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
-                const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
-                return matchesSearch && matchesWorkArea;
-              })
-              .map((employee) => (
+        ) : (() => {
+          const filteredEmployees = employees.filter(emp => {
+            const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
+            return matchesSearch && matchesWorkArea;
+          });
+          
+          const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+          const startIndex = (currentPage - 1) * itemsPerPage;
+          const endIndex = startIndex + itemsPerPage;
+          const currentEmployees = filteredEmployees.slice(startIndex, endIndex);
+          
+          return (
+            <>
+              <div className="space-y-4">
+                {currentEmployees.map((employee) => (
               <div
                 key={employee.id}
                 className="rounded-lg p-4 flex items-center gap-4 hover:bg-muted/50 transition-colors"
@@ -1361,19 +1375,44 @@ const EmployeeManager = () => {
                 </div>
               </div>
             ))}
-            
-            {/* No results message */}
-            {employees.filter(emp => {
-              const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
-              const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
-              return matchesSearch && matchesWorkArea;
-            }).length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                Tidak ada employee yang sesuai dengan filter.
               </div>
-            )}
-          </div>
-        )}
+              
+              {/* No results message */}
+              {filteredEmployees.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  Tidak ada employee yang sesuai dengan filter.
+                </div>
+              )}
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
+                  <div className="text-sm text-muted-foreground">
+                    Halaman {currentPage} dari {totalPages} (Total: {filteredEmployees.length} employees)
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Sebelumnya
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Selanjutnya
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </CardContent>
       
       {/* Mismatch Dialog */}

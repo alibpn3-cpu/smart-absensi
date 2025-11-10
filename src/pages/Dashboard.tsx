@@ -73,7 +73,7 @@ const Dashboard = () => {
   });
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const itemsPerPage = 10;
   
   const [loading, setLoading] = useState(true);
 
