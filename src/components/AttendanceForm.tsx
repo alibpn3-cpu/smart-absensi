@@ -64,6 +64,7 @@ const AttendanceForm = () => {
   const [isButtonProcessing, setIsButtonProcessing] = useState(false);
   const [cameraAttempts, setCameraAttempts] = useState(0);
   const [bypassCamera, setBypassCamera] = useState(false);
+  const [isStaffPopoverOpen, setIsStaffPopoverOpen] = useState(false);
   
   // Audio for button click
   const playClickSound = () => {
@@ -141,6 +142,17 @@ const AttendanceForm = () => {
       localStorage.setItem('last_selected_staff', JSON.stringify(selectedStaff));
     }
   }, [selectedStaff]);
+
+  // Load saved attendance status when checking out
+  useEffect(() => {
+    const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
+    if (isCheckOut) {
+      const savedStatus = localStorage.getItem('attendance_status');
+      if (savedStatus && (savedStatus === 'wfo' || savedStatus === 'wfh' || savedStatus === 'dinas')) {
+        setAttendanceStatus(savedStatus as 'wfo' | 'wfh' | 'dinas');
+      }
+    }
+  }, [todayAttendance]);
 
 
   const checkStoredPermissions = () => {
@@ -525,6 +537,7 @@ const AttendanceForm = () => {
   const handleStaffSelect = (staffUid: string) => {
     const staff = staffUsers.find(s => s.uid === staffUid);
     setSelectedStaff(staff || null);
+    setIsStaffPopoverOpen(false); // Close popover after selection
   };
 
   const handleWorkAreaSelect = (area: string) => {
@@ -763,6 +776,9 @@ const AttendanceForm = () => {
           throw error;
         }
         console.log('✅ Check-in recorded successfully:', data);
+        
+        // Save attendance status to localStorage for checkout
+        localStorage.setItem('attendance_status', attendanceStatus);
       }
 
       toast({
@@ -1238,7 +1254,7 @@ const AttendanceForm = () => {
                 )}
               </div>
               
-              <Popover>
+              <Popover open={isStaffPopoverOpen} onOpenChange={setIsStaffPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -1325,7 +1341,11 @@ const AttendanceForm = () => {
             {/* Attendance Status */}
             <div className="space-y-3">
               <label className="text-sm font-semibold">Status Absen</label>
-              <Select value={attendanceStatus} onValueChange={(value: 'wfo' | 'wfh' | 'dinas') => setAttendanceStatus(value)}>
+              <Select 
+                value={attendanceStatus} 
+                onValueChange={(value: 'wfo' | 'wfh' | 'dinas') => setAttendanceStatus(value)}
+                disabled={isCheckedIn} // Disable when checking out
+              >
                 <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
                   <SelectValue />
                 </SelectTrigger>
@@ -1335,6 +1355,11 @@ const AttendanceForm = () => {
                   <SelectItem value="dinas">🚗 Dinas Luar</SelectItem>
                 </SelectContent>
               </Select>
+              {isCheckedIn && (
+                <p className="text-xs text-muted-foreground">
+                  Status mengikuti check-in ({attendanceStatus.toUpperCase()})
+                </p>
+              )}
             </div>
 
             {/* Reason */}
