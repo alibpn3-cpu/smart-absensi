@@ -491,7 +491,7 @@ const AttendanceExporter = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Area</SelectItem>
-                  {workAreas.map((area) => (
+                  {workAreas.filter(Boolean).map((area) => (
                     <SelectItem key={area} value={area}>
                       {area}
                     </SelectItem>

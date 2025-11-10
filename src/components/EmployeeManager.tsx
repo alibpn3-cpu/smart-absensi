@@ -945,7 +945,7 @@ const EmployeeManager = () => {
                         <SelectValue placeholder="Select position" />
                       </SelectTrigger>
                       <SelectContent>
-                        {positions.map((position) => (
+                        {positions.filter(Boolean).map((position) => (
                           <SelectItem key={position} value={position}>
                             {position}
                           </SelectItem>
@@ -964,7 +964,7 @@ const EmployeeManager = () => {
                         <SelectValue placeholder="Select work area" />
                       </SelectTrigger>
                       <SelectContent>
-                        {workAreas.map((workArea) => (
+                        {workAreas.filter(Boolean).map((workArea) => (
                           <SelectItem key={workArea} value={workArea}>
                             {workArea}
                           </SelectItem>
@@ -983,7 +983,7 @@ const EmployeeManager = () => {
                         <SelectValue placeholder="Select division" />
                       </SelectTrigger>
                       <SelectContent>
-                        {divisions.map((division) => (
+                        {divisions.filter(Boolean).map((division) => (
                           <SelectItem key={division} value={division}>
                             {division}
                           </SelectItem>
@@ -1085,7 +1085,7 @@ const EmployeeManager = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Work Area</SelectItem>
-                  {workAreas.map((workArea) => (
+                  {workAreas.filter(Boolean).map((workArea) => (
                     <SelectItem key={workArea} value={workArea}>
                       {workArea}
                     </SelectItem>
@@ -1375,7 +1375,7 @@ const EmployeeManager = () => {
                   <SelectValue placeholder="Pilih work area (tidak diubah jika kosong)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {workAreas.map((workArea) => (
+                  {workAreas.filter(Boolean).map((workArea) => (
                     <SelectItem key={workArea} value={workArea}>
                       {workArea}
                     </SelectItem>
@@ -1394,7 +1394,7 @@ const EmployeeManager = () => {
                   <SelectValue placeholder="Pilih division (tidak diubah jika kosong)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {divisions.map((division) => (
+                  {divisions.filter(Boolean).map((division) => (
                     <SelectItem key={division} value={division}>
                       {division}
                     </SelectItem>

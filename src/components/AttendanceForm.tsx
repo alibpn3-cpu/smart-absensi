@@ -1200,7 +1200,7 @@ const AttendanceForm = () => {
                   <SelectItem value="all" className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground font-semibold">
                     🌍 Semua Area
                   </SelectItem>
-                  {workAreas.map((area) => (
+                  {workAreas.filter(Boolean).map((area) => (
                     <SelectItem 
                       key={area} 
                       value={area}
