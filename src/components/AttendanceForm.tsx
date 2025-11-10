@@ -62,6 +62,8 @@ const AttendanceForm = () => {
   const [checkoutReason, setCheckoutReason] = useState('');
   const [pendingCheckoutLocation, setPendingCheckoutLocation] = useState<{ lat: number; lng: number; address: string; coordinates: string; accuracy?: number } | null>(null);
   const [isButtonProcessing, setIsButtonProcessing] = useState(false);
+  const [cameraAttempts, setCameraAttempts] = useState(0);
+  const [bypassCamera, setBypassCamera] = useState(false);
   
   // Audio for button click
   const playClickSound = () => {
@@ -642,9 +644,9 @@ const AttendanceForm = () => {
         }
       }
 
-      // Upload photo to Supabase Storage (only for WFH and Dinas)
+      // Upload photo to Supabase Storage (only for WFH and Dinas WITH photo)
       let photoPath = null;
-      if (attendanceStatus === 'wfh' || attendanceStatus === 'dinas') {
+      if ((attendanceStatus === 'wfh' || attendanceStatus === 'dinas') && photoBlob.size > 0 && !bypassCamera) {
         console.log('📸 Compressing thumbnail for WFH/Dinas...');
         const thumbnailBlob = await compressThumbnail(photoBlob);
         console.log(`📉 Thumbnail size: ${(thumbnailBlob.size / 1024).toFixed(2)}KB (original: ${(photoBlob.size / 1024).toFixed(2)}KB)`);
@@ -661,6 +663,12 @@ const AttendanceForm = () => {
         }
         photoPath = uploadData.path;
         console.log('✅ Thumbnail uploaded:', photoPath);
+      } else if ((attendanceStatus === 'wfh' || attendanceStatus === 'dinas') && bypassCamera) {
+        console.log('⚠️ Bypass mode: Skipping photo upload');
+        toast({
+          title: "ℹ️ Absensi Tanpa Foto",
+          description: "Check-in berhasil tanpa foto selfie",
+        });
       } else {
         console.log('🏢 WFO mode: Skipping photo upload');
       }
@@ -783,16 +791,42 @@ const AttendanceForm = () => {
   const checkCameraPermission = async (): Promise<boolean> => {
     try {
       const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
-      return result.state === 'granted';
+      const granted = result.state === 'granted';
+      if (granted) {
+        // Reset attempts and bypass when permission is granted
+        setCameraAttempts(0);
+        setBypassCamera(false);
+      }
+      return granted;
     } catch (error) {
       // Fallback: try to access camera directly
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         stream.getTracks().forEach(track => track.stop());
+        // Reset attempts and bypass on successful access
+        setCameraAttempts(0);
+        setBypassCamera(false);
         return true;
       } catch {
         return false;
       }
+    }
+  };
+
+  const handleCameraError = (error: any) => {
+    const newAttempts = cameraAttempts + 1;
+    setCameraAttempts(newAttempts);
+    
+    if (newAttempts >= 2) {
+      setBypassCamera(true);
+      setShowCamera(false);
+      toast({
+        title: "⚠️ Check-in Tanpa Selfie",
+        description: "Absensi akan diproses tanpa foto selfie. Silakan berikan akses kamera dengan klik tombol permission di bawah layar untuk foto selfie di lain waktu.",
+        duration: 6000,
+      });
+      // Continue with attendance without camera
+      handlePhotoCapture(new Blob());
     }
   };
 
@@ -833,14 +867,38 @@ const AttendanceForm = () => {
 
     // Check camera permission for WFH/Dinas
     if (attendanceStatus !== 'wfo') {
-      const hasCameraPermission = await checkCameraPermission();
-      if (!hasCameraPermission) {
-        toast({
-          title: "Izin Kamera Diperlukan",
-          description: "Silakan izinkan akses kamera di pengaturan browser Anda untuk melanjutkan absensi WFH/Dinas",
-          variant: "destructive"
-        });
-        return;
+      // Check if bypass is already enabled
+      if (!bypassCamera) {
+        const hasCameraPermission = await checkCameraPermission();
+        if (!hasCameraPermission) {
+          // Increment attempts
+          const newAttempts = cameraAttempts + 1;
+          setCameraAttempts(newAttempts);
+          
+          // After 2 failed attempts, allow bypass
+          if (newAttempts >= 2) {
+            setBypassCamera(true);
+            toast({
+              title: "⚠️ Check-in Tanpa Selfie",
+              description: "Absensi akan diproses tanpa foto selfie. Silakan berikan akses kamera dengan klik tombol permission di bawah layar untuk foto selfie di lain waktu.",
+              duration: 6000,
+            });
+            // Continue with attendance without camera
+          } else {
+            toast({
+              title: "Izin Kamera Diperlukan",
+              description: `Silakan izinkan akses kamera (Percobaan ${newAttempts}/2). Setelah 2x gagal, Anda dapat melanjutkan tanpa foto.`,
+              variant: "destructive",
+              duration: 5000
+            });
+            setIsButtonProcessing(false);
+            return;
+          }
+        } else {
+          // Camera permission granted, reset attempts
+          setCameraAttempts(0);
+          setBypassCamera(false);
+        }
       }
     }
 
@@ -880,9 +938,15 @@ const AttendanceForm = () => {
         setCurrentLocation(location);
         handlePhotoCapture(new Blob()); // Pass empty blob for WFO
       } else {
-        // WFH/Dinas: Normal flow with camera for thumbnail
+        // WFH/Dinas: Check if bypass enabled
         setCurrentLocation(location);
-        setShowCamera(true);
+        if (bypassCamera) {
+          // Skip camera, process directly
+          handlePhotoCapture(new Blob());
+        } else {
+          // Normal flow with camera
+          setShowCamera(true);
+        }
       }
     } catch (error) {
       console.error('❌ Location error:', error);
@@ -1438,6 +1502,7 @@ const AttendanceForm = () => {
               setIsButtonProcessing(false);
             }}
             loading={loading}
+            onCameraError={handleCameraError}
           />
         )}
       </div>

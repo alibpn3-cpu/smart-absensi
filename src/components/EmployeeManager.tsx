@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera } from 'lucide-react';
@@ -48,6 +48,11 @@ const EmployeeManager = () => {
   const [batchLoading, setBatchLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [workAreaFilter, setWorkAreaFilter] = useState<string>('all');
+  const [isMismatchDialogOpen, setIsMismatchDialogOpen] = useState(false);
+  const [mismatchData, setMismatchData] = useState<Array<{
+    userName: string;
+    mismatches: string[];
+  }>>([]);
 
   useEffect(() => {
     fetchEmployees();
@@ -500,9 +505,31 @@ const EmployeeManager = () => {
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
+          // Fetch existing data for validation
+          const { data: existingPositions } = await supabase
+            .from('staff_users')
+            .select('position')
+            .not('position', 'is', null);
+          
+          const { data: existingWorkAreas } = await supabase
+            .from('staff_users')
+            .select('work_area')
+            .not('work_area', 'is', null);
+          
+          const { data: existingDivisions } = await supabase
+            .from('staff_users')
+            .select('division')
+            .not('division', 'is', null);
+
+          // Convert to unique arrays (lowercase for comparison)
+          const uniquePositions = [...new Set(existingPositions?.map(p => p.position.toLowerCase()) || [])];
+          const uniqueWorkAreas = [...new Set(existingWorkAreas?.map(w => w.work_area.toLowerCase()) || [])];
+          const uniqueDivisions = [...new Set(existingDivisions?.map(d => d.division?.toLowerCase()).filter(Boolean) || [])];
+
           const employeesToAdd = [];
           const errors = [];
           const duplicateUIDs = [];
+          const mismatches: Array<{ userName: string; mismatches: string[] }> = [];
 
           // Check existing UIDs
           const { data: existingEmployees } = await supabase
@@ -516,7 +543,7 @@ const EmployeeManager = () => {
             const rowNum = i + 2; // +2 because of header row and 0-based index
 
             const uid = row['UID'] || row['uid'];
-            const name = row['Name'] || row['name'];
+            let name = row['Name'] || row['name'];
             const position = row['Position'] || row['position'];
             const work_area = row['Work Area'] || row['work_area'] || row['WorkArea'];
             const division = row['Division'] || row['division'];
@@ -529,6 +556,31 @@ const EmployeeManager = () => {
             if (existingUIDs.has(uid)) {
               duplicateUIDs.push(`${uid} (Baris ${rowNum})`);
               continue;
+            }
+
+            // Auto-uppercase name
+            name = name.trim().toUpperCase();
+
+            // Collect mismatches for this employee
+            const userMismatches: string[] = [];
+            
+            if (position && !uniquePositions.includes(position.toLowerCase())) {
+              userMismatches.push(`Position "${position}" tidak ditemukan dalam data existing`);
+            }
+            
+            if (work_area && !uniqueWorkAreas.includes(work_area.toLowerCase())) {
+              userMismatches.push(`Work Area "${work_area}" tidak ditemukan dalam data existing`);
+            }
+            
+            if (division && !uniqueDivisions.includes(division.toLowerCase())) {
+              userMismatches.push(`Division "${division}" tidak ditemukan dalam data existing`);
+            }
+            
+            if (userMismatches.length > 0) {
+              mismatches.push({
+                userName: name,
+                mismatches: userMismatches
+              });
             }
 
             employeesToAdd.push({
@@ -568,7 +620,7 @@ const EmployeeManager = () => {
             return;
           }
 
-          // Insert employees
+          // Insert all employees (including those with mismatches)
           const { error } = await supabase
             .from('staff_users')
             .insert(employeesToAdd);
@@ -579,6 +631,12 @@ const EmployeeManager = () => {
             title: "Import Berhasil",
             description: `${employeesToAdd.length} karyawan berhasil ditambahkan`
           });
+
+          // Show mismatch dialog if there are mismatches
+          if (mismatches.length > 0) {
+            setMismatchData(mismatches);
+            setIsMismatchDialogOpen(true);
+          }
 
           setIsBatchDialogOpen(false);
           setBatchFile(null);
@@ -1022,6 +1080,46 @@ const EmployeeManager = () => {
           </div>
         )}
       </CardContent>
+      
+      {/* Mismatch Dialog */}
+      <Dialog open={isMismatchDialogOpen} onOpenChange={setIsMismatchDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-yellow-600 flex items-center gap-2">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Peringatan: Data Tidak Sesuai
+              </DialogTitle>
+            </div>
+            <DialogDescription>
+              Data berikut berhasil disimpan, namun memiliki nilai yang tidak sesuai dengan data existing:
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="max-h-[400px] overflow-y-auto pr-4">
+            <div className="space-y-3">
+              {mismatchData.map((item, idx) => (
+                <div key={idx} className="border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded-r">
+                  <p className="font-semibold text-gray-800 dark:text-gray-200">• {item.userName}</p>
+                  <ul className="ml-4 mt-1 space-y-1">
+                    {item.mismatches.map((msg, i) => (
+                      <li key={i} className="text-sm text-gray-700 dark:text-gray-300">- {msg}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-2 mt-4">
+            <Button onClick={() => setIsMismatchDialogOpen(false)}>
+              Tutup
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

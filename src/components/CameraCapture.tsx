@@ -8,9 +8,10 @@ interface CameraCaptureProps {
   onCapture: (photo: Blob) => void;
   onClose: () => void;
   loading: boolean;
+  onCameraError?: (error: any) => void;
 }
 
-const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose, loading }) => {
+const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose, loading, onCameraError }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -57,6 +58,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose, loadi
       localStorage.setItem('camera_permission_granted', 'true');
       
     } catch (error: any) {
+      // Notify parent about camera error
+      if (onCameraError) {
+        onCameraError(error);
+      }
+      
       if (error.name === 'NotAllowedError') {
         toast({
           title: "Izin Kamera Diperlukan",

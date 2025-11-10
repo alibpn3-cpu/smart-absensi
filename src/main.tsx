@@ -24,15 +24,38 @@ if ('serviceWorker' in navigator) {
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('✅ SW: New version installed, activating...');
-                // Tell the new SW to skip waiting
-                newWorker.postMessage({ type: 'SKIP_WAITING' });
+                console.log('✅ SW: New version installed');
                 
-                // Reload page to use new version
-                setTimeout(() => {
-                  console.log('🔄 Reloading to use new version...');
-                  window.location.reload();
-                }, 1000);
+                // Show toast notification with update button
+                const toastDiv = document.createElement('div');
+                toastDiv.innerHTML = `
+                  <div style="position: fixed; bottom: 20px; right: 20px; z-index: 10000; background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px;">
+                    <div style="font-weight: 600; font-size: 16px; margin-bottom: 8px;">🎉 Update Tersedia</div>
+                    <div style="font-size: 14px; color: #64748b; margin-bottom: 12px;">Versi baru aplikasi tersedia. Klik tombol Update untuk mendapatkan fitur terbaru.</div>
+                    <button id="update-now-btn" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; width: 100%;">Update Sekarang</button>
+                  </div>
+                `;
+                document.body.appendChild(toastDiv);
+                
+                document.getElementById('update-now-btn')?.addEventListener('click', async () => {
+                  console.log('🔄 User clicked update, clearing cache and reloading...');
+                  
+                  // Tell service worker to skip waiting
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+                  
+                  // Clear all caches except permissions
+                  if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(
+                      cacheNames.map(cacheName => caches.delete(cacheName))
+                    );
+                  }
+                  
+                  // Reload after a short delay
+                  setTimeout(() => {
+                    window.location.reload();
+                  }, 500);
+                });
               }
             });
           }
