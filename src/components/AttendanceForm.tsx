@@ -1086,12 +1086,12 @@ const AttendanceForm = () => {
           <CardHeader className="pb-4">
             <div className="flex items-center justify-center gap-4 px-4">
               {/* Analog Clock - Modern Design with Gradient Colors */}
-              <div className="relative w-[90px] h-[90px] rounded-full border-[3.5px] border-gradient-to-br from-blue-600 via-purple-600 to-pink-600 bg-gradient-to-br from-slate-50 via-white to-slate-100 shadow-2xl flex-shrink-0 animate-scale-in" style={{ borderImage: 'linear-gradient(135deg, #2563eb, #9333ea, #ec4899) 1' }}>
+              <div className="relative w-[90px] h-[90px] rounded-full border-[3.5px] border-primary bg-card shadow-2xl flex-shrink-0 animate-scale-in">
                 {/* Gradient overlay for depth */}
-                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/60 via-transparent to-slate-100/30 pointer-events-none" />
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/60 via-transparent to-slate-100/30 pointer-events-none z-0" />
                 
                 {/* Subtle inner glow */}
-                <div className="absolute inset-1.5 rounded-full shadow-inner opacity-20" />
+                <div className="absolute inset-1.5 rounded-full shadow-inner opacity-20 z-0" />
                 
                 {/* Clock tick marks */}
                 {[...Array(12)].map((_, i) => {
@@ -1103,7 +1103,7 @@ const AttendanceForm = () => {
                   return (
                     <div
                       key={i}
-                      className={`absolute ${isMainHour ? 'w-0.5 h-3 bg-gradient-to-b from-blue-700 to-purple-700' : 'w-0.5 h-2 bg-slate-400'} rounded-full`}
+                      className={`absolute z-10 ${isMainHour ? 'w-0.5 h-3 bg-primary' : 'w-0.5 h-2 bg-muted-foreground'} rounded-full`}
                       style={{
                         left: `calc(50% + ${x}px)`,
                         top: `calc(50% + ${y}px)`,
@@ -1122,7 +1122,7 @@ const AttendanceForm = () => {
                   return (
                     <div
                       key={hour}
-                      className="absolute text-[7px] font-bold bg-gradient-to-br from-blue-700 to-purple-700 bg-clip-text text-transparent"
+                      className="absolute z-20 text-[7px] font-bold text-primary"
                       style={{
                         left: `calc(50% + ${x}px)`,
                         top: `calc(50% + ${y}px)`,
@@ -1135,27 +1135,16 @@ const AttendanceForm = () => {
                 })}
                 
                 {/* Center dot with glow effect */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full z-10 shadow-xl" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500/40 rounded-full z-10 animate-ping" />
-                
-                {/* Hour hand - gradient with shadow */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full z-40 shadow-xl" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-primary/40 rounded-full z-20 animate-ping" />
+                {/* Minute hand */}
                 <div 
-                  className="absolute top-1/2 left-1/2 w-1.5 bg-gradient-to-t from-blue-800 to-blue-600 rounded-full origin-bottom transition-all duration-500 ease-out shadow-lg"
-                  style={{ 
-                    height: '30%',
-                    transform: `translate(-50%, -100%) rotate(${((getTimeForTimezone(currentDateTime, timezone).hours % 12) * 30) + (getTimeForTimezone(currentDateTime, timezone).minutes * 0.5)}deg)`
-                  }}
-                />
-                
-                {/* Minute hand - gradient with shadow */}
-                <div 
-                  className="absolute top-1/2 left-1/2 w-1 bg-gradient-to-t from-purple-800 to-purple-600 rounded-full origin-bottom transition-all duration-500 ease-out shadow-lg"
+                  className="absolute top-1/2 left-1/2 w-1 bg-primary rounded-full origin-bottom transition-all duration-500 ease-out shadow-lg z-30"
                   style={{ 
                     height: '42%',
                     transform: `translate(-50%, -100%) rotate(${getTimeForTimezone(currentDateTime, timezone).minutes * 6}deg)`
                   }}
                 />
-                
                 {/* Second hand - thin with smooth animation and gradient tip */}
                 <div 
                   className="absolute top-1/2 left-1/2 w-0.5 origin-bottom"
