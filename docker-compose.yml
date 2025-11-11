@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    container_name: smart-absensi-app
+    ports:
+      - "6890:6890"
+    environment:
+      - PORT=6890
+      # Jika menggunakan Supabase, tambahkan variabel berikut:
+      # - SUPABASE_URL=your_supabase_url
+      # - SUPABASE_PUBLISHABLE_KEY=your_supabase_key
+    restart: unless-stopped
+    env_file:
+     - .env

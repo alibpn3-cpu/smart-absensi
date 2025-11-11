@@ -1,0 +1,45 @@
+{
+  "id": "digital-absensi-petrolog",
+  "name": "Digital Absensi",
+  "short_name": "Digital Absensi",
+  "description": "Aplikasi absensi online untuk WFH,WFO dan Dinas Staff Petrolog",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-1.png",
+      "sizes": "512x1024",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Login Screen"
+    },
+    {
+      "src": "/screenshot-2.png",
+      "sizes": "512x1024",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Attendance Dashboard"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "id",
+  "prefer_related_applications": false
+}

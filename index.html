@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Digital Absensi</title>
+    <meta name="description" content="Digital Absensi v1.2">
+    <meta name="author" content="Digital Absensi" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" 
+          href="https://storage.googleapis.com/gpt-engineer-file-uploads/1mkYYMBem1gGKUzdu4s9zduDCL63/uploads/1757857940137-petrolog%20gold.png">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+
+    <!-- iOS PWA Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Digital Absensi">
+    <!-- Jika mau pakai logo perusahaan, ganti URL berikut -->
+    <link rel="apple-touch-icon" 
+          href="https://storage.googleapis.com/gpt-engineer-file-uploads/1mkYYMBem1gGKUzdu4s9zduDCL63/uploads/1757857940137-petrolog%20gold.png">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Digital Absensi" />
+    <meta property="og:description" content="Digital Absensi v1.2" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" 
+          content="https://storage.googleapis.com/gpt-engineer-file-uploads/1mkYYMBem1gGKUzdu4s9zduDCL63/social-images/social-1757857196474-pngwing.com%20(39).png">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@smartzone" />
+    <meta name="twitter:image" 
+          content="https://storage.googleapis.com/gpt-engineer-file-uploads/1mkYYMBem1gGKUzdu4s9zduDCL63/social-images/social-1757857196474-pngwing.com%20(39).png">
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered: ', registration);
+            })
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>
