@@ -16,9 +16,6 @@ import { cn } from '@/lib/utils';
 import CameraCapture from './CameraCapture';
 import BirthdayCard from './BirthdayCard';
 import PermissionIndicators from './PermissionIndicators';
-import OfflineIndicator from './OfflineIndicator';
-import { offlineStorage } from '@/lib/offlineStorage';
-import { networkDetector } from '@/lib/networkDetector';
 import { format } from 'date-fns';
 
 interface StaffUser {
@@ -641,15 +638,6 @@ const AttendanceForm = () => {
     });
   };
 
-  const blobToBase64 = (blob: Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  };
-
   const handlePhotoCapture = async (photoBlob: Blob) => {
     if (!selectedStaff || !currentLocation) {
       console.error('❌ Missing required data:', { selectedStaff, currentLocation });
@@ -698,85 +686,7 @@ const AttendanceForm = () => {
         }
       }
 
-      // Check network status - OFFLINE STORAGE for WFH/Dinas only
-      const isOnline = await networkDetector.checkConnectivity();
-      const now = new Date();
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const y = now.getFullYear();
-      const M = pad(now.getMonth() + 1);
-      const d = pad(now.getDate());
-      const h = pad(now.getHours());
-      const m = pad(now.getMinutes());
-      const s = pad(now.getSeconds());
-      const ms = String(now.getMilliseconds()).padStart(3, '0');
-      const tzMin = -now.getTimezoneOffset();
-      const sign = tzMin >= 0 ? '+' : '-';
-      const offH = pad(Math.floor(Math.abs(tzMin) / 60));
-      const offM = pad(Math.abs(tzMin) % 60);
-      const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
-      const localDateStr = `${y}-${M}-${d}`;
-      const finalReason = checkoutReason || reason || null;
-
-      if (!isOnline && (attendanceStatus === 'wfh' || attendanceStatus === 'dinas')) {
-        console.log('📡 Offline mode detected, saving to IndexedDB...');
-        
-        // Convert photo to base64 for offline storage
-        let photoBase64 = null;
-        if (photoBlob.size > 0 && !bypassCamera) {
-          const thumbnailBlob = await compressThumbnail(photoBlob);
-          photoBase64 = await blobToBase64(thumbnailBlob);
-        }
-
-        // Save to IndexedDB
-        const offlineRecord = {
-          id: `offline_${selectedStaff.uid}_${Date.now()}`,
-          staff_uid: selectedStaff.uid,
-          staff_name: selectedStaff.name,
-          date: localDateStr,
-          status: (attendanceStatus === 'wfh' ? 'WFH' : 'Dinas') as 'WFH' | 'Dinas',
-          reason: finalReason,
-          action_type: isCheckOut ? 'checkout' as const : 'checkin' as const,
-          created_at: new Date().toISOString(),
-          sync_attempts: 0,
-          ...(isCheckOut 
-            ? { 
-                check_out_time: formattedTime,
-                checkout_location_lat: currentLocation.lat,
-                checkout_location_lng: currentLocation.lng,
-                checkout_location_address: locationAddress,
-                selfie_checkout_base64: photoBase64
-              }
-            : { 
-                check_in_time: formattedTime,
-                checkin_location_lat: currentLocation.lat,
-                checkin_location_lng: currentLocation.lng,
-                checkin_location_address: locationAddress,
-                selfie_checkin_base64: photoBase64
-              }
-          )
-        };
-
-        await offlineStorage.saveRecord(offlineRecord);
-        
-        toast({
-          title: "💾 Tersimpan Offline",
-          description: `${isCheckOut ? 'Check-out' : 'Check-in'} tersimpan. Akan disinkronkan saat online.`,
-        });
-
-        setShowCamera(false);
-        setReason('');
-        setCheckoutReason('');
-        setPendingCheckoutLocation(null);
-        
-        // Save attendance status to localStorage for checkout
-        if (!isCheckOut) {
-          localStorage.setItem('attendance_status', attendanceStatus);
-        }
-        
-        return;
-      }
-
-      // ONLINE MODE - Normal Supabase upload
+      // Upload photo to Supabase Storage (only for WFH and Dinas WITH photo)
       let photoPath = null;
       if ((attendanceStatus === 'wfh' || attendanceStatus === 'dinas') && photoBlob.size > 0 && !bypassCamera) {
         console.log('📸 Compressing thumbnail for WFH/Dinas...');
@@ -804,6 +714,26 @@ const AttendanceForm = () => {
       } else {
         console.log('🏢 WFO mode: Skipping photo upload');
       }
+
+      // Save attendance record with full local timestamp including timezone offset, e.g. 2025-10-03 10:02:40.123+08:00
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const y = now.getFullYear();
+      const M = pad(now.getMonth() + 1);
+      const d = pad(now.getDate());
+      const h = pad(now.getHours());
+      const m = pad(now.getMinutes());
+      const s = pad(now.getSeconds());
+      const ms = String(now.getMilliseconds()).padStart(3, '0');
+      const tzMin = -now.getTimezoneOffset();
+      const sign = tzMin >= 0 ? '+' : '-';
+      const offH = pad(Math.floor(Math.abs(tzMin) / 60));
+      const offM = pad(Math.abs(tzMin) % 60);
+      const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
+      const localDateStr = `${y}-${M}-${d}`;
+      
+      // Use the checkout reason if it was set (for WFO checkout outside geofence)
+      const finalReason = checkoutReason || reason || null;
       
       const attendanceData = {
         staff_uid: selectedStaff.uid,
@@ -1592,7 +1522,6 @@ const AttendanceForm = () => {
               onPermissionsUpdate={savePermissions}
             />
           </div>
-          <OfflineIndicator onSyncComplete={fetchTodayAttendance} />
         </div>
 
         {/* Checkout Reason Dialog - WFO outside geofence */}

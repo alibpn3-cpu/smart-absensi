@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smart-zone-absensi-v2.0.3'; // Updated version for auto-update
+const CACHE_NAME = 'smart-zone-absensi-v2.0.2'; // Updated version for auto-update
 const urlsToCache = [
   '/',
   '/manifest.json'
