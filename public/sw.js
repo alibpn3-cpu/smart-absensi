@@ -15,8 +15,7 @@ self.addEventListener('install', (event) => {
       })
       .then(() => {
         console.log('✅ SW: Resources cached');
-        // Skip waiting to activate immediately
-        return self.skipWaiting();
+        // Wait in 'installed' state until client requests SKIP_WAITING
       })
   );
 });

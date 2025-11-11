@@ -26,6 +26,9 @@ if ('serviceWorker' in navigator) {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 console.log('✅ SW: New version installed');
                 
+                // Prevent duplicate prompt
+                if (document.getElementById('update-now-btn')) return;
+                
                 // Show toast notification with update button (centered and mobile responsive)
                 const toastDiv = document.createElement('div');
                 toastDiv.innerHTML = `
