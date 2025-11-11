@@ -910,42 +910,9 @@ const AttendanceForm = () => {
       }
     }
 
-    // Check camera permission for WFH/Dinas
-    if (attendanceStatus !== 'wfo') {
-      // Check if bypass is already enabled
-      if (!bypassCamera) {
-        const hasCameraPermission = await checkCameraPermission();
-        if (!hasCameraPermission) {
-          // Increment attempts
-          const newAttempts = cameraAttempts + 1;
-          setCameraAttempts(newAttempts);
-          
-          // After 2 failed attempts, allow bypass
-          if (newAttempts >= 2) {
-            setBypassCamera(true);
-            toast({
-              title: "⚠️ Check-in Tanpa Selfie",
-              description: "Absensi akan diproses tanpa foto selfie. Silakan berikan akses kamera dengan klik tombol permission di bawah layar untuk foto selfie di lain waktu.",
-              duration: 6000,
-            });
-            // Continue with attendance without camera
-          } else {
-            toast({
-              title: "Izin Kamera Diperlukan",
-              description: `Silakan izinkan akses kamera (Percobaan ${newAttempts}/2). Setelah 2x gagal, Anda dapat melanjutkan tanpa foto.`,
-              variant: "destructive",
-              duration: 5000
-            });
-            setIsButtonProcessing(false);
-            return;
-          }
-        } else {
-          // Camera permission granted, reset attempts
-          setCameraAttempts(0);
-          setBypassCamera(false);
-        }
-      }
-    }
+    // NOTE: Pre-permission check for camera removed to avoid false negatives on iOS/Safari.
+    // Camera permission will be requested directly inside CameraCapture on user gesture.
+
 
     try {
       const location = resolvedLocation!;
