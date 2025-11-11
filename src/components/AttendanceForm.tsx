@@ -859,20 +859,9 @@ const AttendanceForm = () => {
   };
 
   const handleCameraError = (error: any) => {
-    const newAttempts = cameraAttempts + 1;
-    setCameraAttempts(newAttempts);
-    
-    if (newAttempts >= 2) {
-      setBypassCamera(true);
-      setShowCamera(false);
-      toast({
-        title: "⚠️ Check-in Tanpa Selfie",
-        description: "Absensi akan diproses tanpa foto selfie. Silakan berikan akses kamera dengan klik tombol permission di bawah layar untuk foto selfie di lain waktu.",
-        duration: 6000,
-      });
-      // Continue with attendance without camera
-      handlePhotoCapture(new Blob());
-    }
+    // Camera error is now handled by confirmation dialog in CameraCapture component
+    // No auto-processing, let user decide via dialog
+    console.log('⚠️ Camera error:', error);
   };
 
   const handleAttendanceAction = async () => {
