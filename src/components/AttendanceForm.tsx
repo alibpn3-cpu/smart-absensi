@@ -1689,7 +1689,7 @@ const AttendanceForm = () => {
                   onClick={() => handleAttendanceAction('regular', 'check-in')}
                   disabled={!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus}
                   variant="outline"
-                  className="h-12 w-24 rounded-full border-2 active:scale-95 transition-transform"
+                  className="h-12 w-24 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#39ff14]/10"
                   style={{
                     borderColor: (!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus) 
                       ? '#9ca3af' 
@@ -1709,7 +1709,7 @@ const AttendanceForm = () => {
                   onClick={() => handleAttendanceAction('regular', 'check-out')}
                   disabled={!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading}
                   variant="outline"
-                  className="h-12 w-24 rounded-full border-2 active:scale-95 transition-transform"
+                  className="h-12 w-24 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#ff073a]/10"
                   style={{
                     borderColor: (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading)
                       ? '#9ca3af'
@@ -1739,13 +1739,13 @@ const AttendanceForm = () => {
 
               {/* Extend In/Out Buttons - Conditional */}
               {showExtendButtons && (
-                <div className="flex items-center justify-center gap-4">
+                <div className="flex items-center justify-center gap-4 animate-fade-in">
                   {/* Overtime Check In */}
                   <Button 
                     onClick={() => handleAttendanceAction('overtime', 'check-in')}
                     disabled={!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus}
                     variant="outline"
-                    className="h-12 w-28 rounded-full border-2 active:scale-95 transition-transform"
+                    className="h-12 w-28 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#39ff14]/10"
                     style={{
                       borderColor: (!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus)
                         ? '#9ca3af'
@@ -1766,7 +1766,7 @@ const AttendanceForm = () => {
                     onClick={() => handleAttendanceAction('overtime', 'check-out')}
                     disabled={!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading}
                     variant="outline"
-                    className="h-12 w-28 rounded-full border-2 active:scale-95 transition-transform"
+                    className="h-12 w-28 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#ff073a]/10"
                     style={{
                       borderColor: (!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading)
                         ? '#9ca3af'
