@@ -1709,14 +1709,23 @@ const AttendanceForm = () => {
                 {/* Regular Check Out */}
                 <Button 
                   onClick={() => handleAttendanceAction('regular', 'check-out')}
-                  disabled={!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading}
+                  disabled={
+                    // Allow WFO checkout even without check-in (for fast checkout feature)
+                    attendanceStatus === 'wfo' 
+                      ? (!!regularAttendance?.check_out_time || loading || !selectedStaff)
+                      : (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading)
+                  }
                   variant="outline"
                   className="h-12 w-24 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#ff073a]/10"
                   style={{
-                    borderColor: (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading)
+                    borderColor: (attendanceStatus === 'wfo' 
+                      ? (!!regularAttendance?.check_out_time || loading || !selectedStaff)
+                      : (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading))
                       ? '#9ca3af'
                       : '#ff073a',
-                    color: (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading)
+                    color: (attendanceStatus === 'wfo' 
+                      ? (!!regularAttendance?.check_out_time || loading || !selectedStaff)
+                      : (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading))
                       ? '#9ca3af'
                       : '#ff073a',
                     fontWeight: 'bold',
