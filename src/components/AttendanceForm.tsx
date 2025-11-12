@@ -1907,19 +1907,43 @@ const AttendanceForm = () => {
                   {/* Overtime Check In */}
                   <Button 
                     onClick={() => handleAttendanceAction('overtime', 'check-in')}
-                    disabled={!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus}
+                    disabled={
+                      !regularAttendance?.check_out_time || // Must complete regular checkout first
+                      !!overtimeAttendance?.check_in_time || 
+                      loading || 
+                      !selectedStaff || 
+                      !attendanceStatus
+                    }
                     variant="outline"
                     className="h-12 w-28 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#39ff14]/10"
                     style={{
-                      borderColor: (!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus)
+                      borderColor: (
+                        !regularAttendance?.check_out_time ||
+                        !!overtimeAttendance?.check_in_time || 
+                        loading || 
+                        !selectedStaff || 
+                        !attendanceStatus
+                      )
                         ? '#9ca3af'
                         : '#39ff14',
-                      color: (!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus)
+                      color: (
+                        !regularAttendance?.check_out_time ||
+                        !!overtimeAttendance?.check_in_time || 
+                        loading || 
+                        !selectedStaff || 
+                        !attendanceStatus
+                      )
                         ? '#9ca3af'
                         : '#39ff14',
                       fontWeight: 'bold',
                       fontSize: '0.85rem',
-                      opacity: (!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus) ? 0.5 : 1
+                      opacity: (
+                        !regularAttendance?.check_out_time ||
+                        !!overtimeAttendance?.check_in_time || 
+                        loading || 
+                        !selectedStaff || 
+                        !attendanceStatus
+                      ) ? 0.5 : 1
                     }}
                   >
                     In Extend
