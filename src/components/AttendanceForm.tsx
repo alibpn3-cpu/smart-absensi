@@ -2079,7 +2079,16 @@ const AttendanceForm = () => {
         </Dialog>
 
         {/* Checkout Reason Dialog - WFO outside geofence */}
-        <Dialog open={showCheckoutReasonDialog} onOpenChange={setShowCheckoutReasonDialog}>
+        <Dialog open={showCheckoutReasonDialog} onOpenChange={(open) => {
+          setShowCheckoutReasonDialog(open);
+          if (!open) {
+            // Reset states when dialog is closed
+            setCheckoutReason('');
+            setPendingCheckoutLocation(null);
+            setLoading(false);
+            setIsButtonProcessing(false);
+          }
+        }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Checkout WFO di Luar Area Kantor</DialogTitle>
