@@ -61,6 +61,7 @@ const AttendanceForm = () => {
   const [regularAttendance, setRegularAttendance] = useState<AttendanceRecord | null>(null);
   const [overtimeAttendance, setOvertimeAttendance] = useState<AttendanceRecord | null>(null);
   const [currentAttendanceType, setCurrentAttendanceType] = useState<'regular' | 'overtime'>('regular');
+  const [showExtendButtons, setShowExtendButtons] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [permissions, setPermissions] = useState<PermissionsState>({ location: false, camera: false });
@@ -1679,83 +1680,109 @@ const AttendanceForm = () => {
               </div>
             )}
 
-            {/* Action Buttons - 4 Buttons Grid */}
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              {/* Regular Check In - Neon Green */}
-              <Button 
-                onClick={() => handleAttendanceAction('regular', 'check-in')}
-                disabled={!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus}
-                style={{
-                  background: (!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus) 
-                    ? '#6b7280' 
-                    : '#39ff14',
-                  color: (!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus)
-                    ? '#9ca3af'
-                    : '#000',
-                  fontWeight: 'bold',
-                  border: 'none',
-                  opacity: (!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus) ? 0.5 : 1
-                }}
-                className="h-14 text-lg active:scale-95 transition-transform shadow-lg"
-              >
-                In
-              </Button>
-              
-              {/* Regular Check Out - Neon Red */}
-              <Button 
-                onClick={() => handleAttendanceAction('regular', 'check-out')}
-                disabled={!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading}
-                style={{
-                  background: (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading)
-                    ? '#6b7280'
-                    : '#ff073a',
-                  color: '#fff',
-                  fontWeight: 'bold',
-                  border: 'none',
-                  opacity: (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading) ? 0.5 : 1
-                }}
-                className="h-14 text-lg active:scale-95 transition-transform shadow-lg"
-              >
-                Out
-              </Button>
-              
-              {/* Overtime Check In - Neon Green */}
-              <Button 
-                onClick={() => handleAttendanceAction('overtime', 'check-in')}
-                disabled={!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus}
-                style={{
-                  background: (!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus)
-                    ? '#6b7280'
-                    : '#39ff14',
-                  color: (!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus)
-                    ? '#9ca3af'
-                    : '#000',
-                  fontWeight: 'bold',
-                  border: 'none',
-                  opacity: (!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus) ? 0.5 : 1
-                }}
-                className="h-14 text-lg active:scale-95 transition-transform shadow-lg"
-              >
-                In Extend
-              </Button>
-              
-              {/* Overtime Check Out - Neon Red */}
-              <Button 
-                onClick={() => handleAttendanceAction('overtime', 'check-out')}
-                disabled={!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading}
-                style={{
-                  background: (!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading)
-                    ? '#6b7280'
-                    : '#ff073a',
-                  color: '#fff',
-                  fontWeight: 'bold',
-                  border: 'none',
-                  opacity: (!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading) ? 0.5 : 1
-                }}
-                className="h-14 text-lg active:scale-95 transition-transform shadow-lg"
-              >
-                Out Extend
-              </Button>
+            {/* Action Buttons - Compact Round Buttons */}
+            <div className="flex flex-col gap-3 mt-4">
+              {/* Main In/Out Buttons */}
+              <div className="flex items-center justify-center gap-4">
+                {/* Regular Check In */}
+                <Button 
+                  onClick={() => handleAttendanceAction('regular', 'check-in')}
+                  disabled={!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus}
+                  variant="outline"
+                  className="h-12 w-24 rounded-full border-2 active:scale-95 transition-transform"
+                  style={{
+                    borderColor: (!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus) 
+                      ? '#9ca3af' 
+                      : '#39ff14',
+                    color: (!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus)
+                      ? '#9ca3af'
+                      : '#39ff14',
+                    fontWeight: 'bold',
+                    opacity: (!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus) ? 0.5 : 1
+                  }}
+                >
+                  In
+                </Button>
+                
+                {/* Regular Check Out */}
+                <Button 
+                  onClick={() => handleAttendanceAction('regular', 'check-out')}
+                  disabled={!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading}
+                  variant="outline"
+                  className="h-12 w-24 rounded-full border-2 active:scale-95 transition-transform"
+                  style={{
+                    borderColor: (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading)
+                      ? '#9ca3af'
+                      : '#ff073a',
+                    color: (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading)
+                      ? '#9ca3af'
+                      : '#ff073a',
+                    fontWeight: 'bold',
+                    opacity: (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading) ? 0.5 : 1
+                  }}
+                >
+                  Out
+                </Button>
+              </div>
+
+              {/* Extend Toggle Button */}
+              <div className="flex justify-center">
+                <Button
+                  onClick={() => setShowExtendButtons(!showExtendButtons)}
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  {showExtendButtons ? '▲ Sembunyikan Extend' : '▼ Tampilkan Extend'}
+                </Button>
+              </div>
+
+              {/* Extend In/Out Buttons - Conditional */}
+              {showExtendButtons && (
+                <div className="flex items-center justify-center gap-4">
+                  {/* Overtime Check In */}
+                  <Button 
+                    onClick={() => handleAttendanceAction('overtime', 'check-in')}
+                    disabled={!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus}
+                    variant="outline"
+                    className="h-12 w-28 rounded-full border-2 active:scale-95 transition-transform"
+                    style={{
+                      borderColor: (!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus)
+                        ? '#9ca3af'
+                        : '#39ff14',
+                      color: (!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus)
+                        ? '#9ca3af'
+                        : '#39ff14',
+                      fontWeight: 'bold',
+                      fontSize: '0.85rem',
+                      opacity: (!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus) ? 0.5 : 1
+                    }}
+                  >
+                    In Extend
+                  </Button>
+                  
+                  {/* Overtime Check Out */}
+                  <Button 
+                    onClick={() => handleAttendanceAction('overtime', 'check-out')}
+                    disabled={!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading}
+                    variant="outline"
+                    className="h-12 w-28 rounded-full border-2 active:scale-95 transition-transform"
+                    style={{
+                      borderColor: (!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading)
+                        ? '#9ca3af'
+                        : '#ff073a',
+                      color: (!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading)
+                        ? '#9ca3af'
+                        : '#ff073a',
+                      fontWeight: 'bold',
+                      fontSize: '0.85rem',
+                      opacity: (!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading) ? 0.5 : 1
+                    }}
+                  >
+                    Out Extend
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
