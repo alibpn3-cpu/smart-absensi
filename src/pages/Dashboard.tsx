@@ -426,8 +426,21 @@ const Dashboard = () => {
                               <h3 className="font-semibold text-sm text-foreground">{record.staff_name}</h3>
                               <p className="text-xs text-muted-foreground">ID: {record.staff_uid}</p>
                             </div>
-                            {getStatusBadge(record.status)}
+                            <div className="flex items-center gap-2">
+                              {getStatusBadge(record.status)}
+                              {(record as any).attendance_type === 'overtime' && (
+                                <Badge variant="secondary" className="bg-orange-500 text-white text-xs">
+                                  ⏰ Lembur
+                                </Badge>
+                              )}
+                            </div>
                           </div>
+                          
+                          {(record as any).hours_worked && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              <span className="font-semibold">Total Jam:</span> {(record as any).hours_worked} jam
+                            </div>
+                          )}
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                             <div>

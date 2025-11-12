@@ -253,9 +253,10 @@ const AttendanceExporter = () => {
           'Divisi': emp?.division || '-',
           'Tanggal': new Date(record.date).toLocaleDateString('id-ID'),
           'Status': record.status.toUpperCase(),
+          'Jenis Absensi': record.attendance_type === 'overtime' ? 'LEMBUR' : 'REGULAR',
           'Waktu Check In': formatTimeForExport(record.check_in_time),
           'Waktu Check Out': formatTimeForExport(record.check_out_time),
-          'Total Jam Kerja': calculateWorkHours(record.check_in_time, record.check_out_time),
+          'Total Jam Kerja': record.hours_worked || calculateWorkHours(record.check_in_time, record.check_out_time),
           'Alamat Lokasi Check In': geofenceName || record.checkin_location_address || '-',
           'Koordinat Check In': record.checkin_location_lat && record.checkin_location_lng 
             ? `${record.checkin_location_lat}, ${record.checkin_location_lng}` 
@@ -317,7 +318,7 @@ const AttendanceExporter = () => {
         
         // Add check-in coordinate hyperlink
         if (record.checkin_location_lat && record.checkin_location_lng) {
-          const coordCell = `M${rowIndex}`; // Column M is Koordinat Check In
+          const coordCell = `N${rowIndex}`; // Column N is Koordinat Check In (was M before new column)
           const mapsUrl = `https://www.google.com/maps?q=${record.checkin_location_lat},${record.checkin_location_lng}`;
           ws[coordCell] = {
             t: 's',
@@ -330,7 +331,7 @@ const AttendanceExporter = () => {
         const cLat = record.checkout_location_lat ?? (record.check_out_time ? record.checkin_location_lat : null);
         const cLng = record.checkout_location_lng ?? (record.check_out_time ? record.checkin_location_lng : null);
         if (cLat && cLng) {
-          const coordCell = `O${rowIndex}`; // Column O is Koordinat Check Out
+          const coordCell = `P${rowIndex}`; // Column P is Koordinat Check Out (was O before new column)
           const mapsUrl = `https://www.google.com/maps?q=${cLat},${cLng}`;
           ws[coordCell] = {
             t: 's',
@@ -344,7 +345,7 @@ const AttendanceExporter = () => {
         
         // Check-in photo
         if (photoUrls?.checkin) {
-          const checkinPhotoCell = `P${rowIndex}`; // Column P is Foto Check In
+          const checkinPhotoCell = `Q${rowIndex}`; // Column Q is Foto Check In (was P before new column)
           ws[checkinPhotoCell] = {
             t: 's',
             v: 'Lihat Foto',
@@ -354,7 +355,7 @@ const AttendanceExporter = () => {
         
         // Check-out photo
         if (photoUrls?.checkout) {
-          const checkoutPhotoCell = `Q${rowIndex}`; // Column Q is Foto Check Out
+          const checkoutPhotoCell = `R${rowIndex}`; // Column R is Foto Check Out (was Q before new column)
           ws[checkoutPhotoCell] = {
             t: 's',
             v: 'Lihat Foto',
@@ -373,6 +374,7 @@ const AttendanceExporter = () => {
         { wch: 12 },  // Divisi
         { wch: 12 },  // Tanggal
         { wch: 8 },   // Status
+        { wch: 12 },  // Jenis Absensi (NEW)
         { wch: 18 },  // Check In
         { wch: 18 },  // Check Out
         { wch: 12 },  // Total Jam

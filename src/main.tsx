@@ -32,12 +32,26 @@ if ('serviceWorker' in navigator) {
                 // Show toast notification with update button (centered and mobile responsive)
                 const toastDiv = document.createElement('div');
                 toastDiv.innerHTML = `
-                  <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-width: 90vw; width: 400px;">
-                    <div style="font-weight: 600; font-size: 16px; margin-bottom: 8px;">🎉 Update Tersedia</div>
-                    <div style="font-size: 14px; color: #64748b; margin-bottom: 12px;">Versi baru aplikasi tersedia. Klik tombol Update untuk mendapatkan fitur terbaru.</div>
-                    <button id="update-now-btn" style="background: #3b82f6; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; width: 100%; transition: background 0.2s;">Update Sekarang</button>
+                  <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; background: white; border: 2px solid #3b82f6; border-radius: 12px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); max-width: 90vw; width: 420px;">
+                    <div style="font-weight: 700; font-size: 20px; margin-bottom: 12px; color: #1e293b; text-align: center;">
+                      🎉 Update v2.1.0
+                    </div>
+                    
+                    <div style="font-size: 14px; color: #475569; margin-bottom: 20px; text-align: left; line-height: 1.6;">
+                      <strong style="color: #3b82f6; display: block; margin-bottom: 10px; font-size: 15px;">✨ Fitur Baru:</strong>
+                      <ul style="margin: 0; padding-left: 24px; list-style: disc;">
+                        <li style="margin-bottom: 6px;">Sistem Lembur/Overtime terpisah</li>
+                        <li style="margin-bottom: 6px;">Button In/Out yang lebih jelas</li>
+                        <li style="margin-bottom: 6px;">WFO Fast Checkout dengan input manual</li>
+                        <li style="margin-bottom: 6px;">Perhitungan jam kerja otomatis</li>
+                      </ul>
+                    </div>
+                    
+                    <button id="update-now-btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 14px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; transition: all 0.2s; font-size: 16px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);">
+                      Update Sekarang
+                    </button>
                   </div>
-                  <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999;" id="update-backdrop"></div>
+                  <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; backdrop-filter: blur(2px);" id="update-backdrop"></div>
                 `;
                 document.body.appendChild(toastDiv);
                 

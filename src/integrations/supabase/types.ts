@@ -121,6 +121,7 @@ export type Database = {
       }
       attendance_records: {
         Row: {
+          attendance_type: string | null
           check_in_time: string | null
           check_out_time: string | null
           checkin_location_address: string | null
@@ -131,6 +132,7 @@ export type Database = {
           checkout_location_lng: number | null
           created_at: string
           date: string
+          hours_worked: number | null
           id: string
           reason: string | null
           selfie_checkin_url: string | null
@@ -142,6 +144,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          attendance_type?: string | null
           check_in_time?: string | null
           check_out_time?: string | null
           checkin_location_address?: string | null
@@ -152,6 +155,7 @@ export type Database = {
           checkout_location_lng?: number | null
           created_at?: string
           date?: string
+          hours_worked?: number | null
           id?: string
           reason?: string | null
           selfie_checkin_url?: string | null
@@ -163,6 +167,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attendance_type?: string | null
           check_in_time?: string | null
           check_out_time?: string | null
           checkin_location_address?: string | null
@@ -173,6 +178,7 @@ export type Database = {
           checkout_location_lng?: number | null
           created_at?: string
           date?: string
+          hours_worked?: number | null
           id?: string
           reason?: string | null
           selfie_checkin_url?: string | null

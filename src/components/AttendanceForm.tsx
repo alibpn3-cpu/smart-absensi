@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -37,6 +38,8 @@ interface AttendanceRecord {
   checkout_location_address: string | null;
   checkout_location_lat: number | null;
   checkout_location_lng: number | null;
+  attendance_type?: 'regular' | 'overtime';
+  hours_worked?: number | null;
 }
 
 interface PermissionsState {
@@ -55,6 +58,9 @@ const AttendanceForm = () => {
   const [showCamera, setShowCamera] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number; address: string; coordinates: string; accuracy?: number } | null>(null);
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
+  const [regularAttendance, setRegularAttendance] = useState<AttendanceRecord | null>(null);
+  const [overtimeAttendance, setOvertimeAttendance] = useState<AttendanceRecord | null>(null);
+  const [currentAttendanceType, setCurrentAttendanceType] = useState<'regular' | 'overtime'>('regular');
   const [loading, setLoading] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [permissions, setPermissions] = useState<PermissionsState>({ location: false, camera: false });
@@ -65,6 +71,9 @@ const AttendanceForm = () => {
   const [cameraAttempts, setCameraAttempts] = useState(0);
   const [bypassCamera, setBypassCamera] = useState(false);
   const [isStaffPopoverOpen, setIsStaffPopoverOpen] = useState(false);
+  const [showWfoFastCheckoutDialog, setShowWfoFastCheckoutDialog] = useState(false);
+  const [manualCheckInTime, setManualCheckInTime] = useState({ hour: '08', minute: '00' });
+  const [wfoFastCheckoutReason, setWfoFastCheckoutReason] = useState('');
   
   // Audio for button click
   const playClickSound = () => {
@@ -279,18 +288,30 @@ const AttendanceForm = () => {
     const nowLocal = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
     const today = `${nowLocal.getFullYear()}-${pad(nowLocal.getMonth() + 1)}-${pad(nowLocal.getDate())}`;
-    const { data, error } = await supabase
+    
+    // Fetch regular attendance
+    const { data: regularData } = await supabase
       .from('attendance_records')
       .select('*')
       .eq('staff_uid', selectedStaff.uid)
       .eq('date', today)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching attendance:', error);
-    } else {
-      setTodayAttendance(data as AttendanceRecord);
-    }
+      .eq('attendance_type', 'regular')
+      .maybeSingle();
+    
+    // Fetch overtime attendance
+    const { data: overtimeData } = await supabase
+      .from('attendance_records')
+      .select('*')
+      .eq('staff_uid', selectedStaff.uid)
+      .eq('date', today)
+      .eq('attendance_type', 'overtime')
+      .maybeSingle();
+    
+    setRegularAttendance(regularData as AttendanceRecord);
+    setOvertimeAttendance(overtimeData as AttendanceRecord);
+    
+    // Backward compatibility - set todayAttendance to regular
+    setTodayAttendance(regularData as AttendanceRecord);
   };
 
   const requestLocationPermission = (): Promise<{ lat: number; lng: number; address: string; coordinates: string }> => {
@@ -650,6 +671,7 @@ const AttendanceForm = () => {
     try {
       // Check if this is check-out
       const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
+      const currentRecord = currentAttendanceType === 'regular' ? regularAttendance : overtimeAttendance;
       
       // Check geofence for WFO status and get geofence name
       let locationAddress = currentLocation.address;
@@ -741,6 +763,7 @@ const AttendanceForm = () => {
         date: localDateStr,
         selfie_photo_url: photoPath,
         status: attendanceStatus,
+        attendance_type: currentAttendanceType,
         reason: finalReason,
         ...(isCheckOut 
           ? { 
@@ -748,7 +771,8 @@ const AttendanceForm = () => {
               checkout_location_lat: currentLocation.lat,
               checkout_location_lng: currentLocation.lng,
               checkout_location_address: locationAddress,
-              selfie_checkout_url: photoPath
+              selfie_checkout_url: photoPath,
+              hours_worked: currentAttendanceType === 'overtime' ? calculateHoursWorked(currentRecord!.check_in_time!, formattedTime) : undefined
             }
           : { 
               check_in_time: formattedTime,
@@ -864,7 +888,201 @@ const AttendanceForm = () => {
     console.log('⚠️ Camera error:', error);
   };
 
-  const handleAttendanceAction = async () => {
+  const calculateHoursWorked = (checkIn: string, checkOut: string): number => {
+    try {
+      const start = new Date(checkIn.replace(' ', 'T'));
+      const end = new Date(checkOut.replace(' ', 'T'));
+      const diffMs = end.getTime() - start.getTime();
+      const hours = diffMs / (1000 * 60 * 60);
+      return Math.round(hours * 100) / 100;
+    } catch {
+      return 0;
+    }
+  };
+
+  const handleWfoOvertimeWithoutPhoto = async (isCheckOut: boolean) => {
+    try {
+      const location = await requestLocationPermission();
+      if (!location) {
+        setLoading(false);
+        return;
+      }
+      
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const y = now.getFullYear();
+      const M = pad(now.getMonth() + 1);
+      const d = pad(now.getDate());
+      const h = pad(now.getHours());
+      const m = pad(now.getMinutes());
+      const s = pad(now.getSeconds());
+      const ms = String(now.getMilliseconds()).padStart(3, '0');
+      const tzMin = -now.getTimezoneOffset();
+      const sign = tzMin >= 0 ? '+' : '-';
+      const offH = pad(Math.floor(Math.abs(tzMin) / 60));
+      const offM = pad(Math.abs(tzMin) % 60);
+      const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
+      
+      if (!isCheckOut) {
+        // Overtime Check-In
+        const { error } = await supabase
+          .from('attendance_records')
+          .insert({
+            staff_uid: selectedStaff!.uid,
+            staff_name: selectedStaff!.name,
+            date: `${y}-${M}-${d}`,
+            status: 'wfo',
+            attendance_type: 'overtime',
+            check_in_time: formattedTime,
+            checkin_location_address: location.address,
+            checkin_location_lat: location.lat,
+            checkin_location_lng: location.lng
+          });
+        
+        if (error) throw error;
+        
+        toast({ title: "✅ Overtime Check In Berhasil" });
+      } else {
+        // Overtime Check-Out
+        const hoursWorked = calculateHoursWorked(
+          overtimeAttendance!.check_in_time!,
+          formattedTime
+        );
+        
+        const { error } = await supabase
+          .from('attendance_records')
+          .update({
+            check_out_time: formattedTime,
+            checkout_location_address: location.address,
+            checkout_location_lat: location.lat,
+            checkout_location_lng: location.lng,
+            hours_worked: hoursWorked
+          })
+          .eq('id', overtimeAttendance!.id);
+        
+        if (error) throw error;
+        
+        toast({ 
+          title: "✅ Overtime Check Out Berhasil",
+          description: `Total jam lembur: ${hoursWorked} jam`
+        });
+      }
+      
+      await fetchTodayAttendance();
+    } catch (error) {
+      console.error('WFO overtime error:', error);
+      toast({
+        title: "❌ Gagal",
+        description: "Gagal menyimpan absensi lembur",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+      setIsButtonProcessing(false);
+    }
+  };
+
+  const handleWfoFastCheckout = async () => {
+    if (!wfoFastCheckoutReason.trim()) {
+      toast({
+        title: "Alasan Diperlukan",
+        description: "Silakan masukkan alasan checkout WFO",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      const location = await requestLocationPermission();
+      const now = new Date();
+      
+      // Create manual check-in time
+      const manualCheckIn = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        parseInt(manualCheckInTime.hour),
+        parseInt(manualCheckInTime.minute),
+        0
+      );
+      
+      // Validation: Check-in must be before checkout
+      if (manualCheckIn >= now) {
+        toast({
+          title: "Waktu Tidak Valid",
+          description: "Jam check-in harus lebih awal dari sekarang",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const formatTimestamp = (date: Date) => {
+        const y = date.getFullYear();
+        const M = pad(date.getMonth() + 1);
+        const d = pad(date.getDate());
+        const h = pad(date.getHours());
+        const m = pad(date.getMinutes());
+        const s = pad(date.getSeconds());
+        const ms = String(date.getMilliseconds()).padStart(3, '0');
+        const tzMin = -date.getTimezoneOffset();
+        const sign = tzMin >= 0 ? '+' : '-';
+        const offH = pad(Math.floor(Math.abs(tzMin) / 60));
+        const offM = pad(Math.abs(tzMin) % 60);
+        return `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
+      };
+      
+      const checkInFormatted = formatTimestamp(manualCheckIn);
+      const checkOutFormatted = formatTimestamp(now);
+      const hoursWorked = calculateHoursWorked(checkInFormatted, checkOutFormatted);
+      
+      const { error } = await supabase
+        .from('attendance_records')
+        .insert({
+          staff_uid: selectedStaff!.uid,
+          staff_name: selectedStaff!.name,
+          date: format(now, 'yyyy-MM-dd'),
+          status: 'wfo',
+          attendance_type: 'regular',
+          check_in_time: checkInFormatted,
+          check_out_time: checkOutFormatted,
+          checkin_location_address: 'Manual - Absen Fisik Kantor',
+          checkin_location_lat: null,
+          checkin_location_lng: null,
+          checkout_location_address: location.address,
+          checkout_location_lat: location.lat,
+          checkout_location_lng: location.lng,
+          reason: wfoFastCheckoutReason,
+          hours_worked: hoursWorked
+        });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "✅ Checkout WFO Berhasil",
+        description: `Check-in manual: ${manualCheckInTime.hour}:${manualCheckInTime.minute}. Total jam: ${hoursWorked} jam`
+      });
+      
+      await fetchTodayAttendance();
+      setShowWfoFastCheckoutDialog(false);
+      setWfoFastCheckoutReason('');
+    } catch (error) {
+      console.error('WFO fast checkout error:', error);
+      toast({
+        title: "❌ Gagal",
+        description: "Gagal menyimpan checkout WFO",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+      setIsButtonProcessing(false);
+    }
+  };
+
+  const handleAttendanceAction = async (
+    attendanceType: 'regular' | 'overtime',
+    action: 'check-in' | 'check-out'
+  ) => {
     if (isButtonProcessing) return; // Prevent multiple clicks
     
     if (!selectedStaff) {
@@ -876,9 +1094,30 @@ const AttendanceForm = () => {
       return;
     }
     
-    // Play click sound
+    // Play click sound and set processing state
     playClickSound();
+    setCurrentAttendanceType(attendanceType);
     setIsButtonProcessing(true);
+    setLoading(true);
+    
+    const currentRecord = attendanceType === 'regular' ? regularAttendance : overtimeAttendance;
+    const isCheckOut = action === 'check-out';
+    
+    // SPECIAL CASE: WFO regular checkout without check-in
+    if (attendanceType === 'regular' && 
+        isCheckOut && 
+        attendanceStatus === 'wfo' && 
+        !regularAttendance?.check_in_time) {
+      setShowWfoFastCheckoutDialog(true);
+      return; // Dialog will handle rest
+    }
+    
+    // SPECIAL CASE: WFO overtime - SKIP CAMERA
+    if (attendanceType === 'overtime' && attendanceStatus === 'wfo') {
+      // Handle WFO overtime without photo
+      await handleWfoOvertimeWithoutPhoto(isCheckOut);
+      return;
+    }
 
     // Determine location: use detected coordinates if available; otherwise request permission
     let resolvedLocation: { lat: number; lng: number; address: string; coordinates: string; accuracy?: number } | null = null;
@@ -895,19 +1134,14 @@ const AttendanceForm = () => {
           description: "Silakan izinkan akses lokasi untuk melanjutkan absensi",
           variant: "destructive"
         });
+        setLoading(false);
+        setIsButtonProcessing(false);
         return;
       }
     }
 
-    // NOTE: Pre-permission check for camera removed to avoid false negatives on iOS/Safari.
-    // Camera permission will be requested directly inside CameraCapture on user gesture.
-
-
     try {
       const location = resolvedLocation!;
-      
-      // Check if this is check-out
-      const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
       
       if (attendanceStatus === 'wfo') {
         // WFO mode: Check geofence for both check-in and check-out
@@ -921,6 +1155,7 @@ const AttendanceForm = () => {
             setPendingCheckoutLocation(location);
             setShowCheckoutReasonDialog(true);
             setIsButtonProcessing(false); // Reset processing state
+            setLoading(false);
             return;
           } else {
             // Outside geofence for WFO check-in - show error
@@ -930,6 +1165,8 @@ const AttendanceForm = () => {
               description: "Anda harus berada di area kantor untuk check in WFO. Silakan pilih status WFH atau Dinas jika bekerja di luar kantor.",
               variant: "destructive"
             });
+            setLoading(false);
+            setIsButtonProcessing(false);
             return;
           }
         }
@@ -947,6 +1184,8 @@ const AttendanceForm = () => {
         } else {
           // Normal flow with camera
           setShowCamera(true);
+          setLoading(false);
+          setIsButtonProcessing(false);
         }
       }
     } catch (error) {
@@ -956,7 +1195,7 @@ const AttendanceForm = () => {
         description: "Silakan aktifkan akses lokasi untuk melanjutkan",
         variant: "destructive"
       });
-    } finally {
+      setLoading(false);
       setIsButtonProcessing(false);
     }
   };
@@ -1440,30 +1679,84 @@ const AttendanceForm = () => {
               </div>
             )}
 
-            {/* Action Button */}
-            <Button 
-              onClick={handleAttendanceAction}
-              disabled={!selectedStaff || loading || !!isCompleted || isButtonProcessing}
-              className="w-full h-14 text-lg font-semibold gradient-primary border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-              size="lg"
-            >
-              {loading && attendanceStatus === 'wfo' ? (
-                <>
-                  <MapPin className="h-5 w-5 mr-3 animate-pulse" />
-                  Mengambil Koordinat...
-                </>
-              ) : (
-                <>
-                  <Camera className="h-5 w-5 mr-3" />
-                  {isCompleted 
-                    ? "✅ Absen Hari Ini Selesai" 
-                    : isCheckedIn 
-                      ? "📤 Check Out" 
-                      : "📥 Check In"
-                  }
-                </>
-              )}
-            </Button>
+            {/* Action Buttons - 4 Buttons Grid */}
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              {/* Regular Check In - Neon Green */}
+              <Button 
+                onClick={() => handleAttendanceAction('regular', 'check-in')}
+                disabled={!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus}
+                style={{
+                  background: (!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus) 
+                    ? '#6b7280' 
+                    : '#39ff14',
+                  color: (!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus)
+                    ? '#9ca3af'
+                    : '#000',
+                  fontWeight: 'bold',
+                  border: 'none',
+                  opacity: (!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus) ? 0.5 : 1
+                }}
+                className="h-14 text-lg active:scale-95 transition-transform shadow-lg"
+              >
+                In
+              </Button>
+              
+              {/* Regular Check Out - Neon Red */}
+              <Button 
+                onClick={() => handleAttendanceAction('regular', 'check-out')}
+                disabled={!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading}
+                style={{
+                  background: (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading)
+                    ? '#6b7280'
+                    : '#ff073a',
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  border: 'none',
+                  opacity: (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading) ? 0.5 : 1
+                }}
+                className="h-14 text-lg active:scale-95 transition-transform shadow-lg"
+              >
+                Out
+              </Button>
+              
+              {/* Overtime Check In - Neon Green */}
+              <Button 
+                onClick={() => handleAttendanceAction('overtime', 'check-in')}
+                disabled={!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus}
+                style={{
+                  background: (!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus)
+                    ? '#6b7280'
+                    : '#39ff14',
+                  color: (!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus)
+                    ? '#9ca3af'
+                    : '#000',
+                  fontWeight: 'bold',
+                  border: 'none',
+                  opacity: (!!overtimeAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus) ? 0.5 : 1
+                }}
+                className="h-14 text-lg active:scale-95 transition-transform shadow-lg"
+              >
+                In Extend
+              </Button>
+              
+              {/* Overtime Check Out - Neon Red */}
+              <Button 
+                onClick={() => handleAttendanceAction('overtime', 'check-out')}
+                disabled={!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading}
+                style={{
+                  background: (!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading)
+                    ? '#6b7280'
+                    : '#ff073a',
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  border: 'none',
+                  opacity: (!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading) ? 0.5 : 1
+                }}
+                className="h-14 text-lg active:scale-95 transition-transform shadow-lg"
+              >
+                Out Extend
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -1479,6 +1772,58 @@ const AttendanceForm = () => {
             />
           </div>
         </div>
+
+        {/* WFO Fast Checkout Dialog */}
+        <Dialog open={showWfoFastCheckoutDialog} onOpenChange={setShowWfoFastCheckoutDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold">Input Check In Manual</DialogTitle>
+              <DialogDescription className="text-left text-sm">
+                Anda check out saja? apakah anda sudah check in di absen fisik? 
+                jika ya silahkan masukan jam perkiraan check in anda di absen fisik, 
+                serta masukan alasan check out wfo diluar geofence kantor
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Jam Check In Perkiraan</Label>
+                <div className="flex gap-3 items-center">
+                  <Select value={manualCheckInTime.hour} onValueChange={(val) => setManualCheckInTime({...manualCheckInTime, hour: val})}>
+                    <SelectTrigger className="flex-1"><SelectValue placeholder="Jam" /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {Array.from({length: 24}, (_, i) => (
+                        <SelectItem key={i} value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-2xl font-bold">:</span>
+                  <Select value={manualCheckInTime.minute} onValueChange={(val) => setManualCheckInTime({...manualCheckInTime, minute: val})}>
+                    <SelectTrigger className="flex-1"><SelectValue placeholder="Menit" /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {Array.from({length: 60}, (_, i) => (
+                        <SelectItem key={i} value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Alasan Checkout WFO Diluar Geofence</Label>
+                <Textarea
+                  placeholder="Contoh: Sudah check in fingerprint pukul 08:15. Checkout diluar kantor karena urusan mendadak"
+                  value={wfoFastCheckoutReason}
+                  onChange={(e) => setWfoFastCheckoutReason(e.target.value)}
+                  rows={4}
+                  className="resize-none"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => { setShowWfoFastCheckoutDialog(false); setWfoFastCheckoutReason(''); setLoading(false); setIsButtonProcessing(false); }} className="flex-1">Batal</Button>
+              <Button onClick={handleWfoFastCheckout} className="flex-1 bg-primary">Konfirmasi</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Checkout Reason Dialog - WFO outside geofence */}
         <Dialog open={showCheckoutReasonDialog} onOpenChange={setShowCheckoutReasonDialog}>
