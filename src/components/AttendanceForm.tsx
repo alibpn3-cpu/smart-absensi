@@ -1812,7 +1812,15 @@ const AttendanceForm = () => {
         </div>
 
         {/* WFO Fast Checkout Dialog */}
-        <Dialog open={showWfoFastCheckoutDialog} onOpenChange={setShowWfoFastCheckoutDialog}>
+        <Dialog open={showWfoFastCheckoutDialog} onOpenChange={(open) => {
+          setShowWfoFastCheckoutDialog(open);
+          if (!open) {
+            // Reset states when dialog is closed
+            setWfoFastCheckoutReason('');
+            setLoading(false);
+            setIsButtonProcessing(false);
+          }
+        }}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="text-lg font-bold">Input Check In Manual</DialogTitle>
