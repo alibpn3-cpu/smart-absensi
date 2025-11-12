@@ -318,6 +318,12 @@ const AttendanceForm = () => {
     
     // Backward compatibility - set todayAttendance to regular
     setTodayAttendance(regularData as AttendanceRecord);
+    
+    // Restore attendance status from existing record
+    if (regularData && regularData.check_in_time && !regularData.check_out_time) {
+      console.log('📝 Restoring attendance status from existing check-in:', regularData.status);
+      setAttendanceStatus(regularData.status as 'wfo' | 'wfh' | 'dinas');
+    }
   };
 
   const requestLocationPermission = (): Promise<{ lat: number; lng: number; address: string; coordinates: string }> => {
