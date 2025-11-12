@@ -19,6 +19,8 @@ import BirthdayCard from './BirthdayCard';
 import PermissionIndicators from './PermissionIndicators';
 import { format } from 'date-fns';
 
+const APP_VERSION = 'v2.1.0'; // Sync with service worker cache version
+
 interface StaffUser {
   uid: string;
   name: string;
@@ -1788,7 +1790,7 @@ const AttendanceForm = () => {
         </Card>
 
         <div className="text-center text-xs text-muted-foreground mt-2 space-y-2">
-          <div>Versi Aplikasi: v1.0.5 IT Dept. 2025</div>
+          <div>Versi aplikasi : {APP_VERSION} IT Division 2025</div>
           <div className="flex items-center justify-center gap-3">
             <Button variant="outline" size="sm" onClick={handleClearCache}>
               Update (Hapus Cache)
