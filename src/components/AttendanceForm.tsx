@@ -77,6 +77,9 @@ const AttendanceForm = () => {
   const [showWfoFastCheckoutDialog, setShowWfoFastCheckoutDialog] = useState(false);
   const [manualCheckInTime, setManualCheckInTime] = useState({ hour: '08', minute: '00' });
   const [wfoFastCheckoutReason, setWfoFastCheckoutReason] = useState('');
+  const [showDinasFastCheckoutDialog, setShowDinasFastCheckoutDialog] = useState(false);
+  const [dinasFastCheckoutReason, setDinasFastCheckoutReason] = useState('');
+  const [isDinasFastCheckout, setIsDinasFastCheckout] = useState(false);
   
   // Audio for button click
   const playClickSound = () => {
@@ -672,6 +675,97 @@ const AttendanceForm = () => {
     console.log('📸 Starting attendance submission for:', selectedStaff.name);
     
     try {
+      // Check if this is Dinas fast checkout
+      if (isDinasFastCheckout) {
+        console.log('📱 Processing Dinas Fast Checkout with manual check-in time');
+        const now = new Date();
+        
+        // Create manual check-in time
+        const manualCheckIn = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          parseInt(manualCheckInTime.hour),
+          parseInt(manualCheckInTime.minute),
+          0
+        );
+        
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const formatTimestamp = (date: Date) => {
+          const y = date.getFullYear();
+          const M = pad(date.getMonth() + 1);
+          const d = pad(date.getDate());
+          const h = pad(date.getHours());
+          const m = pad(date.getMinutes());
+          const s = pad(date.getSeconds());
+          const ms = String(date.getMilliseconds()).padStart(3, '0');
+          const tzMin = -date.getTimezoneOffset();
+          const sign = tzMin >= 0 ? '+' : '-';
+          const offH = pad(Math.floor(Math.abs(tzMin) / 60));
+          const offM = pad(Math.abs(tzMin) % 60);
+          return `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
+        };
+        
+        // Upload photo
+        let photoPath = null;
+        if (photoBlob.size > 0) {
+          console.log('📸 Compressing thumbnail for Dinas...');
+          const thumbnailBlob = await compressThumbnail(photoBlob);
+          const fileName = `${selectedStaff.uid}_${Date.now()}.jpg`;
+          console.log('📤 Uploading thumbnail:', fileName);
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('attendance-photos')
+            .upload(fileName, thumbnailBlob);
+
+          if (uploadError) {
+            console.error('❌ Photo upload error:', uploadError);
+            throw uploadError;
+          }
+          photoPath = uploadData.path;
+          console.log('✅ Thumbnail uploaded:', photoPath);
+        }
+        
+        const checkInFormatted = formatTimestamp(manualCheckIn);
+        const checkOutFormatted = formatTimestamp(now);
+        const hoursWorked = calculateHoursWorked(checkInFormatted, checkOutFormatted);
+        
+        const { error } = await supabase
+          .from('attendance_records')
+          .insert({
+            staff_uid: selectedStaff!.uid,
+            staff_name: selectedStaff!.name,
+            date: format(now, 'yyyy-MM-dd'),
+            status: 'dinas',
+            attendance_type: 'regular',
+            check_in_time: checkInFormatted,
+            check_out_time: checkOutFormatted,
+            checkin_location_address: 'Manual - Dinas Luar',
+            checkin_location_lat: null,
+            checkin_location_lng: null,
+            checkout_location_address: currentLocation.address,
+            checkout_location_lat: currentLocation.lat,
+            checkout_location_lng: currentLocation.lng,
+            selfie_checkout_url: photoPath,
+            reason: dinasFastCheckoutReason,
+            hours_worked: hoursWorked
+          });
+        
+        if (error) throw error;
+        
+        toast({
+          title: "✅ Checkout Dinas Berhasil",
+          description: `Check-in manual: ${manualCheckInTime.hour}:${manualCheckInTime.minute}. Total jam: ${hoursWorked} jam`
+        });
+        
+        await fetchTodayAttendance();
+        setShowCamera(false);
+        setIsDinasFastCheckout(false);
+        setDinasFastCheckoutReason('');
+        setLoading(false);
+        setIsButtonProcessing(false);
+        return;
+      }
+      
       // Check if this is check-out
       const isCheckOut = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
       const currentRecord = currentAttendanceType === 'regular' ? regularAttendance : overtimeAttendance;
@@ -1082,6 +1176,55 @@ const AttendanceForm = () => {
     }
   };
 
+  const handleDinasFastCheckoutConfirm = async () => {
+    if (!dinasFastCheckoutReason.trim()) {
+      toast({
+        title: "Alasan Diperlukan",
+        description: "Silakan masukkan alasan checkout Dinas",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Validation: Check-in must be before checkout
+    const now = new Date();
+    const manualCheckIn = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      parseInt(manualCheckInTime.hour),
+      parseInt(manualCheckInTime.minute),
+      0
+    );
+    
+    if (manualCheckIn >= now) {
+      toast({
+        title: "Waktu Tidak Valid",
+        description: "Jam check-in harus lebih awal dari sekarang",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Close dialog and trigger camera for selfie
+    setShowDinasFastCheckoutDialog(false);
+    setIsDinasFastCheckout(true);
+    
+    try {
+      const location = await requestLocationPermission();
+      setCurrentLocation(location);
+      setShowCamera(true);
+    } catch (error) {
+      console.error('Location error:', error);
+      toast({
+        title: "Error Lokasi",
+        description: "Silakan aktifkan akses lokasi untuk melanjutkan",
+        variant: "destructive"
+      });
+      setIsDinasFastCheckout(false);
+    }
+  };
+
   const handleAttendanceAction = async (
     attendanceType: 'regular' | 'overtime',
     action: 'check-in' | 'check-out'
@@ -1106,12 +1249,16 @@ const AttendanceForm = () => {
     const currentRecord = attendanceType === 'regular' ? regularAttendance : overtimeAttendance;
     const isCheckOut = action === 'check-out';
     
-    // SPECIAL CASE: WFO regular checkout without check-in
+    // SPECIAL CASE: WFO/Dinas regular checkout without check-in (Fast Checkout)
     if (attendanceType === 'regular' && 
         isCheckOut && 
-        attendanceStatus === 'wfo' && 
+        (attendanceStatus === 'wfo' || attendanceStatus === 'dinas') && 
         !regularAttendance?.check_in_time) {
-      setShowWfoFastCheckoutDialog(true);
+      if (attendanceStatus === 'wfo') {
+        setShowWfoFastCheckoutDialog(true);
+      } else {
+        setShowDinasFastCheckoutDialog(true);
+      }
       return; // Dialog will handle rest
     }
     
@@ -1710,20 +1857,20 @@ const AttendanceForm = () => {
                 <Button 
                   onClick={() => handleAttendanceAction('regular', 'check-out')}
                   disabled={
-                    // Allow WFO checkout even without check-in (for fast checkout feature)
-                    attendanceStatus === 'wfo' 
+                    // Allow WFO/Dinas checkout even without check-in (for fast checkout feature)
+                    (attendanceStatus === 'wfo' || attendanceStatus === 'dinas')
                       ? (!!regularAttendance?.check_out_time || loading || !selectedStaff)
                       : (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading)
                   }
                   variant="outline"
                   className="h-12 w-24 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#ff073a]/10"
                   style={{
-                    borderColor: (attendanceStatus === 'wfo' 
+                    borderColor: ((attendanceStatus === 'wfo' || attendanceStatus === 'dinas')
                       ? (!!regularAttendance?.check_out_time || loading || !selectedStaff)
                       : (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading))
                       ? '#9ca3af'
                       : '#ff073a',
-                    color: (attendanceStatus === 'wfo' 
+                    color: ((attendanceStatus === 'wfo' || attendanceStatus === 'dinas')
                       ? (!!regularAttendance?.check_out_time || loading || !selectedStaff)
                       : (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading))
                       ? '#9ca3af'
@@ -1867,6 +2014,66 @@ const AttendanceForm = () => {
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => { setShowWfoFastCheckoutDialog(false); setWfoFastCheckoutReason(''); setLoading(false); setIsButtonProcessing(false); }} className="flex-1">Batal</Button>
               <Button onClick={handleWfoFastCheckout} className="flex-1 bg-primary">Konfirmasi</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dinas Fast Checkout Dialog */}
+        <Dialog open={showDinasFastCheckoutDialog} onOpenChange={(open) => {
+          setShowDinasFastCheckoutDialog(open);
+          if (!open) {
+            // Reset states when dialog is closed
+            setDinasFastCheckoutReason('');
+            setLoading(false);
+            setIsButtonProcessing(false);
+          }
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold">Input Check In Manual - Dinas</DialogTitle>
+              <DialogDescription className="text-left text-sm">
+                Anda check out saja dengan status Dinas Luar? 
+                Silahkan masukan jam perkiraan check in anda dan alasan,
+                kemudian sistem akan meminta foto selfie untuk checkout
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Jam Check In Perkiraan</Label>
+                <div className="flex gap-3 items-center">
+                  <Select value={manualCheckInTime.hour} onValueChange={(val) => setManualCheckInTime({...manualCheckInTime, hour: val})}>
+                    <SelectTrigger className="flex-1"><SelectValue placeholder="Jam" /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {Array.from({length: 24}, (_, i) => (
+                        <SelectItem key={i} value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-2xl font-bold">:</span>
+                  <Select value={manualCheckInTime.minute} onValueChange={(val) => setManualCheckInTime({...manualCheckInTime, minute: val})}>
+                    <SelectTrigger className="flex-1"><SelectValue placeholder="Menit" /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {Array.from({length: 60}, (_, i) => (
+                        <SelectItem key={i} value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Alasan Checkout Dinas Luar</Label>
+                <Textarea
+                  placeholder="Contoh: Sudah check in pukul 08:00 untuk dinas ke lokasi X"
+                  value={dinasFastCheckoutReason}
+                  onChange={(e) => setDinasFastCheckoutReason(e.target.value)}
+                  rows={4}
+                  className="resize-none"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => { setShowDinasFastCheckoutDialog(false); setDinasFastCheckoutReason(''); setLoading(false); setIsButtonProcessing(false); }} className="flex-1">Batal</Button>
+              <Button onClick={handleDinasFastCheckoutConfirm} className="flex-1 bg-primary">OK - Ambil Foto</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
