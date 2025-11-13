@@ -705,11 +705,24 @@ const AttendanceForm = () => {
     });
   };
 
-  const handlePhotoCapture = async (photoBlob: Blob) => {
-    if (!selectedStaff || !currentLocation) {
-      console.error('❌ Missing required data:', { selectedStaff, currentLocation });
+  const handlePhotoCapture = async (
+    photoBlob: Blob,
+    forcedLocation?: { lat: number; lng: number; address: string; coordinates: string; accuracy?: number }
+  ) => {
+    const usedLocation = forcedLocation || currentLocation;
+    if (!selectedStaff || !usedLocation) {
+      console.error('❌ Missing required data:', { selectedStaff, currentLocation: usedLocation });
+      setLoading(false);
+      setIsButtonProcessing(false);
+      toast({
+        title: "Data Lokasi Belum Siap",
+        description: "Mohon ulangi klik In, sistem sedang membaca lokasi.",
+        variant: "destructive"
+      });
       return;
     }
+
+    // proceed with provided location to avoid race conditions
 
     setLoading(true);
     console.log('📸 Starting attendance submission for:', selectedStaff.name);
@@ -782,9 +795,9 @@ const AttendanceForm = () => {
             checkin_location_address: 'Manual - Dinas Luar',
             checkin_location_lat: null,
             checkin_location_lng: null,
-            checkout_location_address: currentLocation.address,
-            checkout_location_lat: currentLocation.lat,
-            checkout_location_lng: currentLocation.lng,
+            checkout_location_address: usedLocation.address,
+            checkout_location_lat: usedLocation.lat,
+            checkout_location_lng: usedLocation.lng,
             selfie_checkout_url: photoPath,
             reason: dinasFastCheckoutReason,
             hours_worked: hoursWorked
@@ -811,11 +824,11 @@ const AttendanceForm = () => {
       const currentRecord = currentAttendanceType === 'regular' ? regularAttendance : overtimeAttendance;
       
       // Check geofence for WFO status and get geofence name
-      let locationAddress = currentLocation.address;
+      let locationAddress = usedLocation.address;
       
       if (attendanceStatus === 'wfo') {
-        console.log('🏢 Checking WFO geofence for location:', currentLocation.lat, currentLocation.lng);
-        const geofenceResult = await checkGeofence(currentLocation.lat, currentLocation.lng, currentLocation.accuracy);
+        console.log('🏢 Checking WFO geofence for location:', usedLocation.lat, usedLocation.lng);
+        const geofenceResult = await checkGeofence(usedLocation.lat, usedLocation.lng, usedLocation.accuracy);
         console.log('📍 Geofence check result:', geofenceResult);
         
         // For CHECK-IN: Must be inside geofence
@@ -905,16 +918,16 @@ const AttendanceForm = () => {
         ...(isCheckOut 
           ? { 
               check_out_time: formattedTime,
-              checkout_location_lat: currentLocation.lat,
-              checkout_location_lng: currentLocation.lng,
+              checkout_location_lat: usedLocation.lat,
+              checkout_location_lng: usedLocation.lng,
               checkout_location_address: locationAddress,
               selfie_checkout_url: photoPath,
               hours_worked: currentAttendanceType === 'overtime' ? calculateHoursWorked(currentRecord!.check_in_time!, formattedTime) : undefined
             }
           : { 
               check_in_time: formattedTime,
-              checkin_location_lat: currentLocation.lat,
-              checkin_location_lng: currentLocation.lng,
+              checkin_location_lat: usedLocation.lat,
+              checkin_location_lng: usedLocation.lng,
               checkin_location_address: locationAddress,
               selfie_checkin_url: photoPath
             }
@@ -928,8 +941,8 @@ const AttendanceForm = () => {
         console.log('📝 Updating check-out for record:', todayAttendance.id);
         const updateData: any = {
           check_out_time: formattedTime,
-          checkout_location_lat: currentLocation.lat,
-          checkout_location_lng: currentLocation.lng,
+          checkout_location_lat: usedLocation.lat,
+          checkout_location_lng: usedLocation.lng,
           checkout_location_address: locationAddress
         };
         
@@ -991,6 +1004,7 @@ const AttendanceForm = () => {
       });
     } finally {
       setLoading(false);
+      setIsButtonProcessing(false);
     }
   };
 
@@ -1367,13 +1381,13 @@ const AttendanceForm = () => {
         // Inside geofence: Process without camera
         console.log('✅ Inside geofence, processing WFO attendance');
         setCurrentLocation(location);
-        handlePhotoCapture(new Blob()); // Pass empty blob for WFO
+        handlePhotoCapture(new Blob(), location); // Pass location directly to avoid state race
       } else {
         // WFH/Dinas: Check if bypass enabled
         setCurrentLocation(location);
         if (bypassCamera) {
           // Skip camera, process directly
-          handlePhotoCapture(new Blob());
+          handlePhotoCapture(new Blob(), location);
         } else {
           // Normal flow with camera
           setShowCamera(true);
@@ -1407,11 +1421,9 @@ const AttendanceForm = () => {
     
     // For WFO, directly process checkout without camera since no photo needed
     if (attendanceStatus === 'wfo' && pendingCheckoutLocation) {
-      setCurrentLocation(pendingCheckoutLocation);
-      // Use setTimeout to ensure state is updated before calling handlePhotoCapture
-      setTimeout(async () => {
-        await handlePhotoCapture(null as any);
-      }, 100);
+      const loc = pendingCheckoutLocation;
+      // Process immediately with provided location (no camera for WFO)
+      await handlePhotoCapture(new Blob(), loc as any);
     } else {
       // For WFH/Dinas, show camera
       setCurrentLocation(pendingCheckoutLocation);
