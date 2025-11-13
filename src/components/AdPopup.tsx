@@ -67,7 +67,7 @@ const AdPopup = () => {
   useEffect(() => {
     if (!hasShownInitial || ads.length === 0) return;
 
-    // Set up interval to show ads every 10 minutes
+    // Set up interval to show ads every 4 minutes
     if (intervalRef.current) clearInterval(intervalRef.current);
     
     intervalRef.current = window.setInterval(() => {
@@ -84,7 +84,7 @@ const AdPopup = () => {
           });
         }
       }
-    }, 600000); // 10 minutes = 600000ms
+    }, 240000); // 4 minutes = 240000ms
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);

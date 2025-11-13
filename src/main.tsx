@@ -12,10 +12,10 @@ if ('serviceWorker' in navigator) {
       .then((registration) => {
         console.info('✅ SW registered:', registration);
 
-        // Check for updates every 5 minutes
+        // Check for updates every 3 minutes
         setInterval(() => {
           registration.update();
-        }, 5 * 60 * 1000);
+        }, 3 * 60 * 1000);
 
         // Listen for updates
         registration.addEventListener('updatefound', () => {
