@@ -326,24 +326,48 @@ const AttendanceForm = () => {
     }
   };
 
-  const requestLocationPermission = (): Promise<{ lat: number; lng: number; address: string; coordinates: string }> => {
+  const requestLocationPermission = (): Promise<{ lat: number; lng: number; address: string; coordinates: string; accuracy?: number }> => {
     return new Promise(async (resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error('Geolocation not supported'));
         return;
       }
 
+      const processPosition = async (position: GeolocationPosition) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
+        
+        console.log(`📍 Got location: ${lat}, ${lng} (accuracy: ${accuracy}m)`);
+        
+        try {
+          const locationData = await getAddressFromCoords(lat, lng);
+          resolve({ lat, lng, address: locationData.address, coordinates: locationData.coordinates, accuracy });
+        } catch (error) {
+          console.error('❌ Geocoding failed:', error);
+          // Even if geocoding fails, return coordinates
+          const locationCode = generateLocationCode(lat, lng);
+          resolve({ 
+            lat, 
+            lng, 
+            address: `${locationCode} - Lokasi tidak dikenal`, 
+            coordinates: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+            accuracy 
+          });
+        }
+      };
+
+      const handleError = (error: GeolocationPositionError) => {
+        console.error('❌ Geolocation error:', error);
+        reject(error);
+      };
+
       // If we already have permission, use it
       if (permissions.location) {
         navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            const locationData = await getAddressFromCoords(lat, lng);
-            resolve({ lat, lng, address: locationData.address, coordinates: locationData.coordinates });
-          },
-          (error) => reject(error),
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+          processPosition,
+          handleError,
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 }
         );
         return;
       }
@@ -351,17 +375,12 @@ const AttendanceForm = () => {
       // Request permission for the first time
       navigator.geolocation.getCurrentPosition(
         async (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          const locationData = await getAddressFromCoords(lat, lng);
-          
           // Save permission
           savePermissions({ ...permissions, location: true });
-          
-          resolve({ lat, lng, address: locationData.address, coordinates: locationData.coordinates });
+          await processPosition(position);
         },
-        (error) => reject(error),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+        handleError,
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 }
       );
     });
   };
@@ -381,16 +400,27 @@ const AttendanceForm = () => {
       
       let detailedAddress = '';
       
+      // Helper function to fetch with timeout
+      const fetchWithTimeout = (url: string, options: RequestInit, timeout = 8000) => {
+        return Promise.race([
+          fetch(url, options),
+          new Promise<Response>((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), timeout)
+          )
+        ]);
+      };
+      
       // Try OpenStreetMap Nominatim first (more detailed for Indonesia)
       try {
         console.log('🌐 Trying OpenStreetMap Nominatim...');
-        const nominatimResponse = await fetch(
+        const nominatimResponse = await fetchWithTimeout(
           `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=id&zoom=18`,
           {
             headers: {
               'User-Agent': 'AttendanceApp/1.0'
             }
-          }
+          },
+          8000
         );
         
         if (nominatimResponse.ok) {
@@ -450,8 +480,10 @@ const AttendanceForm = () => {
       if (!detailedAddress) {
         try {
           console.log('🌐 Trying BigDataCloud as fallback...');
-          const bigDataResponse = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=id`
+          const bigDataResponse = await fetchWithTimeout(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=id`,
+            {},
+            8000
           );
           
           if (bigDataResponse.ok) {
@@ -489,8 +521,10 @@ const AttendanceForm = () => {
       if (!detailedAddress) {
         try {
           console.log('🌐 Trying LocationIQ as second fallback...');
-          const locationIqResponse = await fetch(
-            `https://us1.locationiq.com/v1/reverse.php?key=pk.locationiq.default_pk&lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=id`
+          const locationIqResponse = await fetchWithTimeout(
+            `https://us1.locationiq.com/v1/reverse.php?key=pk.locationiq.default_pk&lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=id`,
+            {},
+            8000
           );
           
           if (locationIqResponse.ok) {
@@ -1282,7 +1316,9 @@ const AttendanceForm = () => {
       resolvedLocation = currentLocation;
     } else {
       try {
+        console.log('🔍 Requesting location permission...');
         resolvedLocation = await requestLocationPermission();
+        console.log('✅ Location obtained:', resolvedLocation);
       } catch (err) {
         console.error('❌ Failed to obtain location:', err);
         toast({
@@ -1298,10 +1334,11 @@ const AttendanceForm = () => {
 
     try {
       const location = resolvedLocation!;
+      console.log('📍 Processing location:', { lat: location.lat, lng: location.lng, accuracy: location.accuracy });
       
       if (attendanceStatus === 'wfo') {
         // WFO mode: Check geofence for both check-in and check-out
-        console.log('🏢 Checking WFO geofence for location:', location.lat, location.lng);
+        console.log('🏢 Checking WFO geofence for location:', location.lat, location.lng, 'accuracy:', location.accuracy);
         const geofenceResult = await checkGeofence(location.lat, location.lng, location.accuracy);
         console.log('📍 Geofence check result:', geofenceResult);
         
