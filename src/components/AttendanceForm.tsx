@@ -1654,7 +1654,10 @@ const AttendanceForm = () => {
                 <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
                   <SelectValue placeholder="Pilih area tugas..." />
                 </SelectTrigger>
-                <SelectContent className="bg-popover border-border shadow-lg max-h-60 overflow-hidden z-50">
+                <SelectContent 
+                  className="bg-popover border-border shadow-lg max-h-[280px] overflow-y-auto z-50 data-[state=open]:duration-100"
+                  position="popper"
+                >
                   <SelectItem value="all" className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground font-semibold">
                     🌍 Semua Area
                   </SelectItem>
