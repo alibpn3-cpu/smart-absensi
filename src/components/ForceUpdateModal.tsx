@@ -59,7 +59,7 @@ const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent 
-        className="max-w-md mx-auto [&>button]:hidden"
+        className="max-w-md mx-auto [&>[data-radix-dialog-close]]:hidden"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
