@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FileSpreadsheet, Calendar, Filter } from 'lucide-react';
+import { Download, FileSpreadsheet, Calendar, Filter, FileText, FileJson } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface ExportFilters {
   startDate: string;
@@ -39,6 +41,7 @@ const AttendanceExporter = () => {
   const [workAreas, setWorkAreas] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'excel' | 'pdf' | 'csv' | 'html'>('excel');
 
   React.useEffect(() => {
     fetchEmployees();
@@ -431,6 +434,210 @@ const AttendanceExporter = () => {
     }
   };
 
+  const getExportData = async () => {
+    const attendanceData = await fetchAttendanceData();
+    if (!attendanceData || attendanceData.length === 0) {
+      toast({
+        title: "Tidak Ada Data",
+        description: "Tidak ada catatan absensi untuk filter yang dipilih",
+        variant: "destructive"
+      });
+      return null;
+    }
+    return attendanceData.map((record: any, index: number) => {
+      const emp = allEmployees.find((s: any) => s.uid === record.staff_uid);
+      return {
+        no: index + 1,
+        uid: record.staff_uid,
+        name: record.staff_name,
+        position: emp?.position || '-',
+        workArea: emp?.work_area || '-',
+        division: emp?.division || '-',
+        date: new Date(record.date).toLocaleDateString('id-ID'),
+        status: record.status.toUpperCase(),
+        attendanceType: record.attendance_type === 'overtime' ? 'LEMBUR' : 'REGULAR',
+        checkIn: formatTimeForExport(record.check_in_time),
+        checkOut: formatTimeForExport(record.check_out_time),
+        hoursWorked: record.hours_worked || calculateWorkHours(record.check_in_time, record.check_out_time),
+        checkinAddress: record.checkin_location_address || '-',
+        checkoutAddress: record.checkout_location_address || '-',
+        reason: record.reason || '-'
+      };
+    });
+  };
+
+  const exportToPDF = async () => {
+    setLoading(true);
+    try {
+      const data = await getExportData();
+      if (!data) { setLoading(false); return; }
+
+      const doc = new jsPDF('landscape', 'mm', 'a4');
+      
+      // Header
+      doc.setFontSize(16);
+      doc.setTextColor(59, 130, 246);
+      doc.text('Laporan Absensi Karyawan', 14, 15);
+      
+      // Info periode
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Periode: ${filters.startDate} s/d ${filters.endDate}`, 14, 22);
+      doc.text(`Total Records: ${data.length}`, 14, 27);
+      
+      // Table
+      autoTable(doc, {
+        head: [['No', 'Nama', 'Tanggal', 'Status', 'Jenis', 'Check In', 'Check Out', 'Jam Kerja', 'Lokasi Check In']],
+        body: data.map((r) => [
+          r.no, r.name, r.date, r.status, r.attendanceType, r.checkIn, r.checkOut, r.hoursWorked, r.checkinAddress
+        ]),
+        startY: 32,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [59, 130, 246], textColor: 255 },
+        alternateRowStyles: { fillColor: [245, 247, 250] }
+      });
+      
+      // Page numbers
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Halaman ${i} dari ${pageCount}`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+      }
+      
+      const filename = `Laporan-Absensi_${filters.startDate}_${filters.endDate}.pdf`;
+      doc.save(filename);
+      
+      toast({ title: "Berhasil", description: `PDF berhasil diekspor! ${data.length} catatan.` });
+    } catch (error) {
+      console.error('PDF Export error:', error);
+      toast({ title: "Gagal", description: "Gagal mengekspor PDF", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const exportToCSV = async () => {
+    setLoading(true);
+    try {
+      const data = await getExportData();
+      if (!data) { setLoading(false); return; }
+
+      const BOM = '\uFEFF';
+      const headers = ['No', 'UID', 'Nama', 'Jabatan', 'Area Kerja', 'Divisi', 'Tanggal', 'Status', 'Jenis Absensi', 'Check In', 'Check Out', 'Jam Kerja', 'Lokasi Check In', 'Lokasi Check Out', 'Alasan'];
+      const rows = data.map((r) => [
+        r.no, r.uid, r.name, r.position, r.workArea, r.division, r.date, r.status, r.attendanceType, r.checkIn, r.checkOut, r.hoursWorked, r.checkinAddress, r.checkoutAddress, r.reason
+      ]);
+      
+      const csvContent = BOM + [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      saveAs(blob, `Laporan-Absensi_${filters.startDate}_${filters.endDate}.csv`);
+      
+      toast({ title: "Berhasil", description: `CSV berhasil diekspor! ${data.length} catatan.` });
+    } catch (error) {
+      console.error('CSV Export error:', error);
+      toast({ title: "Gagal", description: "Gagal mengekspor CSV", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const exportToHTML = async () => {
+    setLoading(true);
+    try {
+      const data = await getExportData();
+      if (!data) { setLoading(false); return; }
+
+      const tableRows = data.map(r => `
+        <tr>
+          <td>${r.no}</td>
+          <td>${r.name}</td>
+          <td>${r.date}</td>
+          <td><span class="badge ${r.status.toLowerCase()}">${r.status}</span></td>
+          <td>${r.attendanceType}</td>
+          <td>${r.checkIn}</td>
+          <td>${r.checkOut}</td>
+          <td>${r.hoursWorked}</td>
+          <td>${r.checkinAddress}</td>
+        </tr>
+      `).join('');
+
+      const htmlContent = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laporan Absensi - ${filters.startDate} s/d ${filters.endDate}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f7fa; color: #1a202c; }
+    .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    h1 { color: #3B82F6; margin-bottom: 10px; font-size: 24px; }
+    .summary { background: linear-gradient(135deg, #3B82F6, #2563EB); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .summary p { margin: 5px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+    th { background: #3B82F6; color: white; padding: 12px 8px; text-align: left; font-weight: 600; }
+    td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; }
+    tr:nth-child(even) { background: #f8fafc; }
+    tr:hover { background: #e0f2fe; }
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    .badge.wfo { background: #dbeafe; color: #1d4ed8; }
+    .badge.wfh { background: #dcfce7; color: #16a34a; }
+    .badge.dinas { background: #fed7aa; color: #c2410c; }
+    footer { margin-top: 30px; text-align: center; color: #64748b; font-size: 12px; }
+    @media print { body { background: white; } .container { box-shadow: none; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 Laporan Absensi Karyawan</h1>
+    <div class="summary">
+      <p><strong>Periode:</strong> ${filters.startDate} s/d ${filters.endDate}</p>
+      <p><strong>Total Records:</strong> ${data.length}</p>
+      <p><strong>Status:</strong> ${filters.status === 'all' ? 'Semua' : filters.status.toUpperCase()}</p>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>No</th><th>Nama</th><th>Tanggal</th><th>Status</th><th>Jenis</th><th>Check In</th><th>Check Out</th><th>Jam Kerja</th><th>Lokasi</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+    <footer>
+      <p>Diekspor pada: ${new Date().toLocaleString('id-ID')}</p>
+      <p>IT Division 2025</p>
+    </footer>
+  </div>
+</body>
+</html>`;
+
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
+      saveAs(blob, `Laporan-Absensi_${filters.startDate}_${filters.endDate}.html`);
+      
+      toast({ title: "Berhasil", description: `HTML berhasil diekspor! ${data.length} catatan.` });
+    } catch (error) {
+      console.error('HTML Export error:', error);
+      toast({ title: "Gagal", description: "Gagal mengekspor HTML", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExport = () => {
+    switch (exportFormat) {
+      case 'pdf': exportToPDF(); break;
+      case 'csv': exportToCSV(); break;
+      case 'html': exportToHTML(); break;
+      default: exportToExcel();
+    }
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -560,10 +767,24 @@ const AttendanceExporter = () => {
             </div>
           </div>
 
-          {/* Export Button */}
-          <div className="flex justify-center">
+          {/* Export Format & Button */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="flex items-center gap-2">
+              <Label>Format:</Label>
+              <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as any)}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="excel">📊 Excel (.xlsx)</SelectItem>
+                  <SelectItem value="pdf">📄 PDF (.pdf)</SelectItem>
+                  <SelectItem value="csv">📋 CSV (.csv)</SelectItem>
+                  <SelectItem value="html">🌐 HTML (.html)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Button 
-              onClick={exportToExcel}
+              onClick={handleExport}
               disabled={loading || !filters.startDate || !filters.endDate}
               className="gradient-primary px-8 py-3 text-lg"
               size="lg"
@@ -576,7 +797,7 @@ const AttendanceExporter = () => {
               ) : (
                 <>
                   <Download className="h-5 w-5 mr-2" />
-                  Export ke Excel (XLSX)
+                  Export Laporan
                 </>
               )}
             </Button>
@@ -584,10 +805,10 @@ const AttendanceExporter = () => {
 
           {/* Export Info */}
           <div className="text-center text-sm text-muted-foreground">
-            <p>📄 File akan berformat Excel (.xlsx) dengan orientasi landscape</p>
-            <p>📍 Koordinat lokasi dapat diklik untuk membuka peta di browser</p>
-            <p>📷 Kolom foto berisi link untuk membuka foto selfie saat absen</p>
-            <p>⏱️ Data jam kerja otomatis dihitung berdasarkan check-in dan check-out</p>
+            <p>📊 Excel: Format lengkap dengan hyperlink foto dan koordinat</p>
+            <p>📄 PDF: Format cetak dengan tabel rapi dan header</p>
+            <p>📋 CSV: Format teks untuk import ke aplikasi lain</p>
+            <p>🌐 HTML: Format web dengan styling modern</p>
           </div>
         </div>
       </CardContent>

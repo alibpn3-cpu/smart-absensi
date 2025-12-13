@@ -34,7 +34,12 @@ interface CheckInTimeStats {
   count: number;
 }
 
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', '#10b981', '#f59e0b', '#ef4444'];
+// Status colors - distinct and visible
+const STATUS_COLORS: Record<string, string> = {
+  WFO: '#3B82F6',   // Blue
+  WFH: '#22C55E',   // Green
+  Dinas: '#F97316'  // Orange
+};
 
 const DashboardAnalytics = () => {
   const [loading, setLoading] = useState(false);
@@ -382,8 +387,8 @@ const DashboardAnalytics = () => {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {statusDistribution.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  {statusDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || '#8884d8'} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -415,9 +420,9 @@ const DashboardAnalytics = () => {
                   }} 
                 />
                 <Legend />
-                <Bar dataKey="wfo" stackId="a" fill="hsl(var(--primary))" name="WFO" />
-                <Bar dataKey="wfh" stackId="a" fill="hsl(var(--secondary))" name="WFH" />
-                <Bar dataKey="dinas" stackId="a" fill="#10b981" name="Dinas" />
+                <Bar dataKey="wfo" stackId="a" fill="#3B82F6" name="WFO" />
+                <Bar dataKey="wfh" stackId="a" fill="#22C55E" name="WFH" />
+                <Bar dataKey="dinas" stackId="a" fill="#F97316" name="Dinas" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -478,7 +483,7 @@ const DashboardAnalytics = () => {
                           className="h-2 rounded-full transition-all"
                           style={{ 
                             width: `${area.percentage}%`,
-                            backgroundColor: COLORS[index % COLORS.length]
+                            backgroundColor: ['#3B82F6', '#22C55E', '#F97316', '#10b981', '#f59e0b', '#ef4444'][index % 6]
                           }}
                         />
                       </div>
