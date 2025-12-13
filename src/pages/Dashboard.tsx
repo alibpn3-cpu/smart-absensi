@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Users, 
   Calendar, 
@@ -64,6 +65,7 @@ interface AttendanceSummary {
 const Dashboard = () => {
   const { signOut } = useAuth();
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [filteredRecords, setFilteredRecords] = useState<AttendanceRecord[]>([]);
   const [summary, setSummary] = useState<AttendanceSummary>({
     totalStaff: 0,
     presentToday: 0,
@@ -75,17 +77,52 @@ const Dashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
+  // Filter states
+  const [filterName, setFilterName] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterLocation, setFilterLocation] = useState<string>('all');
+  const [locations, setLocations] = useState<string[]>([]);
+  
   const [loading, setLoading] = useState(true);
 
-  // Calculate pagination
-  const totalPages = Math.ceil(attendanceRecords.length / itemsPerPage);
+  // Apply filters to attendance records
+  useEffect(() => {
+    let filtered = [...attendanceRecords];
+    
+    // Filter by name
+    if (filterName.trim()) {
+      const searchTerm = filterName.toLowerCase();
+      filtered = filtered.filter(r => 
+        r.staff_name.toLowerCase().includes(searchTerm) ||
+        r.staff_uid.toLowerCase().includes(searchTerm)
+      );
+    }
+    
+    // Filter by status
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(r => r.status === filterStatus);
+    }
+    
+    // Filter by location
+    if (filterLocation !== 'all') {
+      filtered = filtered.filter(r => 
+        r.checkin_location_address?.includes(filterLocation) ||
+        r.checkout_location_address?.includes(filterLocation)
+      );
+    }
+    
+    setFilteredRecords(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [attendanceRecords, filterName, filterStatus, filterLocation]);
+
+  // Calculate pagination based on filtered records
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentRecords = attendanceRecords.slice(startIndex, endIndex);
+  const currentRecords = filteredRecords.slice(startIndex, endIndex);
 
   useEffect(() => {
     fetchDashboardData();
-    setCurrentPage(1); // Reset to first page when date changes
   }, [selectedDate]);
 
   const fetchDashboardData = async () => {
@@ -108,7 +145,18 @@ const Dashboard = () => {
 
       if (staffError) throw staffError;
 
+      // Fetch geofence areas for location filter
+      const { data: geofences } = await supabase
+        .from('geofence_areas')
+        .select('name')
+        .eq('is_active', true);
+
+      if (geofences) {
+        setLocations(geofences.map(g => g.name));
+      }
+
       setAttendanceRecords((attendance || []) as AttendanceRecord[]);
+      setFilteredRecords((attendance || []) as AttendanceRecord[]);
       
       // Calculate summary
       const presentToday = attendance?.length || 0;
@@ -378,8 +426,9 @@ const Dashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col sm:flex-row gap-4 items-end">
-                  <div className="space-y-2 flex-1 sm:flex-initial">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                  {/* Date Filter */}
+                  <div className="space-y-2">
                     <Label htmlFor="date" className="text-foreground">Tanggal</Label>
                     <Input
                       id="date"
@@ -389,27 +438,104 @@ const Dashboard = () => {
                       className="bg-background border-border text-foreground"
                     />
                   </div>
-                  <Button 
-                    onClick={fetchDashboardData} 
-                    disabled={loading}
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto"
-                  >
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Update
-                  </Button>
+                  
+                  {/* Name Search */}
+                  <div className="space-y-2">
+                    <Label htmlFor="filterName" className="text-foreground">Cari Nama/UID</Label>
+                    <Input
+                      id="filterName"
+                      type="text"
+                      placeholder="Ketik nama atau UID..."
+                      value={filterName}
+                      onChange={(e) => setFilterName(e.target.value)}
+                      className="bg-background border-border text-foreground"
+                    />
+                  </div>
+                  
+                  {/* Status Filter */}
+                  <div className="space-y-2">
+                    <Label htmlFor="filterStatus" className="text-foreground">Status</Label>
+                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+                      <SelectTrigger className="bg-background border-border text-foreground">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Semua Status</SelectItem>
+                        <SelectItem value="wfo">WFO</SelectItem>
+                        <SelectItem value="wfh">WFH</SelectItem>
+                        <SelectItem value="dinas">Dinas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Location Filter */}
+                  <div className="space-y-2">
+                    <Label htmlFor="filterLocation" className="text-foreground">Lokasi</Label>
+                    <Select value={filterLocation} onValueChange={setFilterLocation}>
+                      <SelectTrigger className="bg-background border-border text-foreground">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Semua Lokasi</SelectItem>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Refresh Button */}
+                  <div className="space-y-2">
+                    <Label className="text-transparent">Action</Label>
+                    <Button 
+                      onClick={fetchDashboardData} 
+                      disabled={loading}
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 w-full"
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
                 </div>
+                
+                {/* Active filters indicator */}
+                {(filterName || filterStatus !== 'all' || filterLocation !== 'all') && (
+                  <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Filter aktif:</span>
+                    {filterName && <Badge variant="secondary">Nama: {filterName}</Badge>}
+                    {filterStatus !== 'all' && <Badge variant="secondary">Status: {filterStatus.toUpperCase()}</Badge>}
+                    {filterLocation !== 'all' && <Badge variant="secondary">Lokasi: {filterLocation}</Badge>}
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        setFilterName('');
+                        setFilterStatus('all');
+                        setFilterLocation('all');
+                      }}
+                      className="text-xs h-6"
+                    >
+                      Reset Filter
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             {/* Attendance Records */}
             <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-title-primary">Attendance Records - {new Date(selectedDate).toLocaleDateString('id-ID')}</CardTitle>
+                <CardTitle className="text-title-primary">
+                  Attendance Records - {new Date(selectedDate).toLocaleDateString('id-ID')}
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    ({filteredRecords.length} dari {attendanceRecords.length} records)
+                  </span>
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {loading ? (
                   <div className="text-center py-8 text-foreground">Loading...</div>
-                ) : attendanceRecords.length === 0 ? (
+                ) : filteredRecords.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     No attendance records found for selected date
                   </div>

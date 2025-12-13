@@ -118,11 +118,28 @@ const AttendanceForm = () => {
 
   const [timezone] = useState(getDeviceTimezone());
   const [wfoLocationName, setWfoLocationName] = useState<string | null>(null);
+  const [sharedDeviceMode, setSharedDeviceMode] = useState(false);
+
+  // Fetch shared device mode setting
+  const fetchSharedDeviceMode = async () => {
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('setting_value')
+        .eq('setting_key', 'shared_device_mode')
+        .maybeSingle();
+      
+      setSharedDeviceMode(data?.setting_value === 'true');
+    } catch (error) {
+      console.error('Error fetching shared device mode:', error);
+    }
+  };
 
   useEffect(() => {
     fetchStaffUsers();
     checkStoredPermissions();
     loadSavedStaff();
+    fetchSharedDeviceMode();
   }, []);
 
   useEffect(() => {
@@ -211,7 +228,23 @@ const AttendanceForm = () => {
     localStorage.setItem('attendance_permissions', JSON.stringify(newPermissions));
   };
 
-  const loadSavedStaff = () => {
+  const loadSavedStaff = async () => {
+    // Check if shared device mode is enabled - don't load saved staff
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('setting_value')
+        .eq('setting_key', 'shared_device_mode')
+        .maybeSingle();
+      
+      if (data?.setting_value === 'true') {
+        console.log('📱 Shared device mode: Not loading saved staff');
+        return; // Don't load saved staff in shared device mode
+      }
+    } catch (error) {
+      console.error('Error checking shared device mode:', error);
+    }
+    
     const savedStaff = localStorage.getItem('last_selected_staff');
     if (savedStaff) {
       try {
@@ -615,6 +648,36 @@ const AttendanceForm = () => {
     return { isInGeofence: false };
   };
 
+  // Check ANY geofence (for Dinas status to display geofence name instead of address)
+  const checkAnyGeofence = async (lat: number, lng: number): Promise<string | null> => {
+    const { data: geofences, error } = await supabase
+      .from('geofence_areas')
+      .select('*')
+      .eq('is_active', true);
+
+    if (error || !geofences) return null;
+
+    for (const geofence of geofences) {
+      if (geofence.center_lat && geofence.center_lng && geofence.radius) {
+        const distance = calculateDistance(
+          lat, lng, 
+          parseFloat(geofence.center_lat.toString()), 
+          parseFloat(geofence.center_lng.toString())
+        );
+        
+        // Use a small tolerance for geofence matching
+        const effectiveRadius = geofence.radius + 50; // 50m tolerance
+        
+        if (distance <= effectiveRadius) {
+          console.log(`📍 Dinas: Found matching geofence "${geofence.name}" at ${distance.toFixed(0)}m`);
+          return geofence.name;
+        }
+      }
+    }
+
+    return null;
+  };
+
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371e3; // Earth's radius in meters
     const φ1 = lat1 * Math.PI/180;
@@ -856,6 +919,16 @@ const AttendanceForm = () => {
             console.warn('⚠️ No geofence name found, using address');
           }
         }
+      } else if (attendanceStatus === 'dinas') {
+        // For Dinas status, check if inside any geofence and use that name
+        console.log('📍 Checking if Dinas is inside any geofence...');
+        const geofenceName = await checkAnyGeofence(usedLocation.lat, usedLocation.lng);
+        if (geofenceName) {
+          locationAddress = geofenceName;
+          console.log('✅ Dinas using geofence name:', locationAddress);
+        } else {
+          console.log('📍 Dinas not in any geofence, using address:', locationAddress);
+        }
       }
 
       // Upload photo to Supabase Storage (only for WFH and Dinas WITH photo)
@@ -993,7 +1066,26 @@ const AttendanceForm = () => {
       setReason('');
       setCheckoutReason('');
       setPendingCheckoutLocation(null);
-      fetchTodayAttendance();
+      
+      // Reset for shared device mode after successful attendance
+      if (sharedDeviceMode && isCheckOut) {
+        console.log('📱 Shared device mode: Resetting form after checkout');
+        setTimeout(() => {
+          setSelectedStaff(null);
+          setAttendanceStatus('wfo');
+          setTodayAttendance(null);
+          setRegularAttendance(null);
+          setOvertimeAttendance(null);
+          localStorage.removeItem('last_selected_staff');
+          localStorage.removeItem('attendance_status');
+          toast({
+            title: "Form Reset",
+            description: "Silakan pilih staff berikutnya untuk absensi"
+          });
+        }, 2000);
+      } else {
+        fetchTodayAttendance();
+      }
     } catch (error) {
       console.error('❌ CRITICAL ERROR saving attendance:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));

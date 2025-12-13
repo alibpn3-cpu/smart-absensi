@@ -4,14 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Settings, Save, Image, Clock } from 'lucide-react';
+import { Settings, Save, Image, Clock, Monitor, AlertTriangle } from 'lucide-react';
 
 const AppSettings = () => {
   const [logoUrl, setLogoUrl] = useState('');
   const [appTitle, setAppTitle] = useState('');
   const [timezone, setTimezone] = useState('WIB');
+  const [sharedDeviceMode, setSharedDeviceMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -25,7 +27,7 @@ const AppSettings = () => {
       const { data, error } = await supabase
         .from('app_settings')
         .select('setting_key, setting_value')
-        .in('setting_key', ['app_logo_url', 'app_title', 'app_timezone']);
+        .in('setting_key', ['app_logo_url', 'app_title', 'app_timezone', 'shared_device_mode']);
 
       if (error && error.code !== 'PGRST116') {
         throw error;
@@ -35,10 +37,12 @@ const AppSettings = () => {
         const logoSetting = data.find(item => item.setting_key === 'app_logo_url');
         const titleSetting = data.find(item => item.setting_key === 'app_title');
         const timezoneSetting = data.find(item => item.setting_key === 'app_timezone');
+        const sharedDeviceSetting = data.find(item => item.setting_key === 'shared_device_mode');
         
         setLogoUrl(logoSetting?.setting_value || '');
         setAppTitle(titleSetting?.setting_value || 'Digital Absensi');
         setTimezone(timezoneSetting?.setting_value || 'WIB');
+        setSharedDeviceMode(sharedDeviceSetting?.setting_value === 'true');
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -70,6 +74,11 @@ const AppSettings = () => {
           setting_key: 'app_timezone',
           setting_value: timezone,
           description: 'Application timezone for clock display'
+        },
+        {
+          setting_key: 'shared_device_mode',
+          setting_value: sharedDeviceMode ? 'true' : 'false',
+          description: 'Enable shared device mode for kiosk attendance terminals'
         }
       ];
 
@@ -185,6 +194,40 @@ const AppSettings = () => {
                 </div>
               </div>
             )}
+
+            {/* Shared Device Mode */}
+            <div className="space-y-2 pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="sharedDeviceMode" className="text-black flex items-center gap-2">
+                    <Monitor className="h-4 w-4" />
+                    Shared Device Mode (Kiosk)
+                  </Label>
+                  <p className="text-xs text-gray-600">
+                    Mode untuk perangkat absensi bersama. Staff akan auto-reset setelah absensi.
+                  </p>
+                </div>
+                <Switch
+                  id="sharedDeviceMode"
+                  checked={sharedDeviceMode}
+                  onCheckedChange={setSharedDeviceMode}
+                />
+              </div>
+              
+              {sharedDeviceMode && (
+                <div className="flex items-start gap-2 mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="text-xs text-amber-800">
+                    <p className="font-medium">Mode Kiosk Aktif</p>
+                    <ul className="list-disc ml-4 mt-1 space-y-0.5">
+                      <li>Staff tidak akan tersimpan di browser</li>
+                      <li>Form akan reset otomatis setelah absensi</li>
+                      <li>Cocok untuk terminal absensi bersama (30+ user/hari)</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Save Button */}
             <div className="flex justify-end">
