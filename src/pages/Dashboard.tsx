@@ -34,6 +34,8 @@ import AppSettings from '../components/AppSettings';
 import BirthdayImporter from '../components/BirthdayImporter';
 const AdManager = React.lazy(() => import('../components/AdManager'));
 import ActivityLogViewer from '../components/ActivityLogViewer';
+import NotCheckedInList from '../components/NotCheckedInList';
+const DashboardAnalytics = React.lazy(() => import('../components/DashboardAnalytics'));
 import { PieChart as RePieChart, Pie, Cell } from 'recharts';
 
 interface AttendanceRecord {
@@ -369,10 +371,20 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-8 gap-1 bg-muted h-auto p-1">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-10 gap-1 bg-muted h-auto p-1">
             <TabsTrigger value="attendance" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Attendance</span>
               <span className="sm:hidden">Absen</span>
+            </TabsTrigger>
+            <TabsTrigger value="notcheckedin" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+              <Users className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Belum Absen</span>
+              <span className="sm:hidden">Blm</span>
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Analytics</span>
+              <span className="sm:hidden">Stats</span>
             </TabsTrigger>
             <TabsTrigger value="employees" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
@@ -705,6 +717,16 @@ const Dashboard = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="notcheckedin">
+            <NotCheckedInList />
+          </TabsContent>
+
+          <TabsContent value="analytics">
+            <React.Suspense fallback={<div className="text-center py-8">Loading Analytics...</div>}>
+              <DashboardAnalytics />
+            </React.Suspense>
           </TabsContent>
 
           <TabsContent value="employees">

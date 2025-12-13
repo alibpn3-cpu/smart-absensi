@@ -120,26 +120,17 @@ const AttendanceForm = () => {
   const [wfoLocationName, setWfoLocationName] = useState<string | null>(null);
   const [sharedDeviceMode, setSharedDeviceMode] = useState(false);
 
-  // Fetch shared device mode setting
-  const fetchSharedDeviceMode = async () => {
-    try {
-      const { data } = await supabase
-        .from('app_settings')
-        .select('setting_value')
-        .eq('setting_key', 'shared_device_mode')
-        .maybeSingle();
-      
-      setSharedDeviceMode(data?.setting_value === 'true');
-    } catch (error) {
-      console.error('Error fetching shared device mode:', error);
-    }
+  // Load shared device mode from localStorage (per-device setting)
+  const loadSharedDeviceMode = () => {
+    const localKioskMode = localStorage.getItem('shared_device_mode');
+    setSharedDeviceMode(localKioskMode === 'true');
   };
 
   useEffect(() => {
     fetchStaffUsers();
     checkStoredPermissions();
     loadSavedStaff();
-    fetchSharedDeviceMode();
+    loadSharedDeviceMode();
   }, []);
 
   useEffect(() => {
@@ -228,21 +219,12 @@ const AttendanceForm = () => {
     localStorage.setItem('attendance_permissions', JSON.stringify(newPermissions));
   };
 
-  const loadSavedStaff = async () => {
-    // Check if shared device mode is enabled - don't load saved staff
-    try {
-      const { data } = await supabase
-        .from('app_settings')
-        .select('setting_value')
-        .eq('setting_key', 'shared_device_mode')
-        .maybeSingle();
-      
-      if (data?.setting_value === 'true') {
-        console.log('📱 Shared device mode: Not loading saved staff');
-        return; // Don't load saved staff in shared device mode
-      }
-    } catch (error) {
-      console.error('Error checking shared device mode:', error);
+  const loadSavedStaff = () => {
+    // Check if shared device mode is enabled in localStorage - don't load saved staff
+    const localKioskMode = localStorage.getItem('shared_device_mode');
+    if (localKioskMode === 'true') {
+      console.log('📱 Shared device mode: Not loading saved staff');
+      return; // Don't load saved staff in shared device mode
     }
     
     const savedStaff = localStorage.getItem('last_selected_staff');
@@ -1523,11 +1505,24 @@ const AttendanceForm = () => {
     }
   };
 
-  // Clear app cache/cookies and SW, then reload
+  // Clear app cache/cookies and SW, then reload - PRESERVE kiosk mode
   const handleClearCache = async () => {
     try {
+      // Preserve important device settings before clearing
+      const kioskMode = localStorage.getItem('shared_device_mode');
+      const deviceId = localStorage.getItem('device_id');
+      const userTimezone = localStorage.getItem('user_timezone');
+      const installedVersion = localStorage.getItem('app_installed_version');
+      
       localStorage.clear();
       sessionStorage.clear();
+      
+      // Restore preserved settings
+      if (kioskMode) localStorage.setItem('shared_device_mode', kioskMode);
+      if (deviceId) localStorage.setItem('device_id', deviceId);
+      if (userTimezone) localStorage.setItem('user_timezone', userTimezone);
+      if (installedVersion) localStorage.setItem('app_installed_version', installedVersion);
+      
       // Delete cookies
       document.cookie.split(';').forEach((c) => {
         const eqPos = c.indexOf('=');

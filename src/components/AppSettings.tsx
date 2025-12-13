@@ -5,20 +5,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Settings, Save, Image, Clock, Monitor, AlertTriangle } from 'lucide-react';
+import { Settings, Save, Image, Monitor, AlertTriangle, Sparkles } from 'lucide-react';
 
 const AppSettings = () => {
   const [logoUrl, setLogoUrl] = useState('');
   const [appTitle, setAppTitle] = useState('');
   const [timezone, setTimezone] = useState('WIB');
   const [sharedDeviceMode, setSharedDeviceMode] = useState(false);
+  const [appVersion, setAppVersion] = useState('');
+  const [changelog, setChangelog] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchSettings();
+    // Load shared device mode from localStorage (per-device setting)
+    const localKioskMode = localStorage.getItem('shared_device_mode');
+    setSharedDeviceMode(localKioskMode === 'true');
   }, []);
 
   const fetchSettings = async () => {
@@ -27,7 +33,7 @@ const AppSettings = () => {
       const { data, error } = await supabase
         .from('app_settings')
         .select('setting_key, setting_value')
-        .in('setting_key', ['app_logo_url', 'app_title', 'app_timezone', 'shared_device_mode']);
+        .in('setting_key', ['app_logo_url', 'app_title', 'app_timezone', 'app_current_version', 'app_version_changelog']);
 
       if (error && error.code !== 'PGRST116') {
         throw error;
@@ -37,12 +43,14 @@ const AppSettings = () => {
         const logoSetting = data.find(item => item.setting_key === 'app_logo_url');
         const titleSetting = data.find(item => item.setting_key === 'app_title');
         const timezoneSetting = data.find(item => item.setting_key === 'app_timezone');
-        const sharedDeviceSetting = data.find(item => item.setting_key === 'shared_device_mode');
+        const versionSetting = data.find(item => item.setting_key === 'app_current_version');
+        const changelogSetting = data.find(item => item.setting_key === 'app_version_changelog');
         
         setLogoUrl(logoSetting?.setting_value || '');
         setAppTitle(titleSetting?.setting_value || 'Digital Absensi');
         setTimezone(timezoneSetting?.setting_value || 'WIB');
-        setSharedDeviceMode(sharedDeviceSetting?.setting_value === 'true');
+        setAppVersion(versionSetting?.setting_value || 'v2.2.0');
+        setChangelog(changelogSetting?.setting_value || '');
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -54,6 +62,22 @@ const AppSettings = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSharedDeviceModeChange = (checked: boolean) => {
+    setSharedDeviceMode(checked);
+    // Save to localStorage (per-device setting)
+    if (checked) {
+      localStorage.setItem('shared_device_mode', 'true');
+    } else {
+      localStorage.removeItem('shared_device_mode');
+    }
+    toast({
+      title: checked ? "Kiosk Mode Aktif" : "Kiosk Mode Nonaktif",
+      description: checked 
+        ? "Mode kiosk aktif untuk browser/device ini" 
+        : "Mode kiosk dinonaktifkan untuk browser/device ini"
+    });
   };
 
   const saveSettings = async () => {
@@ -76,9 +100,14 @@ const AppSettings = () => {
           description: 'Application timezone for clock display'
         },
         {
-          setting_key: 'shared_device_mode',
-          setting_value: sharedDeviceMode ? 'true' : 'false',
-          description: 'Enable shared device mode for kiosk attendance terminals'
+          setting_key: 'app_current_version',
+          setting_value: appVersion,
+          description: 'Current application version'
+        },
+        {
+          setting_key: 'app_version_changelog',
+          setting_value: changelog,
+          description: 'Changelog for current version'
         }
       ];
 
@@ -87,7 +116,6 @@ const AppSettings = () => {
         document.title = appTitle;
       }
       if (logoUrl) {
-        // Update favicon
         let favicon = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
         if (!favicon) {
           favicon = document.createElement('link');
@@ -107,7 +135,7 @@ const AppSettings = () => {
 
       toast({
         title: "Berhasil",
-        description: "Pengaturan berhasil disimpan"
+        description: "Pengaturan berhasil disimpan. Semua user akan menerima notifikasi update."
       });
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -134,7 +162,7 @@ const AppSettings = () => {
           <div className="text-center py-8 text-black">Loading settings...</div>
         ) : (
           <div className="space-y-4">
-            {/* Timezone Setting */}
+            {/* Application Title */}
             <div className="space-y-2">
               <Label htmlFor="appTitle" className="text-black flex items-center gap-2">
                 <Settings className="h-4 w-4" />
@@ -148,9 +176,6 @@ const AppSettings = () => {
                 placeholder="Smart Zone Absensi"
                 className="bg-white border-gray-300 text-black placeholder:text-gray-500"
               />
-              <p className="text-xs text-gray-600">
-                Enter the title for your application. It will be displayed on the main page and browser tab.
-              </p>
             </div>
 
             {/* Logo URL Setting */}
@@ -167,9 +192,6 @@ const AppSettings = () => {
                 placeholder="https://example.com/logo.png"
                 className="bg-white border-gray-300 text-black placeholder:text-gray-500"
               />
-              <p className="text-xs text-gray-600">
-                Enter the URL of your company logo. It will be displayed in the main page header and browser tab icon.
-              </p>
             </div>
 
             {/* Logo Preview */}
@@ -195,7 +217,49 @@ const AppSettings = () => {
               </div>
             )}
 
-            {/* Shared Device Mode */}
+            {/* Version Control Section */}
+            <div className="space-y-4 pt-4 border-t border-gray-200">
+              <h3 className="font-semibold text-black flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                Version Control (Force Update)
+              </h3>
+              
+              <div className="space-y-2">
+                <Label htmlFor="appVersion" className="text-black">
+                  App Version
+                </Label>
+                <Input
+                  id="appVersion"
+                  type="text"
+                  value={appVersion}
+                  onChange={(e) => setAppVersion(e.target.value)}
+                  placeholder="v2.2.0"
+                  className="bg-white border-gray-300 text-black placeholder:text-gray-500"
+                />
+                <p className="text-xs text-gray-600">
+                  Saat versi berubah, semua user akan menerima popup update
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="changelog" className="text-black">
+                  Changelog (per baris)
+                </Label>
+                <Textarea
+                  id="changelog"
+                  value={changelog}
+                  onChange={(e) => setChangelog(e.target.value)}
+                  placeholder="• Fitur baru A&#10;• Perbaikan bug B&#10;• Peningkatan performa"
+                  rows={5}
+                  className="bg-white border-gray-300 text-black placeholder:text-gray-500 resize-none"
+                />
+                <p className="text-xs text-gray-600">
+                  Tulis satu fitur per baris. Akan ditampilkan di popup update.
+                </p>
+              </div>
+            </div>
+
+            {/* Shared Device Mode (Per-Device) */}
             <div className="space-y-2 pt-4 border-t border-gray-200">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
@@ -210,15 +274,23 @@ const AppSettings = () => {
                 <Switch
                   id="sharedDeviceMode"
                   checked={sharedDeviceMode}
-                  onCheckedChange={setSharedDeviceMode}
+                  onCheckedChange={handleSharedDeviceModeChange}
                 />
               </div>
               
+              <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <Monitor className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+                <div className="text-xs text-blue-800">
+                  <p className="font-medium">⚠️ Setting Per-Device</p>
+                  <p>Mode ini hanya berlaku untuk browser/device ini saja. Aktifkan di setiap perangkat kiosk secara terpisah.</p>
+                </div>
+              </div>
+              
               {sharedDeviceMode && (
-                <div className="flex items-start gap-2 mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
                   <div className="text-xs text-amber-800">
-                    <p className="font-medium">Mode Kiosk Aktif</p>
+                    <p className="font-medium">🖥️ Kiosk Mode Aktif</p>
                     <ul className="list-disc ml-4 mt-1 space-y-0.5">
                       <li>Staff tidak akan tersimpan di browser</li>
                       <li>Form akan reset otomatis setelah absensi</li>
@@ -230,7 +302,7 @@ const AppSettings = () => {
             </div>
 
             {/* Save Button */}
-            <div className="flex justify-end">
+            <div className="flex justify-end pt-4">
               <Button
                 onClick={saveSettings}
                 disabled={saving}
