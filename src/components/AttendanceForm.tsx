@@ -19,7 +19,7 @@ import BirthdayCard from './BirthdayCard';
 import PermissionIndicators from './PermissionIndicators';
 import { format } from 'date-fns';
 
-const APP_VERSION = 'v2.1.0'; // Sync with service worker cache version
+
 
 interface StaffUser {
   uid: string;
@@ -119,6 +119,7 @@ const AttendanceForm = () => {
   const [timezone] = useState(getDeviceTimezone());
   const [wfoLocationName, setWfoLocationName] = useState<string | null>(null);
   const [sharedDeviceMode, setSharedDeviceMode] = useState(false);
+  const [appVersion, setAppVersion] = useState('v2.2.0');
 
   // Load shared device mode from localStorage (per-device setting)
   const loadSharedDeviceMode = () => {
@@ -126,11 +127,24 @@ const AttendanceForm = () => {
     setSharedDeviceMode(localKioskMode === 'true');
   };
 
+  // Fetch app version from database
+  const fetchAppVersion = async () => {
+    const { data } = await supabase
+      .from('app_settings')
+      .select('setting_value')
+      .eq('setting_key', 'app_current_version')
+      .maybeSingle();
+    if (data?.setting_value) {
+      setAppVersion(data.setting_value);
+    }
+  };
+
   useEffect(() => {
     fetchStaffUsers();
     checkStoredPermissions();
     loadSavedStaff();
     loadSharedDeviceMode();
+    fetchAppVersion();
   }, []);
 
   useEffect(() => {
@@ -1719,6 +1733,11 @@ const AttendanceForm = () => {
                       {formatTimeWithTimezone(currentDateTime, timezone).split(' ')[1]}
                     </span>
                   </div>
+                  {sharedDeviceMode && (
+                    <Badge variant="outline" className="bg-amber-500/20 text-amber-700 border-amber-500 text-xs">
+                      🖥️ Kiosk Mode
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
@@ -2115,7 +2134,7 @@ const AttendanceForm = () => {
         </Card>
 
         <div className="text-center text-xs text-muted-foreground mt-2 space-y-2">
-          <div>Versi aplikasi : {APP_VERSION} IT Division 2025</div>
+          <div>Versi aplikasi : {appVersion} IT Division 2025</div>
           <div className="flex items-center justify-center gap-3">
             <Button variant="outline" size="sm" onClick={handleClearCache}>
               Update (Hapus Cache)
