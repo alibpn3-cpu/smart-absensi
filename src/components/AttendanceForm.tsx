@@ -1789,6 +1789,9 @@ const AttendanceForm = () => {
           </CardHeader>
         </Card>
 
+        {/* Attendance Status List - Shows who has/hasn't checked in */}
+        <AttendanceStatusList selectedWorkArea={selectedWorkArea} />
+
         <Card className="border-0 shadow-xl animate-slide-up">
           <CardContent className="space-y-6 p-6">
             {/* Work Area Selection */}
@@ -2196,8 +2199,6 @@ const AttendanceForm = () => {
           </CardContent>
         </Card>
 
-        {/* Attendance Status List - Shows who has/hasn't checked in */}
-        <AttendanceStatusList selectedWorkArea={selectedWorkArea} />
 
         <div className="text-center text-xs text-muted-foreground mt-2 space-y-2">
           <div>Versi aplikasi : {appVersion} IT Division 2025</div>
