@@ -132,7 +132,12 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ isOpen, onClose, onScanSu
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog
+  open={isOpen}
+  onOpenChange={(open) => {
+    if (!open) handleClose();
+  }}
+>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
