@@ -16,13 +16,16 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ isOpen, onClose, onScanSu
   const [error, setError] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scannerId = useRef(`qr-reader-${Date.now()}`);
 
   useEffect(() => {
-    if (isOpen && containerRef.current) {
+    if (isOpen) {
+      const timer = setTimeout(() => {
       startScanner();
-    }
+    }, 200);
     
     return () => {
+      clearTimeout(timer);
       stopScanner();
     };
   }, [isOpen]);
@@ -35,7 +38,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ isOpen, onClose, onScanSu
       setIsScanning(true);
       
       // Create scanner instance
-      const html5QrCode = new Html5Qrcode("qr-reader");
+      const html5QrCode = new Html5Qrcode(scannerId.current);
       scannerRef.current = html5QrCode;
         
       await html5QrCode.start(
@@ -98,7 +101,10 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ isOpen, onClose, onScanSu
   const stopScanner = async () => {
     if (scannerRef.current) {
       try {
+        const state = scannerRef.current.getState();
+        if (state === 2) { // 2 = SCANNING state
         await scannerRef.current.stop();
+        }
         scannerRef.current.clear();
       } catch (err) {
         console.log('Scanner already stopped');
@@ -142,7 +148,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ isOpen, onClose, onScanSu
           ) : (
             <>
               <div 
-                id="qr-reader" 
+                id={scannerId.current} 
                 ref={containerRef}
                 className="w-full aspect-square max-w-[300px] rounded-lg overflow-hidden bg-muted"
               />
