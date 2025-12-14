@@ -37,32 +37,14 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ isOpen, onClose, onScanSu
       // Create scanner instance
       const html5QrCode = new Html5Qrcode("qr-reader");
       scannerRef.current = html5QrCode;
-      
-      // Get front camera (user facing)
-      const cameras = await Html5Qrcode.getCameras();
-      
-      if (cameras.length === 0) {
-        throw new Error('Tidak ada kamera ditemukan');
-      }
-      
-      // Try to find front camera
-      let cameraId = cameras[0].id;
-      const frontCamera = cameras.find(camera => 
-        camera.label.toLowerCase().includes('front') || 
-        camera.label.toLowerCase().includes('depan') ||
-        camera.label.toLowerCase().includes('user')
-      );
-      
-      if (frontCamera) {
-        cameraId = frontCamera.id;
-      }
-      
+        
       await html5QrCode.start(
-        cameraId,
+        { facingMode: 'user' }, // 🟢 KAMERA DEPAN (KIOSK)
         {
           fps: 10,
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1,
+          disableFlip: false,
         },
         (decodedText) => {
           console.log('📱 QR Code scanned:', decodedText);
