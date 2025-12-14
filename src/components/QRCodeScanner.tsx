@@ -21,13 +21,14 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ isOpen, onClose, onScanSu
   useEffect(() => {
     if (isOpen) {
       const timer = setTimeout(() => {
-      startScanner();
-    }, 200);
+        startScanner();
+      }, 200);
     
     return () => {
       clearTimeout(timer);
       stopScanner();
     };
+    }
   }, [isOpen]);
 
   const startScanner = async () => {
@@ -103,7 +104,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ isOpen, onClose, onScanSu
       try {
         const state = scannerRef.current.getState();
         if (state === 2) { // 2 = SCANNING state
-        await scannerRef.current.stop();
+          await scannerRef.current.stop();
         }
         scannerRef.current.clear();
       } catch (err) {
