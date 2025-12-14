@@ -1843,15 +1843,15 @@ const AttendanceForm = () => {
                     <Button
                       variant="outline"
                       role="combobox"
-                      className="h-12 flex-1 justify-between border-2 hover:border-primary transition-colors"
+                      className="h-12 flex-1 justify-between border-2 hover:border-primary transition-colors overflow-hidden"
                     >
-                      <span className="truncate">
+                      <span className="truncate block text-left flex-1 min-w-0">
                       {selectedStaff 
                         ? `${selectedStaff.name} - ${selectedStaff.position}`
                         : "Pilih nama staff..."
                       }
                       </span>
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 flex-shrink-0" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[90vw] sm:w-[400px] p-0" align="start">
