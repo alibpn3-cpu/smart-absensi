@@ -98,8 +98,8 @@ const AttendanceStatusList: React.FC<AttendanceStatusListProps> = ({ selectedWor
   useEffect(() => {
     fetchAttendanceStatus();
     
-    // Refresh every 5 minutes
-    const interval = setInterval(fetchAttendanceStatus, 5 * 60 * 1000);
+    // Refresh every 1 minutes
+    const interval = setInterval(fetchAttendanceStatus, 1 * 60 * 1000);
     
     return () => clearInterval(interval);
   }, [selectedWorkArea]);
