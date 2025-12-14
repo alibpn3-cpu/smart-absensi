@@ -1845,14 +1845,16 @@ const AttendanceForm = () => {
                       role="combobox"
                       className="h-12 flex-1 justify-between border-2 hover:border-primary transition-colors"
                     >
+                      <span className="truncate">
                       {selectedStaff 
                         ? `${selectedStaff.name} - ${selectedStaff.position}`
                         : "Pilih nama staff..."
                       }
+                      </span>
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
+                  <PopoverContent className="w-[90vw] sm:w-[400px] p-0" align="start">
                     <Command>
                       <CommandInput placeholder="Cari nama staff..." className="h-9" />
                       <CommandEmpty>Tidak ada staff ditemukan.</CommandEmpty>
@@ -1868,15 +1870,18 @@ const AttendanceForm = () => {
                                 key={staff.uid}
                                 value={`${staff.name} ${staff.position}`}
                                 onSelect={() => handleStaffSelect(staff.uid)}
-                                className="cursor-pointer"
+                                className="cursor-pointer flex items-start gap-2 py-3"
                               >
                                 <Check
                                   className={cn(
-                                    "mr-2 h-4 w-4",
+                                    "mt-0.5 h-4 w-4 shrink-0",
                                     selectedStaff?.uid === staff.uid ? "opacity-100" : "opacity-0"
                                   )}
                                 />
-                                {staff.name} - {staff.position}
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium truncate">{staff.name}</div>
+                                  <div className="text-xs text-muted-foreground truncate">{staff.position}</div>
+                                </div>
                               </CommandItem>
                             ))
                           )}
