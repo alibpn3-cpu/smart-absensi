@@ -10,13 +10,15 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Globe, User, ChevronsUpDown, Check } from 'lucide-react';
+import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Globe, User, ChevronsUpDown, Check, QrCode } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import CameraCapture from './CameraCapture';
 import BirthdayCard from './BirthdayCard';
 import PermissionIndicators from './PermissionIndicators';
+import QRCodeScanner from './QRCodeScanner';
+import AttendanceStatusList from './AttendanceStatusList';
 import { format } from 'date-fns';
 
 
@@ -80,6 +82,7 @@ const AttendanceForm = () => {
   const [showDinasFastCheckoutDialog, setShowDinasFastCheckoutDialog] = useState(false);
   const [dinasFastCheckoutReason, setDinasFastCheckoutReason] = useState('');
   const [isDinasFastCheckout, setIsDinasFastCheckout] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
   
   // Audio for button click
   const playClickSound = () => {
@@ -237,7 +240,12 @@ const AttendanceForm = () => {
     // Check if shared device mode is enabled in localStorage - don't load saved staff
     const localKioskMode = localStorage.getItem('shared_device_mode');
     if (localKioskMode === 'true') {
-      console.log('📱 Shared device mode: Not loading saved staff');
+      console.log('📱 Shared device mode: Not loading saved staff, but loading work area');
+      // Load saved work area for kiosk mode
+      const savedWorkArea = localStorage.getItem('last_selected_work_area');
+      if (savedWorkArea) {
+        setSelectedWorkArea(savedWorkArea);
+      }
       return; // Don't load saved staff in shared device mode
     }
     
@@ -249,6 +257,12 @@ const AttendanceForm = () => {
       } catch (error) {
         console.error('Error loading saved staff:', error);
       }
+    }
+    
+    // Load saved work area
+    const savedWorkArea = localStorage.getItem('last_selected_work_area');
+    if (savedWorkArea) {
+      setSelectedWorkArea(savedWorkArea);
     }
   };
 
@@ -268,11 +282,18 @@ const AttendanceForm = () => {
     } else {
       const staff = data || [];
       setStaffUsers(staff);
-      setFilteredStaffUsers(staff);
       
       // Extract unique work areas
       const areas = [...new Set(staff.map(s => s.work_area))].sort();
       setWorkAreas(areas);
+      
+      // Apply saved work area filter after loading staff
+      const savedWorkArea = localStorage.getItem('last_selected_work_area');
+      if (savedWorkArea && savedWorkArea !== 'all') {
+        setFilteredStaffUsers(staff.filter(s => s.work_area === savedWorkArea));
+      } else {
+        setFilteredStaffUsers(staff);
+      }
     }
   };
 
@@ -619,10 +640,10 @@ const AttendanceForm = () => {
 
     if (error || !geofences) return { isInGeofence: true };
 
-    // Add tolerance for low accuracy (desktop browsers typically have 50-1000m accuracy)
-    // If accuracy is poor (>50m), add extra radius tolerance
-    const accuracyTolerance = accuracy && accuracy > 50 ? Math.min(accuracy * 0.8, 500) : 0;
-    console.log(`📏 Accuracy: ${accuracy}m, adding tolerance: ${accuracyTolerance}m`);
+    // Tighter geofence tolerance - max 15 meters
+    // If accuracy is poor, add minimal tolerance based on reported accuracy
+    const accuracyTolerance = accuracy ? Math.min(accuracy * 0.3, 15) : 0;
+    console.log(`📏 Accuracy: ${accuracy}m, adding tolerance: ${accuracyTolerance}m (max 15m)`);
 
     for (const geofence of geofences) {
       if (geofence.center_lat && geofence.center_lng && geofence.radius) {
@@ -695,8 +716,30 @@ const AttendanceForm = () => {
     setIsStaffPopoverOpen(false); // Close popover after selection
   };
 
+  // Handle QR Code scan result
+  const handleQRScanSuccess = (staffUid: string) => {
+    const staff = staffUsers.find(s => s.uid === staffUid);
+    if (staff) {
+      setSelectedStaff(staff);
+      toast({
+        title: "✅ Staff Ditemukan",
+        description: `${staff.name} - ${staff.position}`
+      });
+    } else {
+      toast({
+        title: "❌ Staff Tidak Ditemukan",
+        description: `UID "${staffUid}" tidak terdaftar dalam sistem`,
+        variant: "destructive"
+      });
+    }
+    setShowQRScanner(false);
+  };
+
   const handleWorkAreaSelect = (area: string) => {
     setSelectedWorkArea(area);
+    // Save work area to localStorage for kiosk mode persistence
+    localStorage.setItem('last_selected_work_area', area);
+    
     if (area === 'all') {
       setFilteredStaffUsers(staffUsers);
     } else {
@@ -1063,15 +1106,16 @@ const AttendanceForm = () => {
       setCheckoutReason('');
       setPendingCheckoutLocation(null);
       
-      // Reset for shared device mode after successful attendance
-      if (sharedDeviceMode && isCheckOut) {
-        console.log('📱 Shared device mode: Resetting form after checkout');
+      // Reset for shared device mode after successful CHECK-IN (not checkout)
+      // Keep work area saved so next user can quickly find their name
+      if (sharedDeviceMode && !isCheckOut) {
+        console.log('📱 Shared device mode: Resetting form after check-in');
         setTimeout(() => {
           setSelectedStaff(null);
           setAttendanceStatus('wfo');
-          setTodayAttendance(null);
-          setRegularAttendance(null);
-          setOvertimeAttendance(null);
+          setReason('');
+          // Keep work area, don't reset: setSelectedWorkArea
+          // Keep filtered staff list, don't reset: setFilteredStaffUsers
           localStorage.removeItem('last_selected_staff');
           localStorage.removeItem('attendance_status');
           toast({
@@ -1079,9 +1123,10 @@ const AttendanceForm = () => {
             description: "Silakan pilih staff berikutnya untuk absensi"
           });
         }, 2000);
-      } else {
-        fetchTodayAttendance();
       }
+      
+      // Always fetch attendance after successful action
+      fetchTodayAttendance();
     } catch (error) {
       console.error('❌ CRITICAL ERROR saving attendance:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
@@ -1792,53 +1837,66 @@ const AttendanceForm = () => {
                 )}
               </div>
               
-              <Popover open={isStaffPopoverOpen} onOpenChange={setIsStaffPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className="h-12 w-full justify-between border-2 hover:border-primary transition-colors"
-                  >
-                    {selectedStaff 
-                      ? `${selectedStaff.name} - ${selectedStaff.position}`
-                      : "Pilih nama staff..."
-                    }
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Cari nama staff..." className="h-9" />
-                    <CommandEmpty>Tidak ada staff ditemukan.</CommandEmpty>
-                    <CommandList>
-                      <CommandGroup>
-                        {filteredStaffUsers.length === 0 ? (
-                          <div className="p-3 text-center text-muted-foreground text-sm">
-                            {selectedWorkArea === 'all' ? 'Tidak ada data staff' : `Tidak ada staff di area ${selectedWorkArea}`}
-                          </div>
-                        ) : (
-                          filteredStaffUsers.map((staff) => (
-                            <CommandItem
-                              key={staff.uid}
-                              value={`${staff.name} ${staff.position}`}
-                              onSelect={() => handleStaffSelect(staff.uid)}
-                              className="cursor-pointer"
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  selectedStaff?.uid === staff.uid ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {staff.name} - {staff.position}
-                            </CommandItem>
-                          ))
-                        )}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <div className="flex gap-2">
+                <Popover open={isStaffPopoverOpen} onOpenChange={setIsStaffPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="h-12 flex-1 justify-between border-2 hover:border-primary transition-colors"
+                    >
+                      {selectedStaff 
+                        ? `${selectedStaff.name} - ${selectedStaff.position}`
+                        : "Pilih nama staff..."
+                      }
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Cari nama staff..." className="h-9" />
+                      <CommandEmpty>Tidak ada staff ditemukan.</CommandEmpty>
+                      <CommandList>
+                        <CommandGroup>
+                          {filteredStaffUsers.length === 0 ? (
+                            <div className="p-3 text-center text-muted-foreground text-sm">
+                              {selectedWorkArea === 'all' ? 'Tidak ada data staff' : `Tidak ada staff di area ${selectedWorkArea}`}
+                            </div>
+                          ) : (
+                            filteredStaffUsers.map((staff) => (
+                              <CommandItem
+                                key={staff.uid}
+                                value={`${staff.name} ${staff.position}`}
+                                onSelect={() => handleStaffSelect(staff.uid)}
+                                className="cursor-pointer"
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selectedStaff?.uid === staff.uid ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {staff.name} - {staff.position}
+                              </CommandItem>
+                            ))
+                          )}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                
+                {/* QR Code Scanner Button */}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 border-2 hover:border-primary transition-colors"
+                  onClick={() => setShowQRScanner(true)}
+                  title="Scan QR Code"
+                >
+                  <QrCode className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
             {/* Staff Info Display */}
             {selectedStaff && (
@@ -2133,6 +2191,9 @@ const AttendanceForm = () => {
           </CardContent>
         </Card>
 
+        {/* Attendance Status List - Shows who has/hasn't checked in */}
+        <AttendanceStatusList selectedWorkArea={selectedWorkArea} />
+
         <div className="text-center text-xs text-muted-foreground mt-2 space-y-2">
           <div>Versi aplikasi : {appVersion} IT Division 2025</div>
           <div className="flex items-center justify-center gap-3">
@@ -2145,6 +2206,13 @@ const AttendanceForm = () => {
             />
           </div>
         </div>
+
+        {/* QR Code Scanner Modal */}
+        <QRCodeScanner
+          isOpen={showQRScanner}
+          onClose={() => setShowQRScanner(false)}
+          onScanSuccess={handleQRScanSuccess}
+        />
 
         {/* WFO Fast Checkout Dialog */}
         <Dialog open={showWfoFastCheckoutDialog} onOpenChange={(open) => {
