@@ -8,8 +8,31 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
+interface UserSession {
+  uid: string;
+  name: string;
+  position: string;
+  work_area: string;
+  division?: string;
+  photo_url?: string;
+  is_admin: boolean;
+}
+
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
+  
+  // Check for staff admin session
+  const userSessionData = localStorage.getItem('userSession');
+  let isStaffAdmin = false;
+  
+  if (userSessionData) {
+    try {
+      const userSession: UserSession = JSON.parse(userSessionData);
+      isStaffAdmin = userSession.is_admin;
+    } catch (error) {
+      console.error('Error parsing user session:', error);
+    }
+  }
 
   if (loading) {
     return (
@@ -26,7 +49,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
-  if (!isAuthenticated) {
+  // Allow access if superadmin (from adminSession) OR staff admin (is_admin=true)
+  if (!isAuthenticated && !isStaffAdmin) {
     return <Navigate to="/login" replace />;
   }
 

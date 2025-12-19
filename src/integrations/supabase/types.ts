@@ -268,7 +268,10 @@ export type Database = {
           division: string | null
           id: string
           is_active: boolean
+          is_admin: boolean | null
+          is_first_login: boolean | null
           name: string
+          password_hash: string | null
           photo_url: string | null
           position: string
           uid: string
@@ -280,7 +283,10 @@ export type Database = {
           division?: string | null
           id?: string
           is_active?: boolean
+          is_admin?: boolean | null
+          is_first_login?: boolean | null
           name: string
+          password_hash?: string | null
           photo_url?: string | null
           position: string
           uid: string
@@ -292,7 +298,10 @@ export type Database = {
           division?: string | null
           id?: string
           is_active?: boolean
+          is_admin?: boolean | null
+          is_first_login?: boolean | null
           name?: string
+          password_hash?: string | null
           photo_url?: string | null
           position?: string
           uid?: string
