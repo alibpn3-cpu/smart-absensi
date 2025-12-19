@@ -66,6 +66,7 @@ interface AttendanceSummary {
 
 const Dashboard = () => {
   const { signOut } = useAuth();
+  const navigate = useNavigate();
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<AttendanceRecord[]>([]);
   const [summary, setSummary] = useState<AttendanceSummary>({
@@ -86,6 +87,11 @@ const Dashboard = () => {
   const [locations, setLocations] = useState<string[]>([]);
   
   const [loading, setLoading] = useState(true);
+  
+  // Check if user is superadmin (from admin_accounts) or staff admin
+  const isSuperAdmin = !!localStorage.getItem('adminSession');
+  const userSessionData = localStorage.getItem('userSession');
+  const isStaffAdmin = userSessionData ? JSON.parse(userSessionData).is_admin : false;
 
   // Apply filters to attendance records
   useEffect(() => {
@@ -371,7 +377,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-10 gap-1 bg-muted h-auto p-1">
+          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSuperAdmin ? 'grid-cols-3 sm:grid-cols-11' : 'grid-cols-3 sm:grid-cols-7'}`}>
             <TabsTrigger value="attendance" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Attendance</span>
               <span className="sm:hidden">Absen</span>
@@ -396,16 +402,21 @@ const Dashboard = () => {
               <span className="hidden sm:inline">Birthdays</span>
               <span className="sm:hidden">Ultah</span>
             </TabsTrigger>
-            <TabsTrigger value="admins" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Admins</span>
-              <span className="sm:hidden">Admin</span>
-            </TabsTrigger>
-            <TabsTrigger value="logs" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <History className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Activity Logs</span>
-              <span className="sm:hidden">Log</span>
-            </TabsTrigger>
+            {/* Superadmin only tabs */}
+            {isSuperAdmin && (
+              <>
+                <TabsTrigger value="admins" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Admins</span>
+                  <span className="sm:hidden">Admin</span>
+                </TabsTrigger>
+                <TabsTrigger value="logs" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <History className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Activity Logs</span>
+                  <span className="sm:hidden">Log</span>
+                </TabsTrigger>
+              </>
+            )}
             <TabsTrigger value="export" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Export</span>
@@ -416,16 +427,20 @@ const Dashboard = () => {
               <span className="hidden sm:inline">Geofence</span>
               <span className="sm:hidden">Lokasi</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Settings</span>
-              <span className="sm:hidden">Config</span>
-            </TabsTrigger>
-            <TabsTrigger value="ads" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Ads</span>
-              <span className="sm:hidden">Iklan</span>
-            </TabsTrigger>
+            {isSuperAdmin && (
+              <>
+                <TabsTrigger value="settings" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Settings</span>
+                  <span className="sm:hidden">Config</span>
+                </TabsTrigger>
+                <TabsTrigger value="ads" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Ads</span>
+                  <span className="sm:hidden">Iklan</span>
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
 
           <TabsContent value="attendance" className="space-y-4 sm:space-y-6">

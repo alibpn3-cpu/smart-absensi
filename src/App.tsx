@@ -9,6 +9,8 @@ import { useVersionCheck } from "@/hooks/useVersionCheck";
 import ForceUpdateModal from "@/components/ForceUpdateModal";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
+import UserLogin from "./pages/UserLogin";
+import UserProfile from "./pages/UserProfile";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 
@@ -21,7 +23,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const APP_VERSION = 'v2.2.0';
+const APP_VERSION = 'v2.3.0';
 
 const AppContent = () => {
   const { showUpdateModal, newVersion, changelog, handleUpdate } = useVersionCheck(APP_VERSION);
@@ -37,6 +39,8 @@ const AppContent = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/user-login" element={<UserLogin />} />
+        <Route path="/user-profile" element={<UserProfile />} />
         <Route path="/dashboard" element={
           <ProtectedRoute>
             <Dashboard />

@@ -1,16 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Settings, MapPin, Users, Clock } from 'lucide-react';
+import { Settings, Shield, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import AttendanceForm from '../components/AttendanceForm';
 import AdPopup from '../components/AdPopup';
 
+interface UserSession {
+  uid: string;
+  name: string;
+  position: string;
+  work_area: string;
+  division?: string;
+  photo_url?: string;
+  is_admin: boolean;
+}
+
 const Index = () => {
   const navigate = useNavigate();
   const [logoUrl, setLogoUrl] = useState('');
-  const [appTitle, setAppTitle] = useState('Digital Absensi');
+  const [appTitle, setAppTitle] = useState('Digital Presensi');
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [userSession, setUserSession] = useState<UserSession | null>(null);
+  const [sharedDeviceMode, setSharedDeviceMode] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Auto-detect timezone from device
   const getDeviceTimezone = () => {
@@ -32,6 +45,31 @@ const Index = () => {
   const [timezone, setTimezone] = useState(getDeviceTimezone());
 
   useEffect(() => {
+    // Check shared device mode (kiosk)
+    const kioskMode = localStorage.getItem('shared_device_mode') === 'true';
+    setSharedDeviceMode(kioskMode);
+
+    // Check user session
+    const sessionData = localStorage.getItem('userSession');
+    if (sessionData) {
+      try {
+        const session = JSON.parse(sessionData) as UserSession;
+        setUserSession(session);
+      } catch (error) {
+        console.error('Error parsing session:', error);
+        localStorage.removeItem('userSession');
+      }
+    }
+
+    // If not kiosk mode and not logged in, redirect to login
+    if (!kioskMode && !sessionData) {
+      setLoading(false);
+      navigate('/user-login');
+      return;
+    }
+
+    setLoading(false);
+
     // Fetch logo URL and app title from settings
     const fetchSettings = async () => {
       try {
@@ -64,7 +102,7 @@ const Index = () => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [navigate]);
 
   const formatTimeWithTimezone = (date: Date, tz: string) => {
     const timeZoneOffsets = {
@@ -83,6 +121,15 @@ const Index = () => {
     
     return `${hours}:${minutes}:${seconds} ${tz}`;
   };
+
+  // Show loading while checking session
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -117,6 +164,32 @@ const Index = () => {
             </div>
             
             <div className="flex items-center gap-2">
+              {/* Profile button - only show when logged in (not kiosk) */}
+              {userSession && !sharedDeviceMode && (
+                <Button
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate('/user-profile')}
+                  className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 p-2"
+                >
+                  <User className="h-4 w-4" />
+                </Button>
+              )}
+
+              {/* Admin Dashboard button - show for superadmin or staff with is_admin=true */}
+              {(userSession?.is_admin || localStorage.getItem('adminSession')) && (
+                <Button
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate('/dashboard')}
+                  className="bg-amber-500/10 border-amber-500/20 text-amber-600 hover:bg-amber-500/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 p-2"
+                  title="Admin Dashboard"
+                >
+                  <Shield className="h-4 w-4" />
+                </Button>
+              )}
+
+              {/* Settings/Admin Login - only for superadmin access */}
               <Button
                 variant="outline" 
                 size="sm"
