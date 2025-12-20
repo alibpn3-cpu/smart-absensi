@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Settings, Save, Image, Monitor, AlertTriangle, Sparkles } from 'lucide-react';
+import { Settings, Save, Image, Monitor, AlertTriangle, Sparkles, Upload, Loader2, X } from 'lucide-react';
 
 const AppSettings = () => {
   const [logoUrl, setLogoUrl] = useState('');
@@ -19,6 +18,8 @@ const AppSettings = () => {
   const [changelog, setChangelog] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchSettings();
@@ -80,6 +81,75 @@ const AppSettings = () => {
     });
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Error",
+        description: "Pilih file gambar (PNG, JPG, etc.)",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "Ukuran file maksimal 2MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `company-logo-${Date.now()}.${fileExt}`;
+
+      // Upload to staff-photos bucket (public bucket)
+      const { error: uploadError } = await supabase.storage
+        .from('staff-photos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('staff-photos')
+        .getPublicUrl(fileName);
+
+      setLogoUrl(publicUrl);
+
+      toast({
+        title: "Berhasil",
+        description: "Logo berhasil diupload"
+      });
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      toast({
+        title: "Gagal",
+        description: "Gagal mengupload logo",
+        variant: "destructive"
+      });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const removeLogo = () => {
+    setLogoUrl('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const saveSettings = async () => {
     setSaving(true);
     try {
@@ -123,6 +193,15 @@ const AppSettings = () => {
           document.head.appendChild(favicon);
         }
         favicon.href = logoUrl;
+
+        // Also update apple-touch-icon
+        let appleTouchIcon = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement;
+        if (!appleTouchIcon) {
+          appleTouchIcon = document.createElement('link');
+          appleTouchIcon.rel = 'apple-touch-icon';
+          document.head.appendChild(appleTouchIcon);
+        }
+        appleTouchIcon.href = logoUrl;
       }
 
       const { error } = await supabase
@@ -178,20 +257,55 @@ const AppSettings = () => {
               />
             </div>
 
-            {/* Logo URL Setting */}
+            {/* Logo Upload */}
             <div className="space-y-2">
-              <Label htmlFor="logoUrl" className="text-black flex items-center gap-2">
+              <Label className="text-black flex items-center gap-2">
                 <Image className="h-4 w-4" />
-                Logo URL (Browser Tab Icon)
+                Logo Perusahaan (untuk Kiosk, Favicon, App Icon)
               </Label>
-              <Input
-                id="logoUrl"
-                type="url"
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://example.com/logo.png"
-                className="bg-white border-gray-300 text-black placeholder:text-gray-500"
-              />
+              
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                  id="logo-upload"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                  className="flex-1"
+                >
+                  {uploadingLogo ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Logo
+                    </>
+                  )}
+                </Button>
+                {logoUrl && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={removeLogo}
+                    className="text-destructive"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-gray-600">
+                Format: PNG, JPG, WebP. Maksimal 2MB.
+              </p>
             </div>
 
             {/* Logo Preview */}
@@ -203,7 +317,7 @@ const AppSettings = () => {
                     <img 
                       src={logoUrl} 
                       alt="Logo Preview" 
-                      className="h-10 w-10 object-contain rounded-lg"
+                      className="h-16 w-16 object-contain rounded-lg"
                       onError={(e) => {
                         e.currentTarget.src = '';
                         e.currentTarget.alt = 'Invalid URL';
@@ -212,6 +326,7 @@ const AppSettings = () => {
                   )}
                   <div>
                     <p className="text-black text-sm font-medium">{appTitle || 'Smart Zone Absensi'}</p>
+                    <p className="text-xs text-gray-500">Logo akan tampil di Kiosk Mode dan sebagai favicon</p>
                   </div>
                 </div>
               </div>

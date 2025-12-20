@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Lock, Eye, EyeOff, Loader2, AlertTriangle } from 'lucide-react';
-import bcrypt from 'bcryptjs';
 
 interface ChangePasswordDialogProps {
   isOpen: boolean;
@@ -73,7 +72,8 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
           .maybeSingle();
 
         if (staff?.password_hash) {
-          const isValid = await bcrypt.compare(currentPassword, staff.password_hash);
+          // Plain text comparison
+          const isValid = currentPassword === staff.password_hash;
           if (!isValid) {
             toast({
               title: "Gagal",
@@ -97,15 +97,11 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
         }
       }
 
-      // Hash new password
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-      // Update password in database
+      // Update password in database (plain text)
       const { error } = await supabase
         .from('staff_users')
         .update({
-          password_hash: hashedPassword,
+          password_hash: newPassword,
           is_first_login: false
         })
         .eq('uid', userUid);
