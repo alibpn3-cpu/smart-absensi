@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera, CheckSquare, Square, ChevronsUpDown, Check } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera, CheckSquare, Square, ChevronsUpDown, Check, KeyRound, Shield, ShieldOff } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
@@ -26,6 +27,7 @@ interface StaffUser {
   is_active: boolean;
   created_at: string;
   photo_url?: string;
+  is_admin?: boolean;
 }
 
 // Combobox component for editable dropdowns with auto-uppercase
@@ -548,6 +550,59 @@ const EmployeeManager = () => {
       toast({
         title: "Gagal",
         description: "Gagal menghapus karyawan",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const resetPassword = async (employee: StaffUser) => {
+    try {
+      const { error } = await supabase
+        .from('staff_users')
+        .update({ 
+          password_hash: 'PTG2025',
+          is_first_login: true
+        })
+        .eq('id', employee.id);
+
+      if (error) throw error;
+
+      await logActivity('reset_password', employee.name, { uid: employee.uid });
+
+      toast({
+        title: "Berhasil",
+        description: `Password ${employee.name} berhasil direset ke PTG2025`
+      });
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: "Gagal mereset password",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const toggleAdminStatus = async (employee: StaffUser) => {
+    try {
+      const newAdminStatus = !employee.is_admin;
+      const { error } = await supabase
+        .from('staff_users')
+        .update({ is_admin: newAdminStatus })
+        .eq('id', employee.id);
+
+      if (error) throw error;
+
+      await logActivity(newAdminStatus ? 'grant_admin' : 'revoke_admin', employee.name, { uid: employee.uid });
+
+      toast({
+        title: "Berhasil",
+        description: `${employee.name} ${newAdminStatus ? 'dijadikan admin' : 'dicabut status adminnya'}`
+      });
+      fetchEmployees();
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: "Gagal mengubah status admin",
         variant: "destructive"
       });
     }
@@ -1303,11 +1358,17 @@ const EmployeeManager = () => {
                 </div>
                 
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <h3 className="font-semibold text-foreground">{employee.name}</h3>
                     <Badge variant={employee.is_active ? "default" : "secondary"}>
                       {employee.is_active ? "Active" : "Inactive"}
                     </Badge>
+                    {employee.is_admin && (
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-300">
+                        <Shield className="h-3 w-3 mr-1" />
+                        Admin
+                      </Badge>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
                     <div>
@@ -1327,51 +1388,99 @@ const EmployeeManager = () => {
                   </div>
                 </div>
                 
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toggleEmployeeStatus(employee)}
-                  >
-                    {employee.is_active ? (
-                      <UserX className="h-4 w-4" />
-                    ) : (
-                      <UserCheck className="h-4 w-4" />
-                    )}
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openDialog(employee)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Employee</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete {employee.name}? This action cannot be undone and will also delete all their attendance records.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => deleteEmployee(employee)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    {/* Reset Password Button */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Reset Password"
                         >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                          <KeyRound className="h-4 w-4 text-orange-500" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Reset Password</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Reset password {employee.name} ke default "PTG2025"? User akan diminta ganti password saat login berikutnya.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Batal</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => resetPassword(employee)}>
+                            Reset Password
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                    
+                    {/* Toggle Admin Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleAdminStatus(employee)}
+                      title={employee.is_admin ? "Cabut Admin" : "Jadikan Admin"}
+                    >
+                      {employee.is_admin ? (
+                        <ShieldOff className="h-4 w-4 text-amber-600" />
+                      ) : (
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                    
+                    {/* Toggle Active Status */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleEmployeeStatus(employee)}
+                      title={employee.is_active ? "Nonaktifkan" : "Aktifkan"}
+                    >
+                      {employee.is_active ? (
+                        <UserX className="h-4 w-4" />
+                      ) : (
+                        <UserCheck className="h-4 w-4" />
+                      )}
+                    </Button>
+                    
+                    {/* Edit Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openDialog(employee)}
+                      title="Edit"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    
+                    {/* Delete Button */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm" title="Hapus">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete {employee.name}? This action cannot be undone and will also delete all their attendance records.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteEmployee(employee)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
               </div>
             ))}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Shield, User } from 'lucide-react';
+import { Settings, Shield, User, LogIn } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import AttendanceForm from '../components/AttendanceForm';
 import AdPopup from '../components/AdPopup';
@@ -148,7 +148,8 @@ const Index = () => {
         <div className="flex flex-col items-center space-y-2">
           <div className="flex items-center justify-between w-full max-w-md gap-3">
             <div className="flex items-center gap-3 flex-1 justify-center">
-              {logoUrl && (
+              {/* Logo in header - only for NON-kiosk mode */}
+              {logoUrl && !sharedDeviceMode && (
                 <img 
                   src={logoUrl} 
                   alt="Company Logo" 
@@ -173,6 +174,19 @@ const Index = () => {
                   className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 p-2"
                 >
                   <User className="h-4 w-4" />
+                </Button>
+              )}
+
+              {/* Login button for kiosk mode - to access personal mode */}
+              {sharedDeviceMode && (
+                <Button
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate('/user-login')}
+                  className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 p-2"
+                  title="Login Personal"
+                >
+                  <LogIn className="h-4 w-4" />
                 </Button>
               )}
 
@@ -208,6 +222,22 @@ const Index = () => {
       <div className="relative z-10 flex items-center justify-center px-4 pt-2">
         <div className="w-full max-w-md">
           <AttendanceForm />
+          
+          {/* Company Logo at Bottom - ONLY for Kiosk Mode */}
+          {sharedDeviceMode && logoUrl && (
+            <div className="mt-6 flex justify-center">
+              <div className="p-4 bg-card/50 rounded-xl backdrop-blur-sm border border-border/50">
+                <img 
+                  src={logoUrl} 
+                  alt="Company Logo" 
+                  className="h-20 w-auto max-w-[200px] object-contain"
+                  onError={(e) => {
+                    console.log('Logo failed to load');
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

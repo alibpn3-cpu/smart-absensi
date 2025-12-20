@@ -1106,20 +1106,20 @@ const AttendanceForm = () => {
       setCheckoutReason('');
       setPendingCheckoutLocation(null);
       
-      // Reset for shared device mode after successful CHECK-IN (not checkout)
-      // Keep work area saved so next user can quickly find their name
-      if (sharedDeviceMode && !isCheckOut) {
-        console.log('📱 Shared device mode: Resetting form after check-in');
+      // Reset for shared device mode after successful attendance (both check-in AND check-out)
+      if (sharedDeviceMode) {
+        console.log('📱 Shared device mode: Resetting form after attendance');
         setTimeout(() => {
           setSelectedStaff(null);
           setAttendanceStatus('wfo');
           setReason('');
-          // Keep work area, don't reset: setSelectedWorkArea
-          // Keep filtered staff list, don't reset: setFilteredStaffUsers
+          setTodayAttendance(null);
+          setRegularAttendance(null);
+          setOvertimeAttendance(null);
           localStorage.removeItem('last_selected_staff');
           localStorage.removeItem('attendance_status');
           toast({
-            title: "Form Reset",
+            title: "✅ Absensi Berhasil",
             description: "Silakan pilih staff berikutnya untuk absensi"
           });
         }, 2000);

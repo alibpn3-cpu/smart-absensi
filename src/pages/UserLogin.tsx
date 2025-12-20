@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { LogIn, User, Lock, ArrowLeft, Loader2 } from 'lucide-react';
-import bcrypt from 'bcryptjs';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 
 interface UserSession {
@@ -99,9 +98,9 @@ const UserLogin = () => {
         return;
       }
 
-      // Verify password
-      const passwordHash = staff.password_hash || '$2a$10$8K1p/a0dL1LXMIgZ0DxU8.jNqKGPQJZMBGMVzCH.6P.4kC3GqNqVG'; // Default: PTG2025
-      const isPasswordValid = await bcrypt.compare(credentials.password, passwordHash);
+      // Verify password (plain text comparison)
+      const storedPassword = staff.password_hash || 'PTG2025';
+      const isPasswordValid = credentials.password === storedPassword;
 
       if (!isPasswordValid) {
         toast({
@@ -215,6 +214,9 @@ const UserLogin = () => {
                   className="h-12"
                   autoComplete="current-password"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Password default: PTG2025
+                </p>
               </div>
 
               <Button
