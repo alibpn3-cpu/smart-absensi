@@ -8,9 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Globe, User, ChevronsUpDown, Check, QrCode } from 'lucide-react';
+import { Camera, MapPin, Clock, CheckCircle, Calendar, Users, Globe, User, QrCode, Building2, Briefcase } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -19,9 +17,8 @@ import BirthdayCard from './BirthdayCard';
 import PermissionIndicators from './PermissionIndicators';
 import QRCodeScanner from './QRCodeScanner';
 import AttendanceStatusList from './AttendanceStatusList';
+import StatusPresensiDialog from './StatusPresensiDialog';
 import { format } from 'date-fns';
-
-
 
 interface StaffUser {
   uid: string;
@@ -29,6 +26,7 @@ interface StaffUser {
   position: string;
   work_area: string;
   photo_url?: string;
+  division?: string;
 }
 
 interface AttendanceRecord {
@@ -51,7 +49,11 @@ interface PermissionsState {
   camera: boolean;
 }
 
-const AttendanceForm = () => {
+interface AttendanceFormProps {
+  companyLogoUrl?: string;
+}
+
+const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [filteredStaffUsers, setFilteredStaffUsers] = useState<StaffUser[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<StaffUser | null>(null);
@@ -75,7 +77,6 @@ const AttendanceForm = () => {
   const [isButtonProcessing, setIsButtonProcessing] = useState(false);
   const [cameraAttempts, setCameraAttempts] = useState(0);
   const [bypassCamera, setBypassCamera] = useState(false);
-  const [isStaffPopoverOpen, setIsStaffPopoverOpen] = useState(false);
   const [showWfoFastCheckoutDialog, setShowWfoFastCheckoutDialog] = useState(false);
   const [manualCheckInTime, setManualCheckInTime] = useState({ hour: '08', minute: '00' });
   const [wfoFastCheckoutReason, setWfoFastCheckoutReason] = useState('');
@@ -83,6 +84,14 @@ const AttendanceForm = () => {
   const [dinasFastCheckoutReason, setDinasFastCheckoutReason] = useState('');
   const [isDinasFastCheckout, setIsDinasFastCheckout] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
+  
+  // StatusPresensiDialog state
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ type: 'regular' | 'overtime'; action: 'check-in' | 'check-out' } | null>(null);
+  const [statusDialogLoading, setStatusDialogLoading] = useState(false);
+  
+  // Kiosk mode state
+  const [kioskPendingAction, setKioskPendingAction] = useState<{ type: 'regular' | 'overtime'; action: 'check-in' | 'check-out' } | null>(null);
   
   // Audio for button click
   const playClickSound = () => {
@@ -123,6 +132,9 @@ const AttendanceForm = () => {
   const [wfoLocationName, setWfoLocationName] = useState<string | null>(null);
   const [sharedDeviceMode, setSharedDeviceMode] = useState(false);
   const [appVersion, setAppVersion] = useState('v2.2.0');
+  
+  // Check if user is logged in (non-kiosk mode)
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
 
   // Load shared device mode from localStorage (per-device setting)
   const loadSharedDeviceMode = () => {
@@ -142,12 +154,49 @@ const AttendanceForm = () => {
     }
   };
 
+  // Load user session for non-kiosk mode
+  useEffect(() => {
+    const localKioskMode = localStorage.getItem('shared_device_mode') === 'true';
+    setSharedDeviceMode(localKioskMode);
+    
+    if (!localKioskMode) {
+      // Non-kiosk: load user session
+      const sessionData = localStorage.getItem('userSession');
+      if (sessionData) {
+        try {
+          const session = JSON.parse(sessionData);
+          setIsUserLoggedIn(true);
+          setSelectedStaff({
+            uid: session.uid,
+            name: session.name,
+            position: session.position,
+            work_area: session.work_area,
+            photo_url: session.photo_url,
+            division: session.division
+          });
+          setSelectedWorkArea(session.work_area);
+        } catch (error) {
+          console.error('Error parsing session:', error);
+        }
+      }
+    }
+  }, []);
+
   useEffect(() => {
     fetchStaffUsers();
     checkStoredPermissions();
-    loadSavedStaff();
     loadSharedDeviceMode();
     fetchAppVersion();
+    
+    // Only load saved staff in kiosk mode
+    const localKioskMode = localStorage.getItem('shared_device_mode') === 'true';
+    if (localKioskMode) {
+      // Load saved work area for kiosk mode
+      const savedWorkArea = localStorage.getItem('last_selected_work_area');
+      if (savedWorkArea) {
+        setSelectedWorkArea(savedWorkArea);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -178,8 +227,6 @@ const AttendanceForm = () => {
   useEffect(() => {
     if (selectedStaff) {
       fetchTodayAttendance();
-      // Save selected staff to localStorage
-      localStorage.setItem('last_selected_staff', JSON.stringify(selectedStaff));
     }
   }, [selectedStaff]);
 
@@ -234,36 +281,6 @@ const AttendanceForm = () => {
   const savePermissions = (newPermissions: PermissionsState) => {
     setPermissions(newPermissions);
     localStorage.setItem('attendance_permissions', JSON.stringify(newPermissions));
-  };
-
-  const loadSavedStaff = () => {
-    // Check if shared device mode is enabled in localStorage - don't load saved staff
-    const localKioskMode = localStorage.getItem('shared_device_mode');
-    if (localKioskMode === 'true') {
-      console.log('📱 Shared device mode: Not loading saved staff, but loading work area');
-      // Load saved work area for kiosk mode
-      const savedWorkArea = localStorage.getItem('last_selected_work_area');
-      if (savedWorkArea) {
-        setSelectedWorkArea(savedWorkArea);
-      }
-      return; // Don't load saved staff in shared device mode
-    }
-    
-    const savedStaff = localStorage.getItem('last_selected_staff');
-    if (savedStaff) {
-      try {
-        const staff = JSON.parse(savedStaff);
-        setSelectedStaff(staff);
-      } catch (error) {
-        console.error('Error loading saved staff:', error);
-      }
-    }
-    
-    // Load saved work area
-    const savedWorkArea = localStorage.getItem('last_selected_work_area');
-    if (savedWorkArea) {
-      setSelectedWorkArea(savedWorkArea);
-    }
   };
 
   const fetchStaffUsers = async () => {
@@ -567,42 +584,6 @@ const AttendanceForm = () => {
         }
       }
       
-      // Third fallback - try LocationIQ
-      if (!detailedAddress) {
-        try {
-          console.log('🌐 Trying LocationIQ as second fallback...');
-          const locationIqResponse = await fetchWithTimeout(
-            `https://us1.locationiq.com/v1/reverse.php?key=pk.locationiq.default_pk&lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=id`,
-            {},
-            8000
-          );
-          
-          if (locationIqResponse.ok) {
-            const locationIqData = await locationIqResponse.json();
-            console.log('🌍 LocationIQ response:', locationIqData);
-            
-            if (locationIqData.address) {
-              const addr = locationIqData.address;
-              const addressParts = [];
-              
-              if (addr.road) addressParts.push(addr.road);
-              if (addr.neighbourhood) addressParts.push(addr.neighbourhood);
-              if (addr.suburb) addressParts.push(addr.suburb);
-              if (addr.city) addressParts.push(addr.city);
-              if (addr.state) addressParts.push(addr.state);
-              if (addr.postcode) addressParts.push(addr.postcode);
-              
-              if (addressParts.length > 0) {
-                detailedAddress = addressParts.join(', ');
-                console.log('✅ Built address from LocationIQ:', detailedAddress);
-              }
-            }
-          }
-        } catch (locationIqError) {
-          console.log('❌ LocationIQ failed:', locationIqError);
-        }
-      }
-      
       // Final fallback
       if (!detailedAddress) {
         detailedAddress = `Koordinat ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
@@ -710,29 +691,186 @@ const AttendanceForm = () => {
     return R * c;
   };
 
-  const handleStaffSelect = (staffUid: string) => {
+  // Handle QR Code scan result for Kiosk mode
+  const handleQRScanSuccess = async (staffUid: string) => {
+    setShowQRScanner(false);
+    
     const staff = staffUsers.find(s => s.uid === staffUid);
-    setSelectedStaff(staff || null);
-    setIsStaffPopoverOpen(false); // Close popover after selection
-  };
-
-  // Handle QR Code scan result
-  const handleQRScanSuccess = (staffUid: string) => {
-    const staff = staffUsers.find(s => s.uid === staffUid);
-    if (staff) {
-      setSelectedStaff(staff);
-      toast({
-        title: "✅ Staff Ditemukan",
-        description: `${staff.name} - ${staff.position}`
-      });
-    } else {
+    if (!staff) {
       toast({
         title: "❌ Staff Tidak Ditemukan",
         description: `UID "${staffUid}" tidak terdaftar dalam sistem`,
         variant: "destructive"
       });
+      resetKioskState();
+      return;
     }
-    setShowQRScanner(false);
+    
+    // In kiosk mode, process WFO attendance directly after QR scan
+    if (sharedDeviceMode && kioskPendingAction) {
+      setSelectedStaff(staff);
+      await processKioskAttendance(staff, kioskPendingAction);
+    } else {
+      // Non-kiosk mode - just select the staff
+      setSelectedStaff(staff);
+      toast({
+        title: "✅ Staff Ditemukan",
+        description: `${staff.name} - ${staff.position}`
+      });
+    }
+  };
+
+  const resetKioskState = () => {
+    setKioskPendingAction(null);
+    setSelectedStaff(null);
+    setLoading(false);
+    setIsButtonProcessing(false);
+  };
+
+  const processKioskAttendance = async (staff: StaffUser, action: { type: 'regular' | 'overtime'; action: 'check-in' | 'check-out' }) => {
+    setLoading(true);
+    
+    try {
+      // Get location
+      const location = await requestLocationPermission();
+      
+      // Check geofence for WFO
+      const geofenceResult = await checkGeofence(location.lat, location.lng, location.accuracy);
+      
+      if (!geofenceResult.isInGeofence && action.action === 'check-in') {
+        toast({
+          title: "❌ Di Luar Area Kantor",
+          description: "Anda harus berada di area kantor untuk check in WFO di Kiosk Mode",
+          variant: "destructive"
+        });
+        resetKioskState();
+        return;
+      }
+      
+      // Get today's attendance for this staff
+      const nowLocal = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const today = `${nowLocal.getFullYear()}-${pad(nowLocal.getMonth() + 1)}-${pad(nowLocal.getDate())}`;
+      
+      const { data: existingAttendance } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('staff_uid', staff.uid)
+        .eq('date', today)
+        .eq('attendance_type', action.type)
+        .maybeSingle();
+      
+      // Validate action
+      if (action.action === 'check-in' && existingAttendance?.check_in_time) {
+        toast({
+          title: "❌ Sudah Check In",
+          description: `${staff.name} sudah melakukan check in hari ini`,
+          variant: "destructive"
+        });
+        resetKioskState();
+        return;
+      }
+      
+      if (action.action === 'check-out' && !existingAttendance?.check_in_time) {
+        toast({
+          title: "❌ Belum Check In",
+          description: `${staff.name} belum melakukan check in hari ini`,
+          variant: "destructive"
+        });
+        resetKioskState();
+        return;
+      }
+      
+      if (action.action === 'check-out' && existingAttendance?.check_out_time) {
+        toast({
+          title: "❌ Sudah Check Out",
+          description: `${staff.name} sudah melakukan check out hari ini`,
+          variant: "destructive"
+        });
+        resetKioskState();
+        return;
+      }
+      
+      // Process attendance
+      const now = new Date();
+      const y = now.getFullYear();
+      const M = pad(now.getMonth() + 1);
+      const d = pad(now.getDate());
+      const h = pad(now.getHours());
+      const m = pad(now.getMinutes());
+      const s = pad(now.getSeconds());
+      const ms = String(now.getMilliseconds()).padStart(3, '0');
+      const tzMin = -now.getTimezoneOffset();
+      const sign = tzMin >= 0 ? '+' : '-';
+      const offH = pad(Math.floor(Math.abs(tzMin) / 60));
+      const offM = pad(Math.abs(tzMin) % 60);
+      const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
+      
+      const locationAddress = geofenceResult.geofenceName || location.address;
+      
+      if (action.action === 'check-in') {
+        const { error } = await supabase
+          .from('attendance_records')
+          .insert({
+            staff_uid: staff.uid,
+            staff_name: staff.name,
+            date: today,
+            status: 'wfo',
+            attendance_type: action.type,
+            check_in_time: formattedTime,
+            checkin_location_address: locationAddress,
+            checkin_location_lat: location.lat,
+            checkin_location_lng: location.lng
+          });
+        
+        if (error) throw error;
+        
+        toast({
+          title: `✅ Check In Berhasil`,
+          description: `${staff.name} - ${locationAddress}\n📍 ${location.coordinates}`
+        });
+      } else {
+        const hoursWorked = existingAttendance?.check_in_time 
+          ? calculateHoursWorked(existingAttendance.check_in_time, formattedTime)
+          : undefined;
+        
+        const { error } = await supabase
+          .from('attendance_records')
+          .update({
+            check_out_time: formattedTime,
+            checkout_location_address: locationAddress,
+            checkout_location_lat: location.lat,
+            checkout_location_lng: location.lng,
+            hours_worked: hoursWorked
+          })
+          .eq('id', existingAttendance.id);
+        
+        if (error) throw error;
+        
+        toast({
+          title: `✅ Check Out Berhasil`,
+          description: `${staff.name} - ${locationAddress}\n📍 ${location.coordinates}`
+        });
+      }
+      
+      // Reset for next user
+      setTimeout(() => {
+        resetKioskState();
+        toast({
+          title: "🔄 Siap untuk user berikutnya",
+          description: "Silakan scan QR Code untuk absensi"
+        });
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Kiosk attendance error:', error);
+      toast({
+        title: "❌ Gagal",
+        description: "Terjadi kesalahan saat memproses absensi",
+        variant: "destructive"
+      });
+      resetKioskState();
+    }
   };
 
   const handleWorkAreaSelect = (area: string) => {
@@ -744,10 +882,6 @@ const AttendanceForm = () => {
       setFilteredStaffUsers(staffUsers);
     } else {
       setFilteredStaffUsers(staffUsers.filter(staff => staff.work_area === area));
-    }
-    // Clear selected staff if not in new filtered list
-    if (selectedStaff && area !== 'all' && selectedStaff.work_area !== area) {
-      setSelectedStaff(null);
     }
   };
 
@@ -931,54 +1065,28 @@ const AttendanceForm = () => {
       if (attendanceStatus === 'wfo') {
         console.log('🏢 Checking WFO geofence for location:', usedLocation.lat, usedLocation.lng);
         const geofenceResult = await checkGeofence(usedLocation.lat, usedLocation.lng, usedLocation.accuracy);
-        console.log('📍 Geofence check result:', geofenceResult);
         
-        // For CHECK-IN: Must be inside geofence
-        if (!isCheckOut && !geofenceResult.isInGeofence) {
-          console.error('❌ Not in geofence area for check-in');
-          toast({
-            title: "Error Lokasi",
-            description: "Anda harus berada di dalam area kantor untuk check in WFO",
-            variant: "destructive"
-          });
-          setLoading(false);
-          return;
-        }
-        
-        // For CHECK-OUT: If outside geofence, use the stored reason from dialog
-        if (isCheckOut && !geofenceResult.isInGeofence) {
-          console.log('📝 Checkout outside geofence, using reason:', checkoutReason);
-          // Use the reason provided in the dialog
-        } else {
-          // Inside geofence, use geofence name
-          if (geofenceResult.geofenceName) {
-            locationAddress = geofenceResult.geofenceName;
-            console.log('✅ Using geofence name:', locationAddress);
-          } else {
-            console.warn('⚠️ No geofence name found, using address');
-          }
-        }
-      } else if (attendanceStatus === 'dinas') {
-        // For Dinas status, check if inside any geofence and use that name
-        console.log('📍 Checking if Dinas is inside any geofence...');
-        const geofenceName = await checkAnyGeofence(usedLocation.lat, usedLocation.lng);
-        if (geofenceName) {
-          locationAddress = geofenceName;
-          console.log('✅ Dinas using geofence name:', locationAddress);
-        } else {
-          console.log('📍 Dinas not in any geofence, using address:', locationAddress);
+        if (geofenceResult.isInGeofence && geofenceResult.geofenceName) {
+          locationAddress = geofenceResult.geofenceName;
+          console.log('📍 Using geofence name as location:', locationAddress);
         }
       }
-
-      // Upload photo to Supabase Storage (only for WFH and Dinas WITH photo)
+      
+      // For Dinas, check if in any geofence and use that name
+      if (attendanceStatus === 'dinas') {
+        const matchingGeofence = await checkAnyGeofence(usedLocation.lat, usedLocation.lng);
+        if (matchingGeofence) {
+          locationAddress = matchingGeofence;
+          console.log('📍 Dinas: Using matched geofence name:', locationAddress);
+        }
+      }
+      
+      // Upload photo if present
       let photoPath = null;
-      if ((attendanceStatus === 'wfh' || attendanceStatus === 'dinas') && photoBlob.size > 0 && !bypassCamera) {
-        console.log('📸 Compressing thumbnail for WFH/Dinas...');
+      if (photoBlob.size > 0) {
+        console.log('📸 Compressing and uploading photo...');
         const thumbnailBlob = await compressThumbnail(photoBlob);
-        console.log(`📉 Thumbnail size: ${(thumbnailBlob.size / 1024).toFixed(2)}KB (original: ${(photoBlob.size / 1024).toFixed(2)}KB)`);
-        
         const fileName = `${selectedStaff.uid}_${Date.now()}.jpg`;
-        console.log('📤 Uploading thumbnail:', fileName);
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('attendance-photos')
           .upload(fileName, thumbnailBlob);
@@ -988,15 +1096,7 @@ const AttendanceForm = () => {
           throw uploadError;
         }
         photoPath = uploadData.path;
-        console.log('✅ Thumbnail uploaded:', photoPath);
-      } else if ((attendanceStatus === 'wfh' || attendanceStatus === 'dinas') && bypassCamera) {
-        console.log('⚠️ Bypass mode: Skipping photo upload');
-        toast({
-          title: "ℹ️ Absensi Tanpa Foto",
-          description: "Check-in berhasil tanpa foto selfie",
-        });
-      } else {
-        console.log('🏢 WFO mode: Skipping photo upload');
+        console.log('✅ Photo uploaded:', photoPath);
       }
 
       // Save attendance record with full local timestamp including timezone offset, e.g. 2025-10-03 10:02:40.123+08:00
@@ -1120,7 +1220,7 @@ const AttendanceForm = () => {
           localStorage.removeItem('attendance_status');
           toast({
             title: "✅ Absensi Berhasil",
-            description: "Silakan pilih staff berikutnya untuk absensi"
+            description: "Silakan scan QR Code untuk user berikutnya"
           });
         }, 2000);
       }
@@ -1412,9 +1512,58 @@ const AttendanceForm = () => {
     }
   };
 
-  const handleAttendanceAction = async (
+  // Handler for button clicks - User Login Mode uses StatusPresensiDialog
+  const handleAttendanceButtonClick = (
     attendanceType: 'regular' | 'overtime',
     action: 'check-in' | 'check-out'
+  ) => {
+    if (isButtonProcessing) return;
+    
+    if (!selectedStaff) {
+      toast({
+        title: "Gagal",
+        description: "Data staff tidak ditemukan",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    playClickSound();
+    
+    // In User Login Mode (not kiosk), show StatusPresensiDialog
+    if (isUserLoggedIn && !sharedDeviceMode) {
+      setPendingAction({ type: attendanceType, action });
+      setShowStatusDialog(true);
+    } else if (sharedDeviceMode) {
+      // Kiosk mode - show QR scanner
+      setKioskPendingAction({ type: attendanceType, action });
+      setShowQRScanner(true);
+    }
+  };
+
+  // Handle status dialog confirmation
+  const handleStatusDialogConfirm = async (status: 'wfo' | 'wfh' | 'dinas', dialogReason: string) => {
+    if (!pendingAction) return;
+    
+    setStatusDialogLoading(true);
+    setAttendanceStatus(status);
+    setReason(dialogReason);
+    
+    // Close dialog first
+    setShowStatusDialog(false);
+    
+    // Now process the attendance with selected status
+    await handleAttendanceAction(pendingAction.type, pendingAction.action, status, dialogReason);
+    
+    setStatusDialogLoading(false);
+    setPendingAction(null);
+  };
+
+  const handleAttendanceAction = async (
+    attendanceType: 'regular' | 'overtime',
+    action: 'check-in' | 'check-out',
+    status?: 'wfo' | 'wfh' | 'dinas',
+    actionReason?: string
   ) => {
     if (isButtonProcessing) return; // Prevent multiple clicks
     
@@ -1427,8 +1576,10 @@ const AttendanceForm = () => {
       return;
     }
     
+    const effectiveStatus = status || attendanceStatus;
+    const effectiveReason = actionReason || reason;
+    
     // Play click sound and set processing state
-    playClickSound();
     setCurrentAttendanceType(attendanceType);
     setIsButtonProcessing(true);
     setLoading(true);
@@ -1439,9 +1590,9 @@ const AttendanceForm = () => {
     // SPECIAL CASE: WFO/Dinas regular checkout without check-in (Fast Checkout)
     if (attendanceType === 'regular' && 
         isCheckOut && 
-        (attendanceStatus === 'wfo' || attendanceStatus === 'dinas') && 
+        (effectiveStatus === 'wfo' || effectiveStatus === 'dinas') && 
         !regularAttendance?.check_in_time) {
-      if (attendanceStatus === 'wfo') {
+      if (effectiveStatus === 'wfo') {
         setShowWfoFastCheckoutDialog(true);
       } else {
         setShowDinasFastCheckoutDialog(true);
@@ -1450,7 +1601,7 @@ const AttendanceForm = () => {
     }
     
     // SPECIAL CASE: WFO overtime - SKIP CAMERA
-    if (attendanceType === 'overtime' && attendanceStatus === 'wfo') {
+    if (attendanceType === 'overtime' && effectiveStatus === 'wfo') {
       // Handle WFO overtime without photo
       await handleWfoOvertimeWithoutPhoto(isCheckOut);
       return;
@@ -1483,7 +1634,7 @@ const AttendanceForm = () => {
       const location = resolvedLocation!;
       console.log('📍 Processing location:', { lat: location.lat, lng: location.lng, accuracy: location.accuracy });
       
-      if (attendanceStatus === 'wfo') {
+      if (effectiveStatus === 'wfo') {
         // WFO mode: Check geofence for both check-in and check-out
         console.log('🏢 Checking WFO geofence for location:', location.lat, location.lng, 'accuracy:', location.accuracy);
         const geofenceResult = await checkGeofence(location.lat, location.lng, location.accuracy);
@@ -1491,11 +1642,12 @@ const AttendanceForm = () => {
         
         if (!geofenceResult.isInGeofence) {
           if (isCheckOut) {
-            // Outside geofence for WFO checkout - show reason dialog
+            // WFO check-out outside geofence - ask for reason
+            console.log('⚠️ WFO checkout outside geofence, asking for reason');
             setPendingCheckoutLocation(location);
             setShowCheckoutReasonDialog(true);
-            setIsButtonProcessing(false); // Reset processing state
             setLoading(false);
+            setIsButtonProcessing(false);
             return;
           } else {
             // Outside geofence for WFO check-in - show error
@@ -1790,294 +1942,144 @@ const AttendanceForm = () => {
         </Card>
 
         {/* Attendance Status List - Shows who has/hasn't checked in */}
-        <AttendanceStatusList selectedWorkArea={selectedWorkArea} />
+        <AttendanceStatusList selectedWorkArea={isUserLoggedIn && !sharedDeviceMode ? selectedStaff?.work_area || 'all' : selectedWorkArea} />
 
-        <Card className="border-0 shadow-xl animate-slide-up">
-          <CardContent className="space-y-6 p-6">
-            {/* Work Area Selection */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-primary" />
-                <label className="text-sm font-semibold">Area Tugas</label>
-              </div>
-              
-              <Select
-                onValueChange={handleWorkAreaSelect} 
-                value={selectedWorkArea}
-              >
-                <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
-                  <SelectValue placeholder="Pilih area tugas..." />
-                </SelectTrigger>
-                <SelectContent 
-                  className="bg-popover border-border shadow-lg max-h-[280px] overflow-y-auto z-50 data-[state=open]:duration-100"
-                  position="popper"
+        {/* KIOSK MODE: Show Area Tugas dropdown */}
+        {sharedDeviceMode && (
+          <Card className="border-0 shadow-xl">
+            <CardContent className="p-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <label className="text-sm font-semibold">Area Tugas</label>
+                </div>
+                
+                <Select
+                  onValueChange={handleWorkAreaSelect} 
+                  value={selectedWorkArea}
                 >
-                  <SelectItem value="all" className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground font-semibold">
-                    🌍 Semua Area
-                  </SelectItem>
-                  {workAreas.filter(Boolean).map((area) => (
-                    <SelectItem 
-                      key={area} 
-                      value={area}
-                      className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground"
-                    >
-                      📍 {area}
+                  <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
+                    <SelectValue placeholder="Pilih area tugas..." />
+                  </SelectTrigger>
+                  <SelectContent 
+                    className="bg-popover border-border shadow-lg max-h-[280px] overflow-y-auto z-50 data-[state=open]:duration-100"
+                    position="popper"
+                  >
+                    <SelectItem value="all" className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground font-semibold">
+                      🌍 Semua Area
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                    {workAreas.filter(Boolean).map((area) => (
+                      <SelectItem 
+                        key={area} 
+                        value={area}
+                        className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground"
+                      >
+                        📍 {area}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-            {/* Staff Selection */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" />
-                <label className="text-sm font-semibold">Nama Staff</label>
-                {selectedStaff && (
-                  <Badge variant="secondary" className="text-xs">
-                    Tersimpan: {selectedStaff.name}
-                  </Badge>
+        {/* USER LOGIN MODE: Show User Profile Card */}
+        {isUserLoggedIn && !sharedDeviceMode && selectedStaff && (
+          <Card className="border-0 shadow-xl bg-gradient-to-br from-primary/5 to-primary/10">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16 border-2 border-primary/20">
+                  <AvatarImage src={selectedStaff.photo_url} alt={selectedStaff.name} />
+                  <AvatarFallback className="bg-primary/10 text-primary text-lg font-bold">
+                    {selectedStaff.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-lg truncate">{selectedStaff.name}</h3>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Briefcase className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{selectedStaff.position}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{selectedStaff.work_area}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                    <User className="h-3 w-3 shrink-0" />
+                    <span>UID: {selectedStaff.uid}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Today's Attendance Status - Show for logged in user */}
+        {isUserLoggedIn && !sharedDeviceMode && todayAttendance && (
+          <Card className="border-0 shadow-xl">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <span className="font-semibold">Status Hari Ini</span>
+                </div>
+                <Badge variant={
+                  todayAttendance.status === 'wfo' ? 'default' :
+                  todayAttendance.status === 'wfh' ? 'secondary' : 'outline'
+                }>
+                  {todayAttendance.status?.toUpperCase()}
+                </Badge>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Check In:</span>
+                  <span className="font-medium">
+                    {formatCheckTime(todayAttendance.check_in_time as string)}
+                  </span>
+                </div>
+                {todayAttendance.check_out_time && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Check Out:</span>
+                    <span className="font-medium">
+                      {formatCheckTime(todayAttendance.check_out_time as string)}
+                    </span>
+                  </div>
+                )}
+                {todayAttendance.checkin_location_address && (
+                  <div>
+                    <span className="text-muted-foreground block">Lokasi:</span>
+                    <span className="font-medium text-xs">
+                      {todayAttendance.status === 'wfo' && wfoLocationName ? wfoLocationName : (todayAttendance.checkin_location_address || '-')}
+                    </span>
+                  </div>
                 )}
               </div>
-              
-              <div className="flex gap-2">
-                <Popover open={isStaffPopoverOpen} onOpenChange={setIsStaffPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className="h-12 flex-1 justify-between border-2 hover:border-primary transition-colors overflow-hidden"
-                    >
-                      <span className="truncate block text-left flex-1 min-w-0">
-                      {selectedStaff 
-                        ? `${selectedStaff.name} - ${selectedStaff.position}`
-                        : "Pilih nama staff..."
-                      }
-                      </span>
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 flex-shrink-0" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[90vw] sm:w-[400px] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Cari nama staff..." className="h-9" />
-                      <CommandEmpty>Tidak ada staff ditemukan.</CommandEmpty>
-                      <CommandList>
-                        <CommandGroup>
-                          {filteredStaffUsers.length === 0 ? (
-                            <div className="p-3 text-center text-muted-foreground text-sm">
-                              {selectedWorkArea === 'all' ? 'Tidak ada data staff' : `Tidak ada staff di area ${selectedWorkArea}`}
-                            </div>
-                          ) : (
-                            filteredStaffUsers.map((staff) => (
-                              <CommandItem
-                                key={staff.uid}
-                                value={`${staff.name} ${staff.position}`}
-                                onSelect={() => handleStaffSelect(staff.uid)}
-                                className="cursor-pointer flex items-start gap-2 py-3"
-                              >
-                                <Check
-                                  className={cn(
-                                    "mt-0.5 h-4 w-4 shrink-0",
-                                    selectedStaff?.uid === staff.uid ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium truncate">{staff.name}</div>
-                                  <div className="text-xs text-muted-foreground truncate">{staff.position}</div>
-                                </div>
-                              </CommandItem>
-                            ))
-                          )}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                
-                {/* QR Code Scanner Button */}
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-12 w-12 border-2 hover:border-primary transition-colors"
-                  onClick={() => setShowQRScanner(true)}
-                  title="Scan QR Code"
-                >
-                  <QrCode className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-            {/* Staff Info Display */}
-            {selectedStaff && (
-              <div className="bg-muted/30 p-4 rounded-lg space-y-3">
-                <div className="flex gap-3">
-                  {/* Staff Photo - No Border */}
-                  <div className="flex-shrink-0">
-                    <div className="overflow-hidden flex items-center justify-center w-[50px] h-[80px]">
-                      {selectedStaff.photo_url ? (
-                        <img src={selectedStaff.photo_url} alt={selectedStaff.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <User className="w-12 h-12 text-muted-foreground" />
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Staff Details */}
-                  <div className="flex-1 space-y-3">
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="text-muted-foreground block">UID:</span>
-                        <span className="font-semibold text-foreground">{selectedStaff.uid}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground block">Jabatan:</span>
-                        <span className="font-semibold text-foreground">{selectedStaff.position}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground text-sm block">Area Tugas:</span>
-                      <span className="font-semibold text-foreground">{selectedStaff.work_area}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            </CardContent>
+          </Card>
+        )}
 
-            {/* Attendance Status */}
-            <div className="space-y-3">
-              <label className="text-sm font-semibold">Status Absen</label>
-              <Select 
-                value={attendanceStatus} 
-                onValueChange={(value: 'wfo' | 'wfh' | 'dinas') => setAttendanceStatus(value)}
-                disabled={isCheckedIn} // Disable when checking out
-              >
-                <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border shadow-lg z-50">
-                  <SelectItem value="wfo">🏢 WFO (Work From Office)</SelectItem>
-                  <SelectItem value="wfh">🏠 WFH (Work From Home)</SelectItem>
-                  <SelectItem value="dinas">🚗 Dinas Luar</SelectItem>
-                </SelectContent>
-              </Select>
-              {isCheckedIn && (
-                <p className="text-xs text-muted-foreground">
-                  Status mengikuti check-in ({attendanceStatus.toUpperCase()})
-                </p>
-              )}
-            </div>
-
-            {/* Reason */}
-            <div className="space-y-3">
-              <label className="text-sm font-semibold">Alasan Absen (Opsional)</label>
-              <Textarea
-                placeholder="Masukkan alasan jika diperlukan..."
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                rows={3}
-                className="border-2 hover:border-primary transition-colors resize-none"
-              />
-            </div>
-
-
-            {/* Today's Attendance Status */}
-            {todayAttendance && (
-              <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-semibold">Status Hari Ini</span>
-                  <Badge variant={isCompleted ? "default" : "secondary"} className="shadow-glow">
-                    {isCompleted ? "✅ Selesai" : "⏰ Check In"}
-                  </Badge>
-                </div>
-                <div className="space-y-2 text-sm">
-                  {todayAttendance.check_in_time && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Check In:</span>
-                      <span className="font-medium">
-                        {formatCheckTime(todayAttendance.check_in_time as string)}
-                      </span>
-                    </div>
-                  )}
-                  {todayAttendance.check_out_time && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Check Out:</span>
-                      <span className="font-medium">
-                        {formatCheckTime(todayAttendance.check_out_time as string)}
-                      </span>
-                    </div>
-                  )}
-                  {todayAttendance.checkin_location_address && (
-                    <div>
-                      <span className="text-muted-foreground block">Lokasi Check In:</span>
-                      <span className="font-medium text-xs mb-2 block">
-                        {todayAttendance.status === 'wfo' && wfoLocationName ? wfoLocationName : (todayAttendance.checkin_location_address || '-')}
-                      </span>
-                      <span className="text-muted-foreground block text-xs">Koordinat:</span>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">
-                          📍 {todayAttendance.checkin_location_lat}, {todayAttendance.checkin_location_lng}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(
-                            `https://www.google.com/maps?q=${todayAttendance.checkin_location_lat},${todayAttendance.checkin_location_lng}`,
-                            '_blank'
-                          )}
-                          className="text-xs h-6"
-                        >
-                          🗺️ Maps
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                  {todayAttendance.checkout_location_address && (
-                    <div className="mt-2">
-                      <span className="text-muted-foreground block">Lokasi Check Out:</span>
-                      <span className="font-medium text-xs mb-2 block">
-                        {todayAttendance.checkout_location_address || '-'}
-                      </span>
-                      <span className="text-muted-foreground block text-xs">Koordinat:</span>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">
-                          📍 {todayAttendance.checkout_location_lat}, {todayAttendance.checkout_location_lng}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(
-                            `https://www.google.com/maps?q=${todayAttendance.checkout_location_lat},${todayAttendance.checkout_location_lng}`,
-                            '_blank'
-                          )}
-                          className="text-xs h-6"
-                        >
-                          🗺️ Maps
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Action Buttons - Compact Round Buttons */}
-            <div className="flex flex-col gap-3 mt-4">
+        {/* Action Buttons */}
+        <Card className="border-0 shadow-xl">
+          <CardContent className="p-6">
+            <div className="flex flex-col gap-3">
               {/* Main In/Out Buttons */}
               <div className="flex items-center justify-center gap-4">
                 {/* Regular Check In */}
                 <Button 
-                  onClick={() => handleAttendanceAction('regular', 'check-in')}
-                  disabled={!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus}
+                  onClick={() => handleAttendanceButtonClick('regular', 'check-in')}
+                  disabled={!!regularAttendance?.check_in_time || loading || !selectedStaff}
                   variant="outline"
                   className="h-12 w-24 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#39ff14]/10"
                   style={{
-                    borderColor: (!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus) 
+                    borderColor: (!!regularAttendance?.check_in_time || loading || !selectedStaff) 
                       ? '#9ca3af' 
                       : '#39ff14',
-                    color: (!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus)
+                    color: (!!regularAttendance?.check_in_time || loading || !selectedStaff)
                       ? '#9ca3af'
                       : '#39ff14',
                     fontWeight: 'bold',
-                    opacity: (!!regularAttendance?.check_in_time || loading || !selectedStaff || !attendanceStatus) ? 0.5 : 1
+                    opacity: (!!regularAttendance?.check_in_time || loading || !selectedStaff) ? 0.5 : 1
                   }}
                 >
                   In
@@ -2085,28 +2087,19 @@ const AttendanceForm = () => {
                 
                 {/* Regular Check Out */}
                 <Button 
-                  onClick={() => handleAttendanceAction('regular', 'check-out')}
-                  disabled={
-                    // Allow WFO/Dinas checkout even without check-in (for fast checkout feature)
-                    (attendanceStatus === 'wfo' || attendanceStatus === 'dinas')
-                      ? (!!regularAttendance?.check_out_time || loading || !selectedStaff)
-                      : (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading)
-                  }
+                  onClick={() => handleAttendanceButtonClick('regular', 'check-out')}
+                  disabled={!!regularAttendance?.check_out_time || loading || !selectedStaff}
                   variant="outline"
                   className="h-12 w-24 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#ff073a]/10"
                   style={{
-                    borderColor: ((attendanceStatus === 'wfo' || attendanceStatus === 'dinas')
-                      ? (!!regularAttendance?.check_out_time || loading || !selectedStaff)
-                      : (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading))
+                    borderColor: (!!regularAttendance?.check_out_time || loading || !selectedStaff)
                       ? '#9ca3af'
                       : '#ff073a',
-                    color: ((attendanceStatus === 'wfo' || attendanceStatus === 'dinas')
-                      ? (!!regularAttendance?.check_out_time || loading || !selectedStaff)
-                      : (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading))
+                    color: (!!regularAttendance?.check_out_time || loading || !selectedStaff)
                       ? '#9ca3af'
                       : '#ff073a',
                     fontWeight: 'bold',
-                    opacity: (!regularAttendance?.check_in_time || !!regularAttendance?.check_out_time || loading) ? 0.5 : 1
+                    opacity: (!!regularAttendance?.check_out_time || loading || !selectedStaff) ? 0.5 : 1
                   }}
                 >
                   Out
@@ -2130,13 +2123,12 @@ const AttendanceForm = () => {
                 <div className="flex items-center justify-center gap-4 animate-fade-in">
                   {/* Overtime Check In */}
                   <Button 
-                    onClick={() => handleAttendanceAction('overtime', 'check-in')}
+                    onClick={() => handleAttendanceButtonClick('overtime', 'check-in')}
                     disabled={
                       !regularAttendance?.check_out_time || // Must complete regular checkout first
                       !!overtimeAttendance?.check_in_time || 
                       loading || 
-                      !selectedStaff || 
-                      !attendanceStatus
+                      !selectedStaff
                     }
                     variant="outline"
                     className="h-12 w-28 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#39ff14]/10"
@@ -2145,8 +2137,7 @@ const AttendanceForm = () => {
                         !regularAttendance?.check_out_time ||
                         !!overtimeAttendance?.check_in_time || 
                         loading || 
-                        !selectedStaff || 
-                        !attendanceStatus
+                        !selectedStaff
                       )
                         ? '#9ca3af'
                         : '#39ff14',
@@ -2154,8 +2145,7 @@ const AttendanceForm = () => {
                         !regularAttendance?.check_out_time ||
                         !!overtimeAttendance?.check_in_time || 
                         loading || 
-                        !selectedStaff || 
-                        !attendanceStatus
+                        !selectedStaff
                       )
                         ? '#9ca3af'
                         : '#39ff14',
@@ -2165,8 +2155,7 @@ const AttendanceForm = () => {
                         !regularAttendance?.check_out_time ||
                         !!overtimeAttendance?.check_in_time || 
                         loading || 
-                        !selectedStaff || 
-                        !attendanceStatus
+                        !selectedStaff
                       ) ? 0.5 : 1
                     }}
                   >
@@ -2175,7 +2164,7 @@ const AttendanceForm = () => {
                   
                   {/* Overtime Check Out */}
                   <Button 
-                    onClick={() => handleAttendanceAction('overtime', 'check-out')}
+                    onClick={() => handleAttendanceButtonClick('overtime', 'check-out')}
                     disabled={!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading}
                     variant="outline"
                     className="h-12 w-28 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#ff073a]/10"
@@ -2199,6 +2188,22 @@ const AttendanceForm = () => {
           </CardContent>
         </Card>
 
+        {/* Company Logo Card - ONLY for Kiosk Mode */}
+        {sharedDeviceMode && companyLogoUrl && (
+          <Card className="border-0 shadow-xl">
+            <CardContent className="p-6 flex items-center justify-center" style={{ minHeight: '180px' }}>
+              <img 
+                src={companyLogoUrl} 
+                alt="Company Logo" 
+                className="max-h-[160px] max-w-full object-contain"
+                onError={(e) => {
+                  console.log('Company logo failed to load');
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         <div className="text-center text-xs text-muted-foreground mt-2 space-y-2">
           <div>Versi aplikasi : {appVersion} IT Division 2025</div>
@@ -2213,10 +2218,28 @@ const AttendanceForm = () => {
           </div>
         </div>
 
+        {/* StatusPresensiDialog - For User Login Mode */}
+        <StatusPresensiDialog
+          isOpen={showStatusDialog}
+          onClose={() => {
+            setShowStatusDialog(false);
+            setPendingAction(null);
+          }}
+          onConfirm={handleStatusDialogConfirm}
+          actionType={pendingAction?.action === 'check-in' ? 'check-in' : 
+                     pendingAction?.action === 'check-out' ? 'check-out' :
+                     pendingAction?.type === 'overtime' && pendingAction?.action === 'check-in' ? 'in-extend' : 'out-extend'}
+          defaultStatus={attendanceStatus}
+          loading={statusDialogLoading}
+        />
+
         {/* QR Code Scanner Modal */}
         <QRCodeScanner
           isOpen={showQRScanner}
-          onClose={() => setShowQRScanner(false)}
+          onClose={() => {
+            setShowQRScanner(false);
+            setKioskPendingAction(null);
+          }}
           onScanSuccess={handleQRScanSuccess}
         />
 

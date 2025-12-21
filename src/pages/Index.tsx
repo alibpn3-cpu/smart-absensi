@@ -19,6 +19,7 @@ interface UserSession {
 const Index = () => {
   const navigate = useNavigate();
   const [logoUrl, setLogoUrl] = useState('');
+  const [companyLogoUrl, setCompanyLogoUrl] = useState('');
   const [appTitle, setAppTitle] = useState('Digital Presensi');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userSession, setUserSession] = useState<UserSession | null>(null);
@@ -76,14 +77,18 @@ const Index = () => {
         const { data } = await supabase
           .from('app_settings')
           .select('setting_key, setting_value')
-          .in('setting_key', ['app_logo_url', 'app_title']);
+          .in('setting_key', ['app_logo_url', 'company_logo_url', 'app_title']);
         
         if (data && data.length > 0) {
           const logoSetting = data.find(item => item.setting_key === 'app_logo_url');
+          const companyLogoSetting = data.find(item => item.setting_key === 'company_logo_url');
           const titleSetting = data.find(item => item.setting_key === 'app_title');
           
           if (logoSetting?.setting_value) {
             setLogoUrl(logoSetting.setting_value);
+          }
+          if (companyLogoSetting?.setting_value) {
+            setCompanyLogoUrl(companyLogoSetting.setting_value);
           }
           if (titleSetting?.setting_value) {
             setAppTitle(titleSetting.setting_value);
