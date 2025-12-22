@@ -18,6 +18,7 @@ import PermissionIndicators from './PermissionIndicators';
 import QRCodeScanner from './QRCodeScanner';
 import AttendanceStatusList from './AttendanceStatusList';
 import StatusPresensiDialog from './StatusPresensiDialog';
+import DebugLogger from './DebugLogger';
 import { format } from 'date-fns';
 
 interface StaffUser {
@@ -2068,18 +2069,28 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                 {/* Regular Check In */}
                 <Button 
                   onClick={() => handleAttendanceButtonClick('regular', 'check-in')}
-                  disabled={!!regularAttendance?.check_in_time || loading || !selectedStaff}
+                  disabled={
+                    sharedDeviceMode 
+                      ? loading || isButtonProcessing  // Kiosk: staff dipilih via QR
+                      : !!regularAttendance?.check_in_time || loading || !selectedStaff  // Login mode
+                  }
                   variant="outline"
                   className="h-12 w-24 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#39ff14]/10"
                   style={{
-                    borderColor: (!!regularAttendance?.check_in_time || loading || !selectedStaff) 
+                    borderColor: (sharedDeviceMode 
+                      ? loading || isButtonProcessing
+                      : !!regularAttendance?.check_in_time || loading || !selectedStaff) 
                       ? '#9ca3af' 
                       : '#39ff14',
-                    color: (!!regularAttendance?.check_in_time || loading || !selectedStaff)
+                    color: (sharedDeviceMode 
+                      ? loading || isButtonProcessing
+                      : !!regularAttendance?.check_in_time || loading || !selectedStaff)
                       ? '#9ca3af'
                       : '#39ff14',
                     fontWeight: 'bold',
-                    opacity: (!!regularAttendance?.check_in_time || loading || !selectedStaff) ? 0.5 : 1
+                    opacity: (sharedDeviceMode 
+                      ? loading || isButtonProcessing
+                      : !!regularAttendance?.check_in_time || loading || !selectedStaff) ? 0.5 : 1
                   }}
                 >
                   In
@@ -2088,18 +2099,28 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                 {/* Regular Check Out */}
                 <Button 
                   onClick={() => handleAttendanceButtonClick('regular', 'check-out')}
-                  disabled={!!regularAttendance?.check_out_time || loading || !selectedStaff}
+                  disabled={
+                    sharedDeviceMode 
+                      ? loading || isButtonProcessing  // Kiosk: staff dipilih via QR
+                      : !!regularAttendance?.check_out_time || loading || !selectedStaff  // Login mode
+                  }
                   variant="outline"
                   className="h-12 w-24 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#ff073a]/10"
                   style={{
-                    borderColor: (!!regularAttendance?.check_out_time || loading || !selectedStaff)
+                    borderColor: (sharedDeviceMode 
+                      ? loading || isButtonProcessing
+                      : !!regularAttendance?.check_out_time || loading || !selectedStaff)
                       ? '#9ca3af'
                       : '#ff073a',
-                    color: (!!regularAttendance?.check_out_time || loading || !selectedStaff)
+                    color: (sharedDeviceMode 
+                      ? loading || isButtonProcessing
+                      : !!regularAttendance?.check_out_time || loading || !selectedStaff)
                       ? '#9ca3af'
                       : '#ff073a',
                     fontWeight: 'bold',
-                    opacity: (!!regularAttendance?.check_out_time || loading || !selectedStaff) ? 0.5 : 1
+                    opacity: (sharedDeviceMode 
+                      ? loading || isButtonProcessing
+                      : !!regularAttendance?.check_out_time || loading || !selectedStaff) ? 0.5 : 1
                   }}
                 >
                   Out
@@ -2125,37 +2146,30 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                   <Button 
                     onClick={() => handleAttendanceButtonClick('overtime', 'check-in')}
                     disabled={
-                      !regularAttendance?.check_out_time || // Must complete regular checkout first
-                      !!overtimeAttendance?.check_in_time || 
-                      loading || 
-                      !selectedStaff
+                      sharedDeviceMode
+                        ? loading || isButtonProcessing  // Kiosk: staff dipilih via QR
+                        : !regularAttendance?.check_out_time || !!overtimeAttendance?.check_in_time || loading || !selectedStaff
                     }
                     variant="outline"
                     className="h-12 w-28 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#39ff14]/10"
                     style={{
-                      borderColor: (
-                        !regularAttendance?.check_out_time ||
-                        !!overtimeAttendance?.check_in_time || 
-                        loading || 
-                        !selectedStaff
+                      borderColor: (sharedDeviceMode
+                        ? loading || isButtonProcessing
+                        : !regularAttendance?.check_out_time || !!overtimeAttendance?.check_in_time || loading || !selectedStaff
                       )
                         ? '#9ca3af'
                         : '#39ff14',
-                      color: (
-                        !regularAttendance?.check_out_time ||
-                        !!overtimeAttendance?.check_in_time || 
-                        loading || 
-                        !selectedStaff
+                      color: (sharedDeviceMode
+                        ? loading || isButtonProcessing
+                        : !regularAttendance?.check_out_time || !!overtimeAttendance?.check_in_time || loading || !selectedStaff
                       )
                         ? '#9ca3af'
                         : '#39ff14',
                       fontWeight: 'bold',
                       fontSize: '0.85rem',
-                      opacity: (
-                        !regularAttendance?.check_out_time ||
-                        !!overtimeAttendance?.check_in_time || 
-                        loading || 
-                        !selectedStaff
+                      opacity: (sharedDeviceMode
+                        ? loading || isButtonProcessing
+                        : !regularAttendance?.check_out_time || !!overtimeAttendance?.check_in_time || loading || !selectedStaff
                       ) ? 0.5 : 1
                     }}
                   >
@@ -2165,19 +2179,29 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                   {/* Overtime Check Out */}
                   <Button 
                     onClick={() => handleAttendanceButtonClick('overtime', 'check-out')}
-                    disabled={!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading}
+                    disabled={
+                      sharedDeviceMode
+                        ? loading || isButtonProcessing  // Kiosk: staff dipilih via QR
+                        : !overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading
+                    }
                     variant="outline"
                     className="h-12 w-28 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#ff073a]/10"
                     style={{
-                      borderColor: (!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading)
+                      borderColor: (sharedDeviceMode
+                        ? loading || isButtonProcessing
+                        : !overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading)
                         ? '#9ca3af'
                         : '#ff073a',
-                      color: (!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading)
+                      color: (sharedDeviceMode
+                        ? loading || isButtonProcessing
+                        : !overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading)
                         ? '#9ca3af'
                         : '#ff073a',
                       fontWeight: 'bold',
                       fontSize: '0.85rem',
-                      opacity: (!overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading) ? 0.5 : 1
+                      opacity: (sharedDeviceMode
+                        ? loading || isButtonProcessing
+                        : !overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading) ? 0.5 : 1
                     }}
                   >
                     Out Extend
@@ -2207,10 +2231,16 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
 
         <div className="text-center text-xs text-muted-foreground mt-2 space-y-2">
           <div>Versi aplikasi : {appVersion} IT Division 2025</div>
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex items-center justify-center gap-3 flex-wrap">
             <Button variant="outline" size="sm" onClick={handleClearCache}>
               Update (Hapus Cache)
             </Button>
+            <DebugLogger 
+              staffUid={selectedStaff?.uid}
+              staffName={selectedStaff?.name}
+              workAreas={workAreas}
+              permissions={permissions}
+            />
             <PermissionIndicators 
               permissions={permissions} 
               onPermissionsUpdate={savePermissions}
