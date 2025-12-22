@@ -170,7 +170,7 @@ const UserLogin = () => {
             <img src={logoUrl} alt="Logo" className="h-16 w-16 mx-auto object-contain" />
           )}
           <h1 className="text-2xl font-bold text-foreground">{appTitle}</h1>
-          <p className="text-muted-foreground">Login dengan UID Anda</p>
+          <p className="text-muted-foreground">Login dengan User Anda</p>
         </div>
 
         <Card className="border-2 shadow-xl">
@@ -185,12 +185,12 @@ const UserLogin = () => {
               <div className="space-y-2">
                 <Label htmlFor="uid" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  UID Staff
+                  User Staff
                 </Label>
                 <Input
                   id="uid"
                   type="text"
-                  placeholder="Masukkan UID Anda"
+                  placeholder="Masukkan User Anda"
                   value={credentials.uid}
                   onChange={(e) => setCredentials({ ...credentials, uid: e.target.value.toUpperCase() })}
                   disabled={loading}
@@ -213,10 +213,7 @@ const UserLogin = () => {
                   disabled={loading}
                   className="h-12"
                   autoComplete="current-password"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Password default: PTG2025
-                </p>
+                />                
               </div>
 
               <Button
