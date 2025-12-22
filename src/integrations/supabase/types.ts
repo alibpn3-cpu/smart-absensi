@@ -226,6 +226,66 @@ export type Database = {
         }
         Relationships: []
       }
+      debug_logs: {
+        Row: {
+          console_logs: string[] | null
+          created_at: string | null
+          device_id: string | null
+          error_message: string | null
+          error_stack: string | null
+          id: string
+          issue_type: string | null
+          location_data: Json | null
+          permissions_state: Json | null
+          platform: string | null
+          screen_height: number | null
+          screen_width: number | null
+          staff_name: string | null
+          staff_uid: string | null
+          user_agent: string | null
+          user_notes: string | null
+          work_areas_data: Json | null
+        }
+        Insert: {
+          console_logs?: string[] | null
+          created_at?: string | null
+          device_id?: string | null
+          error_message?: string | null
+          error_stack?: string | null
+          id?: string
+          issue_type?: string | null
+          location_data?: Json | null
+          permissions_state?: Json | null
+          platform?: string | null
+          screen_height?: number | null
+          screen_width?: number | null
+          staff_name?: string | null
+          staff_uid?: string | null
+          user_agent?: string | null
+          user_notes?: string | null
+          work_areas_data?: Json | null
+        }
+        Update: {
+          console_logs?: string[] | null
+          created_at?: string | null
+          device_id?: string | null
+          error_message?: string | null
+          error_stack?: string | null
+          id?: string
+          issue_type?: string | null
+          location_data?: Json | null
+          permissions_state?: Json | null
+          platform?: string | null
+          screen_height?: number | null
+          screen_width?: number | null
+          staff_name?: string | null
+          staff_uid?: string | null
+          user_agent?: string | null
+          user_notes?: string | null
+          work_areas_data?: Json | null
+        }
+        Relationships: []
+      }
       geofence_areas: {
         Row: {
           center_lat: number | null
