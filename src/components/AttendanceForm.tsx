@@ -1520,6 +1520,16 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   ) => {
     if (isButtonProcessing) return;
     
+    playClickSound();
+    
+    // Kiosk mode - show QR scanner first, staff akan dipilih setelah scan
+    if (sharedDeviceMode) {
+      setKioskPendingAction({ type: attendanceType, action });
+      setShowQRScanner(true);
+      return;
+    }
+    
+    // User Login Mode - perlu selectedStaff
     if (!selectedStaff) {
       toast({
         title: "Gagal",
@@ -1529,17 +1539,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       return;
     }
     
-    playClickSound();
-    
-    // In User Login Mode (not kiosk), show StatusPresensiDialog
-    if (isUserLoggedIn && !sharedDeviceMode) {
-      setPendingAction({ type: attendanceType, action });
-      setShowStatusDialog(true);
-    } else if (sharedDeviceMode) {
-      // Kiosk mode - show QR scanner
-      setKioskPendingAction({ type: attendanceType, action });
-      setShowQRScanner(true);
-    }
+    // Show StatusPresensiDialog
+    setPendingAction({ type: attendanceType, action });
+    setShowStatusDialog(true);
   };
 
   // Handle status dialog confirmation
