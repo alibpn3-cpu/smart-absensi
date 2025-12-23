@@ -597,7 +597,7 @@ const Dashboard = () => {
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                             <div>
-                              <p className="text-muted-foreground">Check In:</p>
+                              <p className="text-muted-foreground">Clock In:</p>
                               <p className="font-medium text-foreground">
                                 {record.check_in_time 
                                   ? (() => {
@@ -613,7 +613,7 @@ const Dashboard = () => {
                               </p>
                             </div>
                             <div>
-                              <p className="text-muted-foreground">Check Out:</p>
+                              <p className="text-muted-foreground">Clock Out:</p>
                               <p className="font-medium text-foreground">
                                 {record.check_out_time 
                                   ? (() => {
@@ -632,7 +632,7 @@ const Dashboard = () => {
 
                           {record.checkin_location_address && (
                             <div>
-                              <p className="text-xs text-muted-foreground">Lokasi Check In:</p>
+                              <p className="text-xs text-muted-foreground">Lokasi Clock In:</p>
                               <p className="text-xs text-foreground mb-1">{record.checkin_location_address}</p>
                               <div className="flex items-center justify-between">
                                 <p className="text-xs text-muted-foreground">
@@ -655,7 +655,7 @@ const Dashboard = () => {
 
                           {record.checkout_location_address && (
                             <div className="mt-1">
-                              <p className="text-xs text-muted-foreground">Lokasi Check Out:</p>
+                              <p className="text-xs text-muted-foreground">Lokasi Clock Out:</p>
                               <p className="text-xs text-foreground mb-1">{record.checkout_location_address}</p>
                               <div className="flex items-center justify-between">
                                 <p className="text-xs text-muted-foreground">

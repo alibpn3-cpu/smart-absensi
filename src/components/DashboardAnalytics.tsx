@@ -310,7 +310,7 @@ const DashboardAnalytics = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Rata-rata Check In</p>
+                <p className="text-xs text-muted-foreground">Rata-rata Clock In</p>
                 <p className="text-2xl font-bold text-foreground">{summary.avgCheckInTime}</p>
               </div>
               <Clock className="h-8 w-8 text-primary opacity-50" />
@@ -431,7 +431,7 @@ const DashboardAnalytics = () => {
         {/* Check-in Time Distribution */}
         <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Distribusi Waktu Check In</CardTitle>
+            <CardTitle className="text-sm font-medium">Distribusi Waktu Clock In</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
