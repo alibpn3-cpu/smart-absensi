@@ -764,8 +764,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       // Validate action
       if (action.action === 'check-in' && existingAttendance?.check_in_time) {
         toast({
-          title: "❌ Sudah Check In",
-          description: `${staff.name} sudah melakukan check in hari ini`,
+          title: "❌ Sudah Clock In",
+          description: `${staff.name} sudah melakukan clock in hari ini`,
           variant: "destructive"
         });
         resetKioskState();
@@ -774,8 +774,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       
       if (action.action === 'check-out' && !existingAttendance?.check_in_time) {
         toast({
-          title: "❌ Belum Check In",
-          description: `${staff.name} belum melakukan check in hari ini`,
+          title: "❌ Belum Clock In",
+          description: `${staff.name} belum melakukan clock in hari ini`,
           variant: "destructive"
         });
         resetKioskState();
@@ -784,8 +784,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       
       if (action.action === 'check-out' && existingAttendance?.check_out_time) {
         toast({
-          title: "❌ Sudah Check Out",
-          description: `${staff.name} sudah melakukan check out hari ini`,
+          title: "❌ Sudah Clock Out",
+          description: `${staff.name} sudah melakukan clock out hari ini`,
           variant: "destructive"
         });
         resetKioskState();
@@ -827,7 +827,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         if (error) throw error;
         
         toast({
-          title: `✅ Check In Berhasil`,
+          title: `✅ Clock In Berhasil`,
           description: `${staff.name} - ${locationAddress}\n📍 ${location.coordinates}`
         });
       } else {
@@ -849,7 +849,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         if (error) throw error;
         
         toast({
-          title: `✅ Check Out Berhasil`,
+          title: `✅ Clock Out Berhasil`,
           description: `${staff.name} - ${locationAddress}\n📍 ${location.coordinates}`
         });
       }
@@ -1199,7 +1199,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
 
       toast({
         title: "Berhasil",
-        description: `Berhasil ${isCheckOut ? 'check out' : 'check in'}! Lokasi: ${locationAddress}`
+        description: `Berhasil ${isCheckOut ? 'clock out' : 'clock in'}! Lokasi: ${locationAddress}`
       });
 
       setShowCamera(false);
@@ -1326,7 +1326,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         
         if (error) throw error;
         
-        toast({ title: "✅ Overtime Check In Berhasil" });
+        toast({ title: "✅ Overtime Clock In Berhasil" });
       } else {
         // Overtime Check-Out
         const hoursWorked = calculateHoursWorked(
@@ -1348,7 +1348,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         if (error) throw error;
         
         toast({ 
-          title: "✅ Overtime Check Out Berhasil",
+          title: "✅ Overtime Clock Out Berhasil",
           description: `Total jam lembur: ${hoursWorked} jam`
         });
       }
@@ -1371,7 +1371,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     if (!wfoFastCheckoutReason.trim()) {
       toast({
         title: "Alasan Diperlukan",
-        description: "Silakan masukkan alasan checkout WFO",
+        description: "Silakan masukkan alasan clock out WFO",
         variant: "destructive"
       });
       return;
@@ -1391,11 +1391,11 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         0
       );
       
-      // Validation: Check-in must be before checkout
+      // Validation: Clock-in must be before clock-out
       if (manualCheckIn >= now) {
         toast({
           title: "Waktu Tidak Valid",
-          description: "Jam check-in harus lebih awal dari sekarang",
+          description: "Jam clock-in harus lebih awal dari sekarang",
           variant: "destructive"
         });
         return;
@@ -2036,14 +2036,14 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
               </div>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Check In:</span>
+                  <span className="text-muted-foreground">Clock In:</span>
                   <span className="font-medium">
                     {formatCheckTime(todayAttendance.check_in_time as string)}
                   </span>
                 </div>
                 {todayAttendance.check_out_time && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Check Out:</span>
+                    <span className="text-muted-foreground">Clock Out:</span>
                     <span className="font-medium">
                       {formatCheckTime(todayAttendance.check_out_time as string)}
                     </span>
@@ -2287,16 +2287,16 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         }}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-lg font-bold">Input Check In Manual</DialogTitle>
+              <DialogTitle className="text-lg font-bold">Input Clock In Manual</DialogTitle>
               <DialogDescription className="text-left text-sm">
-                Anda check out saja? apakah anda sudah check in di absen fisik? 
-                jika ya silahkan masukan jam perkiraan check in anda di absen fisik, 
-                serta masukan alasan check out wfo diluar geofence kantor
+                Anda clock out saja? apakah anda sudah clock in di absen fisik? 
+                jika ya silahkan masukan jam perkiraan clock in anda di absen fisik, 
+                serta masukan alasan clock out wfo diluar geofence kantor
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label className="text-sm font-medium mb-2 block">Jam Check In Perkiraan</Label>
+                <Label className="text-sm font-medium mb-2 block">Jam Clock In Perkiraan</Label>
                 <div className="flex gap-3 items-center">
                   <Select value={manualCheckInTime.hour} onValueChange={(val) => setManualCheckInTime({...manualCheckInTime, hour: val})}>
                     <SelectTrigger className="flex-1"><SelectValue placeholder="Jam" /></SelectTrigger>
@@ -2318,9 +2318,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                 </div>
               </div>
               <div>
-                <Label className="text-sm font-medium mb-2 block">Alasan Checkout WFO Diluar Geofence</Label>
+                <Label className="text-sm font-medium mb-2 block">Alasan Clock Out WFO Diluar Geofence</Label>
                 <Textarea
-                  placeholder="Contoh: Sudah check in fingerprint pukul 08:15. Checkout diluar kantor karena urusan mendadak"
+                  placeholder="Contoh: Sudah clock in fingerprint pukul 08:15. Clock out diluar kantor karena urusan mendadak"
                   value={wfoFastCheckoutReason}
                   onChange={(e) => setWfoFastCheckoutReason(e.target.value)}
                   rows={4}
@@ -2347,16 +2347,16 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         }}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-lg font-bold">Input Check In Manual - Dinas</DialogTitle>
+              <DialogTitle className="text-lg font-bold">Input Clock In Manual - Dinas</DialogTitle>
               <DialogDescription className="text-left text-sm">
-                Anda check out saja dengan status Dinas Luar? 
-                Silahkan masukan jam perkiraan check in anda dan alasan,
-                kemudian sistem akan meminta foto selfie untuk checkout
+                Anda clock out saja dengan status Dinas Luar? 
+                Silahkan masukan jam perkiraan clock in anda dan alasan,
+                kemudian sistem akan meminta foto selfie untuk clock out
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label className="text-sm font-medium mb-2 block">Jam Check In Perkiraan</Label>
+                <Label className="text-sm font-medium mb-2 block">Jam Clock In Perkiraan</Label>
                 <div className="flex gap-3 items-center">
                   <Select value={manualCheckInTime.hour} onValueChange={(val) => setManualCheckInTime({...manualCheckInTime, hour: val})}>
                     <SelectTrigger className="flex-1"><SelectValue placeholder="Jam" /></SelectTrigger>
@@ -2378,9 +2378,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                 </div>
               </div>
               <div>
-                <Label className="text-sm font-medium mb-2 block">Alasan Checkout Dinas Luar</Label>
+                <Label className="text-sm font-medium mb-2 block">Alasan Clock Out Dinas Luar</Label>
                 <Textarea
-                  placeholder="Contoh: Sudah check in pukul 08:00 untuk dinas ke lokasi X"
+                  placeholder="Contoh: Sudah clock in pukul 08:00 untuk dinas ke lokasi X"
                   value={dinasFastCheckoutReason}
                   onChange={(e) => setDinasFastCheckoutReason(e.target.value)}
                   rows={4}

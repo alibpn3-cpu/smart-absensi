@@ -41,9 +41,9 @@ const StatusPresensiDialog: React.FC<StatusPresensiDialogProps> = ({
   const getActionLabel = () => {
     switch (actionType) {
       case 'check-in':
-        return 'Check In';
+        return 'Clock In';
       case 'check-out':
-        return 'Check Out';
+        return 'Clock Out';
       case 'in-extend':
         return 'In Extend (Lembur)';
       case 'out-extend':
