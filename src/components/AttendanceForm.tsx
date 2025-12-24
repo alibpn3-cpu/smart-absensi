@@ -2347,6 +2347,12 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                      pendingAction?.type === 'overtime' && pendingAction?.action === 'check-in' ? 'in-extend' : 'out-extend'}
           defaultStatus={attendanceStatus}
           loading={statusDialogLoading}
+          checkInStatus={
+            // Pass check-in status untuk membatasi pilihan saat checkout
+            pendingAction?.action === 'check-out' 
+              ? (pendingAction.type === 'regular' ? regularAttendance?.status : overtimeAttendance?.status) ?? null
+              : null
+          }
         />
 
         {/* QR Code Scanner Modal */}
