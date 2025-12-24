@@ -34,6 +34,7 @@ import AttendanceExporter from '../components/AttendanceExporter';
 import AppSettings from '../components/AppSettings';
 import BirthdayImporter from '../components/BirthdayImporter';
 const AdManager = React.lazy(() => import('../components/AdManager'));
+const KioskModeSettings = React.lazy(() => import('../components/KioskModeSettings'));
 import ActivityLogViewer from '../components/ActivityLogViewer';
 import NotCheckedInList from '../components/NotCheckedInList';
 const DashboardAnalytics = React.lazy(() => import('../components/DashboardAnalytics'));
@@ -379,7 +380,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
-          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSuperAdmin ? 'grid-cols-3 sm:grid-cols-12' : 'grid-cols-3 sm:grid-cols-8'}`}>
+          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSuperAdmin ? 'grid-cols-3 sm:grid-cols-13' : 'grid-cols-3 sm:grid-cols-10'}`}>
             <TabsTrigger value="attendance" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Attendance</span>
               <span className="sm:hidden">Absen</span>
@@ -434,19 +435,25 @@ const Dashboard = () => {
               <span className="hidden sm:inline">Geofence</span>
               <span className="sm:hidden">Lokasi</span>
             </TabsTrigger>
+            {/* Kiosk - accessible to all admins */}
+            <TabsTrigger value="kiosk" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+              <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Kiosk</span>
+              <span className="sm:hidden">Kiosk</span>
+            </TabsTrigger>
+            {/* Ads - accessible to all admins */}
+            <TabsTrigger value="ads" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+              <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Ads</span>
+              <span className="sm:hidden">Iklan</span>
+            </TabsTrigger>
+            {/* Settings - superadmin only */}
             {isSuperAdmin && (
-              <>
-                <TabsTrigger value="settings" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-                  <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Settings</span>
-                  <span className="sm:hidden">Config</span>
-                </TabsTrigger>
-                <TabsTrigger value="ads" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-                  <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Ads</span>
-                  <span className="sm:hidden">Iklan</span>
-                </TabsTrigger>
-              </>
+              <TabsTrigger value="settings" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Settings</span>
+                <span className="sm:hidden">Config</span>
+              </TabsTrigger>
             )}
           </TabsList>
 
@@ -783,14 +790,20 @@ const Dashboard = () => {
             </React.Suspense>
           </TabsContent>
 
-          <TabsContent value="settings">
-            <AppSettings />
+          <TabsContent value="kiosk">
+            <React.Suspense fallback={<div className="text-center py-8">Loading...</div>}>
+              <KioskModeSettings />
+            </React.Suspense>
           </TabsContent>
 
           <TabsContent value="ads">
             <React.Suspense fallback={<div className="text-center py-8">Loading...</div>}>
               <AdManager />
             </React.Suspense>
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <AppSettings />
           </TabsContent>
         </Tabs>
       </div>
