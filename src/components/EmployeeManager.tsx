@@ -1052,7 +1052,14 @@ const EmployeeManager = () => {
             <Users className="h-5 w-5" />
             Employee Management
           </CardTitle>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={downloadBatchQRCodes}
+            >
+              <QrCode className="h-4 w-4 mr-2" />
+              {selectedEmployees.size > 0 ? `Download ${selectedEmployees.size} QR` : 'Download All QR'}
+            </Button>
             <Button
               variant="outline"
               onClick={() => exportTemplate('xlsx')}

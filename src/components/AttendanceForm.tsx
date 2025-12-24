@@ -19,7 +19,10 @@ import QRCodeScanner from './QRCodeScanner';
 import AttendanceStatusList from './AttendanceStatusList';
 import StatusPresensiDialog from './StatusPresensiDialog';
 import DebugLogger from './DebugLogger';
+import LocationAccuracyIndicator from './LocationAccuracyIndicator';
 import { format } from 'date-fns';
+import { getEnhancedLocation, getAccuracyLevel, clearLocationCache } from '@/utils/enhancedGeolocation';
+import { isPointInPolygon, PolygonCoordinate } from '@/utils/polygonValidator';
 
 interface StaffUser {
   uid: string;
@@ -401,19 +404,39 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         return;
       }
 
-      const processPosition = async (position: GeolocationPosition) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        const accuracy = position.coords.accuracy;
+      try {
+        // Use enhanced geolocation with multiple readings
+        console.log('📍 Using enhanced geolocation...');
+        const locationResult = await getEnhancedLocation({
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
+          multipleReadings: true,
+          readingsCount: 3,
+          readingInterval: 500,
+        });
         
-        console.log(`📍 Got location: ${lat}, ${lng} (accuracy: ${accuracy}m)`);
+        const { latitude: lat, longitude: lng, accuracy } = locationResult;
+        console.log(`📍 Enhanced location: ${lat}, ${lng} (accuracy: ${accuracy.toFixed(1)}m from ${locationResult.readingsCount} readings)`);
+        
+        // Check accuracy level and warn if poor
+        const accuracyLevel = getAccuracyLevel(accuracy);
+        if (accuracyLevel === 'poor') {
+          toast({
+            title: "⚠️ Akurasi GPS Rendah",
+            description: `Akurasi ${accuracy.toFixed(0)}m - Pindah ke area terbuka untuk hasil lebih baik`,
+            variant: "destructive"
+          });
+        }
+        
+        // Save permission
+        savePermissions({ ...permissions, location: true });
         
         try {
           const locationData = await getAddressFromCoords(lat, lng);
           resolve({ lat, lng, address: locationData.address, coordinates: locationData.coordinates, accuracy });
         } catch (error) {
           console.error('❌ Geocoding failed:', error);
-          // Even if geocoding fails, return coordinates
           const locationCode = generateLocationCode(lat, lng);
           resolve({ 
             lat, 
@@ -423,33 +446,10 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             accuracy 
           });
         }
-      };
-
-      const handleError = (error: GeolocationPositionError) => {
-        console.error('❌ Geolocation error:', error);
+      } catch (error) {
+        console.error('❌ Enhanced geolocation failed:', error);
         reject(error);
-      };
-
-      // If we already have permission, use it
-      if (permissions.location) {
-        navigator.geolocation.getCurrentPosition(
-          processPosition,
-          handleError,
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 }
-        );
-        return;
       }
-
-      // Request permission for the first time
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          // Save permission
-          savePermissions({ ...permissions, location: true });
-          await processPosition(position);
-        },
-        handleError,
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 }
-      );
     });
   };
 
@@ -623,12 +623,26 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     if (error || !geofences) return { isInGeofence: true };
 
     // Tighter geofence tolerance - max 15 meters
-    // If accuracy is poor, add minimal tolerance based on reported accuracy
     const accuracyTolerance = accuracy ? Math.min(accuracy * 0.3, 15) : 0;
     console.log(`📏 Accuracy: ${accuracy}m, adding tolerance: ${accuracyTolerance}m (max 15m)`);
 
     for (const geofence of geofences) {
-      if (geofence.center_lat && geofence.center_lng && geofence.radius) {
+      // Check polygon geofence first (if coordinates exist)
+      if (geofence.coordinates && Array.isArray(geofence.coordinates) && geofence.coordinates.length >= 3) {
+        try {
+          const polygonCoords = geofence.coordinates as unknown as PolygonCoordinate[];
+          const isInside = isPointInPolygon(lat, lng, accuracy || 0, polygonCoords);
+          console.log(`📍 Polygon check for ${geofence.name}: ${isInside ? 'INSIDE' : 'OUTSIDE'}`);
+          
+          if (isInside) {
+            return { isInGeofence: true, geofenceName: geofence.name };
+          }
+        } catch (error) {
+          console.error('Error checking polygon geofence:', error);
+        }
+      }
+      // Fallback to radius-based geofence
+      else if (geofence.center_lat && geofence.center_lng && geofence.radius) {
         const distance = calculateDistance(
           lat, lng, 
           parseFloat(geofence.center_lat.toString()), 
@@ -657,15 +671,28 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     if (error || !geofences) return null;
 
     for (const geofence of geofences) {
-      if (geofence.center_lat && geofence.center_lng && geofence.radius) {
+      // Check polygon geofence first
+      if (geofence.coordinates && Array.isArray(geofence.coordinates) && geofence.coordinates.length >= 3) {
+        try {
+          const polygonCoords = geofence.coordinates as unknown as PolygonCoordinate[];
+          const isInside = isPointInPolygon(lat, lng, 50, polygonCoords); // 50m tolerance for Dinas
+          if (isInside) {
+            console.log(`📍 Dinas: Found matching polygon geofence "${geofence.name}"`);
+            return geofence.name;
+          }
+        } catch (error) {
+          console.error('Error checking polygon for Dinas:', error);
+        }
+      }
+      // Fallback to radius-based
+      else if (geofence.center_lat && geofence.center_lng && geofence.radius) {
         const distance = calculateDistance(
           lat, lng, 
           parseFloat(geofence.center_lat.toString()), 
           parseFloat(geofence.center_lng.toString())
         );
         
-        // Use a small tolerance for geofence matching
-        const effectiveRadius = geofence.radius + 50; // 50m tolerance
+        const effectiveRadius = geofence.radius + 50;
         
         if (distance <= effectiveRadius) {
           console.log(`📍 Dinas: Found matching geofence "${geofence.name}" at ${distance.toFixed(0)}m`);
