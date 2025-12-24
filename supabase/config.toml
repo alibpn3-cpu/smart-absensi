@@ -1,1 +1,4 @@
 project_id = "spqakoyhyziuxfgdkgpm"
+
+[functions.calculate-daily-scores]
+verify_jwt = false

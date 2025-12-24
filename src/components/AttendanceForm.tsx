@@ -14,6 +14,7 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import CameraCapture from './CameraCapture';
 import BirthdayCard from './BirthdayCard';
+import SlideCarousel from './SlideCarousel';
 import PermissionIndicators from './PermissionIndicators';
 import QRCodeScanner from './QRCodeScanner';
 import AttendanceStatusList from './AttendanceStatusList';
@@ -1908,8 +1909,12 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   return (
     <div className="min-h-screen bg-background p-4 pt-2">
       <div className="max-w-md mx-auto space-y-2 animate-fade-in">
-        {/* Birthday Card - Shows only when there are birthdays today */}
-        <BirthdayCard />
+        {/* Birthday + Ranking Carousel - Shows only when there are birthdays or score feature enabled */}
+        {featureFlags.scoreEnabled ? (
+          <SlideCarousel showRanking={true} />
+        ) : (
+          <BirthdayCard />
+        )}
         
         {/* Header with Date/Time */}
         <Card className="bg-card border shadow-lg">
