@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2 } from 'lucide-react';
+import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { calculatePolygonArea, getPolygonCenter, PolygonCoordinate } from '@/utils/polygonValidator';
+import { calculatePolygonArea, getPolygonCenter, PolygonCoordinate, sanitizeCoordinates } from '@/utils/polygonValidator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface GeofenceArea {
   id: string;
@@ -29,6 +30,7 @@ const PolygonGeofenceManager: React.FC = () => {
   const [mapLoading, setMapLoading] = useState(true);
   const [leafletLoaded, setLeafletLoaded] = useState(false);
   
+  const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -117,10 +119,19 @@ const PolygonGeofenceManager: React.FC = () => {
 
       if (error) throw error;
       
-      const parsed = (data || []).map(g => ({
-        ...g,
-        coordinates: g.coordinates ? (g.coordinates as unknown as PolygonCoordinate[]) : null
-      }));
+      const parsed = (data || []).map(g => {
+        // Sanitize coordinates from database
+        let coords: PolygonCoordinate[] | null = null;
+        if (g.coordinates) {
+          const rawCoords = g.coordinates as unknown as any[];
+          coords = sanitizeCoordinates(rawCoords);
+          if (coords.length < 3) coords = null;
+        }
+        return {
+          ...g,
+          coordinates: coords
+        };
+      });
       
       setGeofences(parsed);
     } catch (error) {
@@ -142,8 +153,15 @@ const PolygonGeofenceManager: React.FC = () => {
     geofenceLayersRef.current = [];
     
     geofences.forEach(geofence => {
+      // Skip the currently editing geofence
+      if (geofence.id === editingId) return;
+      
       if (geofence.coordinates && geofence.coordinates.length >= 3) {
-        const latLngs = geofence.coordinates.map(c => [c.lat, c.lng]);
+        // Validate coordinates before drawing
+        const validCoords = sanitizeCoordinates(geofence.coordinates);
+        if (validCoords.length < 3) return;
+        
+        const latLngs = validCoords.map(c => [c.lat, c.lng]);
         const polygon = L.polygon(latLngs, {
           color: geofence.is_active ? '#22c55e' : '#9ca3af',
           fillColor: geofence.is_active ? '#22c55e' : '#9ca3af',
@@ -163,6 +181,7 @@ const PolygonGeofenceManager: React.FC = () => {
         }).addTo(leafletMapRef.current!);
         
         circle.bindPopup(`<strong>${geofence.name}</strong><br/>Radius: ${geofence.radius}m<br/>Status: ${geofence.is_active ? 'Aktif' : 'Nonaktif'}`);
+        geofenceLayersRef.current.push(circle);
       }
     });
   };
@@ -362,15 +381,29 @@ const PolygonGeofenceManager: React.FC = () => {
     
     const L = LRef.current;
     
+    // Scroll to map first
+    mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
     setEditingId(geofence.id);
     setName(geofence.name);
     
     if (geofence.coordinates && geofence.coordinates.length >= 3) {
-      setCurrentPolygon(geofence.coordinates);
+      // Sanitize coordinates before editing
+      const validCoords = sanitizeCoordinates(geofence.coordinates);
+      if (validCoords.length < 3) {
+        toast({
+          title: "Error",
+          description: "Koordinat polygon tidak valid",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setCurrentPolygon(validCoords);
       setIsDrawing(true);
       
       clearDrawingLayers();
-      geofence.coordinates.forEach(coord => {
+      validCoords.forEach(coord => {
         const marker = L.marker([coord.lat, coord.lng], {
           draggable: true,
         }).addTo(leafletMapRef.current);
@@ -388,8 +421,16 @@ const PolygonGeofenceManager: React.FC = () => {
         markersRef.current.push(marker);
       });
       
-      const bounds = L.latLngBounds(geofence.coordinates.map(c => [c.lat, c.lng]));
+      const bounds = L.latLngBounds(validCoords.map(c => [c.lat, c.lng]));
       leafletMapRef.current.fitBounds(bounds, { padding: [50, 50] });
+      
+      // Redraw geofences to hide the one being edited
+      drawExistingGeofences();
+      
+      toast({
+        title: "Mode Edit",
+        description: `Mengedit "${geofence.name}". Drag marker untuk mengubah bentuk polygon.`
+      });
     }
   };
 
@@ -450,14 +491,74 @@ const PolygonGeofenceManager: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Map Card */}
-      <Card>
+      <Card ref={mapContainerRef}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Map className="h-5 w-5" />
             Polygon Geofence Editor
+            {editingId && (
+              <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700">
+                EDITING: {name}
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Edit Mode Alert */}
+          {editingId && (
+            <Alert className="border-blue-200 bg-blue-50">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-700">
+                <strong>Mode Edit:</strong> Drag marker untuk mengubah posisi titik. Klik pada peta untuk menambah titik baru.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {/* Name Input - Always visible when drawing/editing */}
+          {isDrawing && (
+            <div className="p-4 bg-muted rounded-lg border-2 border-dashed border-primary/30">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <Label htmlFor="area-name" className="text-base font-semibold">
+                    Nama Area {editingId ? '(sedang diedit)' : '(baru)'}
+                  </Label>
+                  <Input
+                    id="area-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Contoh: Kantor Pusat"
+                    className="mt-1 text-lg"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex items-end gap-2">
+                  <Button 
+                    onClick={savePolygon} 
+                    disabled={currentPolygon.length < 3 || !name.trim() || loading}
+                    className="min-w-[120px]"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {editingId ? 'Update' : 'Simpan'}
+                  </Button>
+                  <Button variant="outline" onClick={cancelDrawing}>
+                    <X className="h-4 w-4 mr-2" />
+                    Batal
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Polygon Info */}
+              {currentPolygon.length > 0 && (
+                <div className="flex gap-4 text-sm text-muted-foreground mt-3 pt-3 border-t">
+                  <span>Titik: {currentPolygon.length}</span>
+                  {currentPolygon.length >= 3 && (
+                    <span>Luas: {polygonArea.toLocaleString('id-ID', { maximumFractionDigits: 0 })} m²</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          
           {/* Drawing Controls */}
           <div className="flex flex-wrap gap-2">
             {!isDrawing ? (
@@ -469,53 +570,15 @@ const PolygonGeofenceManager: React.FC = () => {
               <>
                 <Button variant="outline" onClick={undoLastPoint} disabled={currentPolygon.length === 0}>
                   <Undo2 className="h-4 w-4 mr-2" />
-                  Undo
+                  Undo Titik
                 </Button>
                 <Button variant="outline" onClick={clearAll}>
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Hapus Semua
-                </Button>
-                <Button variant="outline" onClick={cancelDrawing}>
-                  <X className="h-4 w-4 mr-2" />
-                  Batal
+                  Hapus Semua Titik
                 </Button>
               </>
             )}
           </div>
-          
-          {/* Name Input & Save (when drawing) */}
-          {isDrawing && (
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1">
-                <Label htmlFor="area-name">Nama Area</Label>
-                <Input
-                  id="area-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Contoh: Kantor Pusat"
-                />
-              </div>
-              <div className="flex items-end">
-                <Button 
-                  onClick={savePolygon} 
-                  disabled={currentPolygon.length < 3 || !name.trim() || loading}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {editingId ? 'Update' : 'Simpan'} Area
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          {/* Polygon Info */}
-          {currentPolygon.length > 0 && (
-            <div className="flex gap-4 text-sm text-muted-foreground">
-              <span>Titik: {currentPolygon.length}</span>
-              {currentPolygon.length >= 3 && (
-                <span>Luas: {polygonArea.toLocaleString('id-ID', { maximumFractionDigits: 0 })} m²</span>
-              )}
-            </div>
-          )}
           
           {/* Map Container */}
           <div className="relative">
@@ -545,46 +608,59 @@ const PolygonGeofenceManager: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {geofences.map((geofence) => (
-                <div
-                  key={geofence.id}
-                  className="border rounded-lg p-4 space-y-3"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-semibold">{geofence.name}</h3>
-                      {geofence.coordinates ? (
-                        <p className="text-sm text-muted-foreground">
-                          Polygon: {geofence.coordinates.length} titik
-                          {geofence.coordinates.length >= 3 && (
-                            <> • Luas: {calculatePolygonArea(geofence.coordinates).toLocaleString('id-ID', { maximumFractionDigits: 0 })} m²</>
+              {geofences.map((geofence) => {
+                const isBeingEdited = editingId === geofence.id;
+                return (
+                  <div
+                    key={geofence.id}
+                    className={`border rounded-lg p-4 space-y-3 transition-all ${
+                      isBeingEdited 
+                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' 
+                        : ''
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-semibold flex items-center gap-2">
+                          {geofence.name}
+                          {isBeingEdited && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs">
+                              Sedang Diedit
+                            </Badge>
                           )}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">
-                          Radius: {geofence.radius}m
-                        </p>
-                      )}
-                    </div>
-                    <Badge 
-                      variant={geofence.is_active ? "default" : "secondary"}
-                      className="cursor-pointer"
-                      onClick={() => toggleActive(geofence.id, geofence.is_active)}
-                    >
-                      {geofence.is_active ? 'Aktif' : 'Nonaktif'}
-                    </Badge>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    {geofence.coordinates && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => editGeofence(geofence)}
-                        disabled={!leafletLoaded}
+                        </h3>
+                        {geofence.coordinates ? (
+                          <p className="text-sm text-muted-foreground">
+                            Polygon: {geofence.coordinates.length} titik
+                            {geofence.coordinates.length >= 3 && (
+                              <> • Luas: {calculatePolygonArea(geofence.coordinates).toLocaleString('id-ID', { maximumFractionDigits: 0 })} m²</>
+                            )}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            Radius: {geofence.radius}m
+                          </p>
+                        )}
+                      </div>
+                      <Badge 
+                        variant={geofence.is_active ? "default" : "secondary"}
+                        className="cursor-pointer"
+                        onClick={() => !isBeingEdited && toggleActive(geofence.id, geofence.is_active)}
                       >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
+                        {geofence.is_active ? 'Aktif' : 'Nonaktif'}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      {geofence.coordinates && (
+                        <Button
+                          variant={isBeingEdited ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => !isBeingEdited && editGeofence(geofence)}
+                          disabled={!leafletLoaded || isBeingEdited}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          {isBeingEdited ? 'Sedang Diedit...' : 'Edit'}
                       </Button>
                     )}
                     <Button
@@ -610,7 +686,8 @@ const PolygonGeofenceManager: React.FC = () => {
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
