@@ -33,6 +33,9 @@ const PolygonGeofenceManager: React.FC = () => {
   const [mapLoading, setMapLoading] = useState(true);
   const [leafletLoaded, setLeafletLoaded] = useState(false);
   
+  // EXPLICIT editor mode state - key fix for toggle bug
+  const [editorMode, setEditorMode] = useState<'radius' | 'polygon'>('radius');
+  
   const mapRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<any>(null);
@@ -47,6 +50,7 @@ const PolygonGeofenceManager: React.FC = () => {
   const editingGeofenceRef = useRef<GeofenceArea | null>(null);
   const currentPolygonRef = useRef<PolygonCoordinate[]>([]);
   const radiusRef = useRef<number>(100);
+  const editorModeRef = useRef<'radius' | 'polygon'>('radius');
 
   useEffect(() => {
     fetchGeofences();
@@ -65,6 +69,10 @@ const PolygonGeofenceManager: React.FC = () => {
   useEffect(() => {
     radiusRef.current = radius;
   }, [radius]);
+
+  useEffect(() => {
+    editorModeRef.current = editorMode;
+  }, [editorMode]);
 
   const loadLeaflet = async () => {
     try {
@@ -204,18 +212,14 @@ const PolygonGeofenceManager: React.FC = () => {
     
     map.on('click', (e: any) => {
       // Use refs to get latest state (avoid closure bug)
-      const currentGeofence = editingGeofenceRef.current;
-      const polygonPoints = currentPolygonRef.current;
+      const currentMode = editorModeRef.current;
       const currentRadius = radiusRef.current;
       
-      // Check if in polygon mode: coordinates exists AND has at least 1 point
-      const isPolygonMode = currentGeofence?.coordinates && currentGeofence.coordinates.length > 0;
-      
-      // If NOT polygon mode (radius mode or new mode without polygon), handle radius
-      if (currentGeofence && !isPolygonMode && polygonPoints.length === 0) {
-        // Radius mode - move center
+      // Use explicit editorMode - key fix for toggle bug
+      if (currentMode === 'radius') {
+        // Radius mode - move center point
         const { lat, lng } = e.latlng;
-        drawRadiusCircle(lat, lng, currentRadius);
+        drawRadiusCenterFromClick(lat, lng, currentRadius);
         return;
       }
       
@@ -232,6 +236,42 @@ const PolygonGeofenceManager: React.FC = () => {
         
         return updated;
       });
+    });
+  };
+
+  // Separate function to handle radius center update from map click
+  const drawRadiusCenterFromClick = (lat: number, lng: number, r: number) => {
+    if (!leafletMapRef.current || !LRef.current) return;
+    
+    const L = LRef.current;
+    
+    if (circleLayerRef.current) {
+      circleLayerRef.current.remove();
+    }
+    
+    circleLayerRef.current = L.circle([lat, lng], {
+      radius: r,
+      color: '#3b82f6',
+      fillColor: '#3b82f6',
+      fillOpacity: 0.3,
+      weight: 2,
+    }).addTo(leafletMapRef.current);
+    
+    // Update editing geofence with new center using functional update
+    setEditingGeofence(prev => prev ? {
+      ...prev,
+      center_lat: lat,
+      center_lng: lng,
+      radius: r,
+      coordinates: null // Ensure stays in radius mode
+    } : {
+      id: '',
+      name: '',
+      center_lat: lat,
+      center_lng: lng,
+      radius: r,
+      coordinates: null,
+      is_active: true
     });
   };
 
@@ -452,11 +492,21 @@ const PolygonGeofenceManager: React.FC = () => {
   };
 
   const openNewEditor = () => {
-    setEditingGeofence(null);
+    // Create a draft geofence for new mode
+    setEditingGeofence({
+      id: '',
+      name: '',
+      center_lat: null,
+      center_lng: null,
+      radius: 100,
+      coordinates: null,
+      is_active: true
+    });
     setIsNewMode(true);
     setName('');
     setCurrentPolygon([]);
     setRadius(100);
+    setEditorMode('radius'); // Default to radius mode for new geofence
     setIsEditorOpen(true);
     // Scroll to editor after a short delay
     setTimeout(() => {
@@ -470,6 +520,14 @@ const PolygonGeofenceManager: React.FC = () => {
     setName(geofence.name);
     setRadius(geofence.radius || 100);
     setCurrentPolygon([]);
+    
+    // Set mode based on existing geofence data
+    if (geofence.coordinates && geofence.coordinates.length > 0) {
+      setEditorMode('polygon');
+    } else {
+      setEditorMode('radius');
+    }
+    
     setIsEditorOpen(true);
     // Scroll to editor after a short delay
     setTimeout(() => {
@@ -483,16 +541,25 @@ const PolygonGeofenceManager: React.FC = () => {
     setIsNewMode(false);
     setName('');
     setCurrentPolygon([]);
+    setEditorMode('radius');
     clearDrawingLayers();
   };
 
   const saveGeofence = async () => {
-    const isRadiusMode = editingGeofence && !editingGeofence.coordinates;
-    
-    if (!isRadiusMode && currentPolygon.length < 3) {
+    // Use explicit editorMode for validation
+    if (editorMode === 'polygon' && currentPolygon.length < 3) {
       toast({
         title: "Gagal",
         description: "Polygon harus memiliki minimal 3 titik",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (editorMode === 'radius' && (!editingGeofence?.center_lat || !editingGeofence?.center_lng)) {
+      toast({
+        title: "Gagal",
+        description: "Titik tengah harus ditentukan. Klik pada peta atau masukkan koordinat.",
         variant: "destructive"
       });
       return;
@@ -512,8 +579,9 @@ const PolygonGeofenceManager: React.FC = () => {
     try {
       let geofenceData: any;
       
-      if (isRadiusMode && editingGeofence) {
-        // Radius-based update
+      // Use explicit editorMode for save logic
+      if (editorMode === 'radius' && editingGeofence) {
+        // Radius-based save
         geofenceData = {
           name: name.trim(),
           center_lat: editingGeofence.center_lat,
@@ -633,103 +701,135 @@ const PolygonGeofenceManager: React.FC = () => {
   };
 
   const polygonArea = calculatePolygonArea(currentPolygon);
-  const isRadiusMode = editingGeofence && !editingGeofence.coordinates;
 
-  // Convert radius-based geofence to polygon mode with only center point
-  const convertRadiusToPolygon = () => {
-    if (!editingGeofence?.center_lat || !editingGeofence?.center_lng) {
+  // Switch to polygon mode (used by mode toggle and convert button)
+  const switchToPolygonMode = () => {
+    // If we have a center point, use it as the first polygon point
+    if (editingGeofence?.center_lat && editingGeofence?.center_lng) {
+      const centerLat = editingGeofence.center_lat;
+      const centerLng = editingGeofence.center_lng;
+      const coords: PolygonCoordinate[] = [{ lat: centerLat, lng: centerLng }];
+
+      // Clear existing circle layer
+      if (circleLayerRef.current) {
+        circleLayerRef.current.remove();
+        circleLayerRef.current = null;
+      }
+
+      // Clear existing markers
+      clearDrawingLayers();
+
+      // Update state to polygon mode
+      setEditingGeofence(prev => prev ? {
+        ...prev,
+        coordinates: coords,
+        radius: radius // Keep radius as backup
+      } : null);
+      setCurrentPolygon(coords);
+      setEditorMode('polygon');
+
+      // Add marker for center point
+      addMarkerWithPopup(centerLat, centerLng, 0);
+
       toast({
-        title: "Gagal",
-        description: "Titik tengah tidak ditemukan",
-        variant: "destructive"
+        title: "Mode Polygon Aktif",
+        description: "Klik pada peta untuk menambah titik polygon. Minimal 3 titik untuk menyimpan."
       });
-      return;
+    } else {
+      // No center point, just switch mode
+      setEditorMode('polygon');
+      clearDrawingLayers();
+      setCurrentPolygon([]);
+      
+      toast({
+        title: "Mode Polygon Aktif",
+        description: "Klik pada peta untuk menambah titik polygon. Minimal 3 titik untuk menyimpan."
+      });
     }
+  };
 
-    const centerLat = editingGeofence.center_lat;
-    const centerLng = editingGeofence.center_lng;
+  // Switch to radius mode (used by mode toggle and convert button)
+  const switchToRadiusMode = () => {
+    // If we have polygon points, use their center
+    if (currentPolygon.length > 0) {
+      const center = getPolygonCenter(currentPolygon);
+      if (center) {
+        const area = calculatePolygonArea(currentPolygon);
+        const estimatedRadius = Math.max(50, Math.round(Math.sqrt(area / Math.PI)));
 
-    // Only 1 point: center point
-    const coords: PolygonCoordinate[] = [{ lat: centerLat, lng: centerLng }];
+        // Clear polygon layers
+        clearDrawingLayers();
 
-    // Clear existing circle layer
-    if (circleLayerRef.current) {
-      circleLayerRef.current.remove();
-      circleLayerRef.current = null;
+        // Update state to radius mode
+        setEditingGeofence(prev => prev ? {
+          ...prev,
+          coordinates: null,
+          center_lat: center.lat,
+          center_lng: center.lng,
+          radius: estimatedRadius
+        } : null);
+        setCurrentPolygon([]);
+        setRadius(estimatedRadius);
+        setEditorMode('radius');
+
+        // Draw circle on map
+        drawRadiusCircle(center.lat, center.lng, estimatedRadius);
+
+        // Center map on new circle
+        if (leafletMapRef.current) {
+          leafletMapRef.current.setView([center.lat, center.lng], 16);
+        }
+
+        toast({
+          title: "Mode Radius Aktif",
+          description: `Diubah ke mode radius dengan jari-jari ~${estimatedRadius}m`
+        });
+        return;
+      }
     }
-
-    // Clear existing markers
+    
+    // No polygon points or couldn't get center, just switch mode
     clearDrawingLayers();
-
-    // Update state to polygon mode
-    setEditingGeofence({
-      ...editingGeofence,
-      coordinates: coords,
-      radius: radius // Keep radius as backup
-    });
-    setCurrentPolygon(coords);
-
-    // Add marker for center point
-    addMarkerWithPopup(centerLat, centerLng, 0);
-
+    setCurrentPolygon([]);
+    setEditorMode('radius');
+    
+    // If we already have a center, draw the circle
+    if (editingGeofence?.center_lat && editingGeofence?.center_lng) {
+      drawRadiusCircle(editingGeofence.center_lat, editingGeofence.center_lng, radius);
+    }
+    
     toast({
-      title: "Mode Polygon Aktif",
-      description: "Klik pada peta untuk menambah titik polygon. Minimal 3 titik untuk menyimpan."
+      title: "Mode Radius Aktif",
+      description: "Klik pada peta untuk menentukan titik tengah, atau masukkan koordinat manual."
     });
   };
 
-  // Convert polygon-based geofence back to radius mode
-  const convertPolygonToRadius = () => {
-    if (currentPolygon.length === 0) {
-      toast({
-        title: "Gagal",
-        description: "Tidak ada polygon untuk dikonversi",
-        variant: "destructive"
-      });
-      return;
+  // Handle manual lat input
+  const handleLatChange = (value: string) => {
+    const lat = parseFloat(value);
+    if (!isNaN(lat) && lat >= -90 && lat <= 90) {
+      setEditingGeofence(prev => prev ? { ...prev, center_lat: lat } : null);
+      if (editingGeofence?.center_lng) {
+        drawRadiusCircle(lat, editingGeofence.center_lng, radius);
+        if (leafletMapRef.current) {
+          leafletMapRef.current.setView([lat, editingGeofence.center_lng], 16);
+        }
+      }
     }
+  };
 
-    // Calculate center from polygon
-    const center = getPolygonCenter(currentPolygon);
-    if (!center) {
-      toast({
-        title: "Gagal",
-        description: "Gagal menghitung titik tengah polygon",
-        variant: "destructive"
-      });
-      return;
+  // Handle manual lng input
+  const handleLngChange = (value: string) => {
+    const lng = parseFloat(value);
+    if (!isNaN(lng) && lng >= -180 && lng <= 180) {
+      setEditingGeofence(prev => prev ? { ...prev, center_lng: lng } : null);
+      if (editingGeofence?.center_lat) {
+        drawRadiusCircle(editingGeofence.center_lat, lng, radius);
+        if (leafletMapRef.current) {
+          leafletMapRef.current.setView([editingGeofence.center_lat, lng], 16);
+        }
+      }
     }
-
-    // Calculate estimated radius from polygon area
-    const area = calculatePolygonArea(currentPolygon);
-    const estimatedRadius = Math.max(50, Math.round(Math.sqrt(area / Math.PI)));
-
-    // Clear polygon layers
-    clearDrawingLayers();
-
-    // Update state to radius mode
-    setEditingGeofence({
-      ...editingGeofence!,
-      coordinates: null, // null = radius mode
-      center_lat: center.lat,
-      center_lng: center.lng,
-      radius: estimatedRadius
-    });
-    setCurrentPolygon([]);
-    setRadius(estimatedRadius);
-
-    // Draw circle on map
-    drawRadiusCircle(center.lat, center.lng, estimatedRadius);
-
-    // Center map on new circle
-    if (leafletMapRef.current) {
-      leafletMapRef.current.setView([center.lat, center.lng], 16);
-    }
-
-    toast({
-      title: "Mode Radius Aktif",
-      description: `Diubah ke mode radius dengan jari-jari ~${estimatedRadius}m`
-    });
   };
 
   return (
@@ -852,9 +952,31 @@ const PolygonGeofenceManager: React.FC = () => {
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Mode Selector */}
+            <div className="flex gap-2 p-1 bg-muted rounded-lg">
+              <Button
+                variant={editorMode === 'radius' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={switchToRadiusMode}
+                className="flex-1"
+              >
+                <Circle className="h-4 w-4 mr-2" />
+                Mode Radius
+              </Button>
+              <Button
+                variant={editorMode === 'polygon' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={switchToPolygonMode}
+                className="flex-1"
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                Mode Polygon
+              </Button>
+            </div>
+            
             <p className="text-sm text-muted-foreground">
-              {isRadiusMode 
-                ? 'Klik pada peta untuk memindahkan titik tengah, atau ubah radius di bawah.'
+              {editorMode === 'radius' 
+                ? 'Klik pada peta untuk menentukan titik tengah, atau masukkan koordinat manual di bawah.'
                 : 'Klik pada peta untuk menambahkan titik polygon. Drag marker untuk mengubah posisi.'}
             </p>
             
@@ -870,9 +992,36 @@ const PolygonGeofenceManager: React.FC = () => {
               />
             </div>
             
-            {/* Radius Input - tampilkan jika radius mode ATAU polygon kosong dan ada center */}
-            {(isRadiusMode || (currentPolygon.length === 0 && editingGeofence?.center_lat)) && (
+            {/* Radius Mode Controls */}
+            {editorMode === 'radius' && (
               <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
+                {/* Manual Lat/Lng Input */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="center-lat">Latitude</Label>
+                    <Input
+                      id="center-lat"
+                      type="number"
+                      step="any"
+                      value={editingGeofence?.center_lat ?? ''}
+                      onChange={(e) => handleLatChange(e.target.value)}
+                      placeholder="-6.2088"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="center-lng">Longitude</Label>
+                    <Input
+                      id="center-lng"
+                      type="number"
+                      step="any"
+                      value={editingGeofence?.center_lng ?? ''}
+                      onChange={(e) => handleLngChange(e.target.value)}
+                      placeholder="106.8456"
+                    />
+                  </div>
+                </div>
+                
+                {/* Radius Slider & Input */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="geofence-radius">Radius</Label>
@@ -909,56 +1058,41 @@ const PolygonGeofenceManager: React.FC = () => {
                     className="text-center"
                   />
                 </div>
-                <Button 
-                  variant="outline" 
-                  onClick={convertRadiusToPolygon}
-                  className="w-full"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Ubah ke Mode Polygon
-                </Button>
+                
                 <p className="text-xs text-muted-foreground">
-                  Klik peta untuk pindahkan titik tengah. Geser slider untuk ubah radius.
+                  Klik peta untuk pindahkan titik tengah, atau masukkan koordinat Lat/Lng manual. Geser slider untuk ubah radius.
                 </p>
               </div>
             )}
             
-            {/* Polygon Info */}
-            {!isRadiusMode && currentPolygon.length > 0 && (
-              <div className="flex gap-4 text-sm bg-muted p-3 rounded-lg">
-                <span className="font-medium">Titik: {currentPolygon.length}</span>
-                {currentPolygon.length >= 3 && (
-                  <span className="font-medium">Luas: {polygonArea.toLocaleString('id-ID', { maximumFractionDigits: 0 })} m²</span>
-                )}
-                {currentPolygon.length < 3 && (
-                  <span className="text-destructive">Minimal 3 titik diperlukan</span>
-                )}
-              </div>
-            )}
-            
-            {/* Drawing Controls */}
-            {!isRadiusMode && (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={undoLastPoint} disabled={currentPolygon.length === 0}>
-                  <Undo2 className="h-4 w-4 mr-2" />
-                  Undo Titik
-                </Button>
-                <Button variant="outline" size="sm" onClick={clearAllPoints} disabled={currentPolygon.length === 0}>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Hapus Semua
-                </Button>
+            {/* Polygon Mode Controls */}
+            {editorMode === 'polygon' && (
+              <>
+                {/* Polygon Info */}
                 {currentPolygon.length > 0 && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={convertPolygonToRadius}
-                    className="ml-auto"
-                  >
-                    <Circle className="h-4 w-4 mr-2" />
-                    Ubah ke Mode Radius
-                  </Button>
+                  <div className="flex gap-4 text-sm bg-muted p-3 rounded-lg">
+                    <span className="font-medium">Titik: {currentPolygon.length}</span>
+                    {currentPolygon.length >= 3 && (
+                      <span className="font-medium">Luas: {polygonArea.toLocaleString('id-ID', { maximumFractionDigits: 0 })} m²</span>
+                    )}
+                    {currentPolygon.length < 3 && (
+                      <span className="text-destructive">Minimal 3 titik diperlukan</span>
+                    )}
+                  </div>
                 )}
-              </div>
+                
+                {/* Drawing Controls */}
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={undoLastPoint} disabled={currentPolygon.length === 0}>
+                    <Undo2 className="h-4 w-4 mr-2" />
+                    Undo Titik
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={clearAllPoints} disabled={currentPolygon.length === 0}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Hapus Semua
+                  </Button>
+                </div>
+              </>
             )}
             
             {/* Map Container */}
@@ -987,13 +1121,13 @@ const PolygonGeofenceManager: React.FC = () => {
                   !name.trim() || 
                   loading || 
                   // Polygon mode: butuh minimal 3 titik
-                  (!isRadiusMode && currentPolygon.length >= 1 && currentPolygon.length < 3) ||
+                  (editorMode === 'polygon' && currentPolygon.length < 3) ||
                   // Radius mode: butuh center point
-                  (isRadiusMode && (!editingGeofence?.center_lat || !editingGeofence?.center_lng))
+                  (editorMode === 'radius' && (!editingGeofence?.center_lat || !editingGeofence?.center_lng))
                 }
               >
                 <Save className="h-4 w-4 mr-2" />
-                {loading ? 'Menyimpan...' : (editingGeofence ? 'Simpan Perubahan' : 'Buat Area')}
+                {loading ? 'Menyimpan...' : (isNewMode ? 'Buat Area' : 'Simpan Perubahan')}
               </Button>
             </div>
           </CardContent>
