@@ -168,3 +168,33 @@ All colors MUST be HSL.
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Browser Compatibility Fixes */
+@layer components {
+  /* Dropdown/Select fallbacks for Safari and Firefox */
+  select,
+  [data-radix-select-trigger] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+  
+  /* Ensure dropdowns have proper z-index and background */
+  [data-radix-select-content],
+  [data-radix-popper-content-wrapper],
+  [data-radix-menu-content],
+  [data-radix-dropdown-menu-content] {
+    z-index: 9999 !important;
+    background-color: hsl(var(--popover)) !important;
+  }
+  
+  /* Leaflet map fixes */
+  .leaflet-container {
+    z-index: 0 !important;
+  }
+  
+  .leaflet-pane,
+  .leaflet-control {
+    z-index: auto !important;
+  }
+}

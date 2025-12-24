@@ -25,6 +25,11 @@ const queryClient = new QueryClient({
 
 const APP_VERSION = 'v2.3.0';
 
+// HTTPS redirect for production
+if (typeof window !== 'undefined' && window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+  window.location.href = window.location.href.replace('http:', 'https:');
+}
+
 const AppContent = () => {
   const { showUpdateModal, newVersion, changelog, handleUpdate } = useVersionCheck(APP_VERSION);
 

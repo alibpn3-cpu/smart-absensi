@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera, CheckSquare, Square, ChevronsUpDown, Check, KeyRound, Shield, ShieldOff } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera, CheckSquare, Square, ChevronsUpDown, Check, KeyRound, Shield, ShieldOff, QrCode } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -751,6 +751,78 @@ const EmployeeManager = () => {
     toast({
       title: "Download Berhasil",
       description: `${employeesToExport.length} data karyawan telah didownload`
+    });
+  };
+
+  const downloadBatchQRCodes = async () => {
+    let employeesToExport = employees;
+    if (selectedEmployees.size > 0) {
+      employeesToExport = employees.filter(emp => selectedEmployees.has(emp.id));
+    }
+    
+    if (employeesToExport.length === 0) {
+      toast({
+        title: "Gagal",
+        description: "Tidak ada karyawan untuk didownload",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    toast({
+      title: "Memproses",
+      description: `Mengunduh ${employeesToExport.length} QR Code...`
+    });
+    
+    // Create PDF with jsPDF
+    const { jsPDF } = await import('jspdf');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const qrSize = 50;
+    const margin = 15;
+    const cols = 3;
+    const rows = 4;
+    const itemsPerPage = cols * rows;
+    
+    for (let i = 0; i < employeesToExport.length; i++) {
+      const emp = employeesToExport[i];
+      const pageIndex = Math.floor(i / itemsPerPage);
+      const itemIndex = i % itemsPerPage;
+      
+      if (itemIndex === 0 && i > 0) {
+        pdf.addPage();
+      }
+      
+      const col = itemIndex % cols;
+      const row = Math.floor(itemIndex / cols);
+      const x = margin + col * ((pageWidth - 2 * margin) / cols);
+      const y = margin + row * (qrSize + 25);
+      
+      try {
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(emp.uid)}&format=png`;
+        const response = await fetch(qrUrl);
+        const blob = await response.blob();
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+        
+        pdf.addImage(base64, 'PNG', x, y, qrSize, qrSize);
+        pdf.setFontSize(8);
+        pdf.text(emp.name.substring(0, 20), x + qrSize / 2, y + qrSize + 4, { align: 'center' });
+        pdf.setFontSize(7);
+        pdf.text(emp.uid, x + qrSize / 2, y + qrSize + 8, { align: 'center' });
+      } catch (error) {
+        console.error(`Failed to add QR for ${emp.uid}:`, error);
+      }
+    }
+    
+    pdf.save(`QR_Codes_${employeesToExport.length}_employees.pdf`);
+    
+    toast({
+      title: "Berhasil",
+      description: `${employeesToExport.length} QR Code telah diunduh`
     });
   };
 

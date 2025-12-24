@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, User, MapPin, Briefcase, Building2, LogOut, Lock, Shield } from 'lucide-react';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog';
+import QRCodeDisplay from '@/components/QRCodeDisplay';
 
 interface UserSession {
   uid: string;
@@ -161,6 +162,14 @@ const UserProfile = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* QR Code Card */}
+        <QRCodeDisplay 
+          uid={userSession.uid} 
+          name={userSession.name} 
+          size={200}
+          showDownload={true}
+        />
       </div>
 
       {/* Change Password Dialog */}
