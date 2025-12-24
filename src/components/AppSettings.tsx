@@ -5,10 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Settings, Save, Image, Monitor, AlertTriangle, Sparkles, Upload, Loader2, X, Building2 } from 'lucide-react';
+import { Settings, Save, Image, Monitor, AlertTriangle, Sparkles, Upload, Loader2, X, Building2, MapPin } from 'lucide-react';
 import FeatureFlagSettings from './FeatureFlagSettings';
+
+interface GeofenceArea {
+  id: string;
+  name: string;
+  is_active: boolean;
+}
 
 const AppSettings = () => {
   const [logoUrl, setLogoUrl] = useState('');
@@ -16,6 +23,8 @@ const AppSettings = () => {
   const [appTitle, setAppTitle] = useState('');
   const [timezone, setTimezone] = useState('WIB');
   const [sharedDeviceMode, setSharedDeviceMode] = useState(false);
+  const [kioskGeofenceArea, setKioskGeofenceArea] = useState<string>('');
+  const [geofenceAreas, setGeofenceAreas] = useState<GeofenceArea[]>([]);
   const [appVersion, setAppVersion] = useState('');
   const [changelog, setChangelog] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,8 +36,13 @@ const AppSettings = () => {
 
   useEffect(() => {
     fetchSettings();
+    fetchGeofenceAreas();
     const localKioskMode = localStorage.getItem('shared_device_mode');
     setSharedDeviceMode(localKioskMode === 'true');
+    const localKioskGeofence = localStorage.getItem('kiosk_geofence_area');
+    if (localKioskGeofence) {
+      setKioskGeofenceArea(localKioskGeofence);
+    }
   }, []);
 
   const fetchSettings = async () => {
@@ -57,17 +71,53 @@ const AppSettings = () => {
     }
   };
 
+  const fetchGeofenceAreas = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('geofence_areas')
+        .select('id, name, is_active')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setGeofenceAreas(data || []);
+    } catch (error) {
+      console.error('Error fetching geofence areas:', error);
+    }
+  };
+
   const handleSharedDeviceModeChange = (checked: boolean) => {
     setSharedDeviceMode(checked);
     if (checked) {
       localStorage.setItem('shared_device_mode', 'true');
     } else {
       localStorage.removeItem('shared_device_mode');
+      // Also clear geofence area when disabling kiosk mode
+      localStorage.removeItem('kiosk_geofence_area');
+      setKioskGeofenceArea('');
     }
     toast({
       title: checked ? "Kiosk Mode Aktif" : "Kiosk Mode Nonaktif",
       description: checked ? "Mode kiosk aktif untuk browser/device ini" : "Mode kiosk dinonaktifkan untuk browser/device ini"
     });
+  };
+
+  const handleKioskGeofenceChange = (geofenceId: string) => {
+    setKioskGeofenceArea(geofenceId);
+    if (geofenceId && geofenceId !== 'none') {
+      localStorage.setItem('kiosk_geofence_area', geofenceId);
+      const selectedArea = geofenceAreas.find(g => g.id === geofenceId);
+      toast({
+        title: "Area Kiosk Diset",
+        description: `Device ini akan menggunakan area "${selectedArea?.name}" untuk absensi kiosk`
+      });
+    } else {
+      localStorage.removeItem('kiosk_geofence_area');
+      toast({
+        title: "Area Kiosk Dihapus",
+        description: "Device ini akan menggunakan GPS untuk validasi lokasi"
+      });
+    }
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>, isCompanyLogo = false) => {
@@ -212,7 +262,7 @@ const AppSettings = () => {
               </div>
 
               {/* Kiosk Mode */}
-              <div className="space-y-2 pt-4 border-t border-gray-200">
+              <div className="space-y-4 pt-4 border-t border-gray-200">
                 <div className="flex items-center justify-between">
                   <div>
                     <Label htmlFor="sharedDeviceMode" className="text-black flex items-center gap-2"><Monitor className="h-4 w-4" />Shared Device Mode (Kiosk)</Label>
@@ -220,6 +270,34 @@ const AppSettings = () => {
                   </div>
                   <Switch id="sharedDeviceMode" checked={sharedDeviceMode} onCheckedChange={handleSharedDeviceModeChange} />
                 </div>
+
+                {/* Kiosk Device Area - Only show when Kiosk mode is enabled */}
+                {sharedDeviceMode && (
+                  <div className="space-y-2 pl-6 border-l-2 border-primary/30">
+                    <Label className="text-black flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Area Device Kiosk
+                    </Label>
+                    <Select value={kioskGeofenceArea || 'none'} onValueChange={handleKioskGeofenceChange}>
+                      <SelectTrigger className="bg-white border-gray-300 text-black">
+                        <SelectValue placeholder="Pilih area geofence..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">-- Gunakan GPS (Default) --</SelectItem>
+                        {geofenceAreas.map((area) => (
+                          <SelectItem key={area.id} value={area.id}>
+                            {area.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-600">
+                      {kioskGeofenceArea && kioskGeofenceArea !== 'none' 
+                        ? "✅ Device ini akan bypass GPS check dan menggunakan area yang dipilih"
+                        : "⚠️ Device ini akan menggunakan GPS untuk validasi lokasi"}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end pt-4">
