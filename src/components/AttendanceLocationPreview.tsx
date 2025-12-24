@@ -1,8 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle, XCircle, MapPin } from 'lucide-react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { CheckCircle, XCircle, MapPin, Loader2 } from 'lucide-react';
 import { PolygonCoordinate } from '@/utils/polygonValidator';
 
 interface AttendanceLocationPreviewProps {
@@ -15,14 +13,6 @@ interface AttendanceLocationPreviewProps {
   className?: string;
 }
 
-// Fix Leaflet default marker icon
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
-
 const AttendanceLocationPreview: React.FC<AttendanceLocationPreviewProps> = ({
   userLat,
   userLng,
@@ -33,22 +23,42 @@ const AttendanceLocationPreview: React.FC<AttendanceLocationPreviewProps> = ({
   className,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const leafletMapRef = useRef<L.Map | null>(null);
+  const leafletMapRef = useRef<any>(null);
+  const [loading, setLoading] = useState(true);
+  const LRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!mapRef.current || leafletMapRef.current) return;
+    const loadMap = async () => {
+      if (!mapRef.current) return;
+      
+      try {
+        // Dynamically import Leaflet
+        const L = await import('leaflet');
+        await import('leaflet/dist/leaflet.css');
+        
+        LRef.current = L.default || L;
+        
+        // Initialize map
+        leafletMapRef.current = LRef.current.map(mapRef.current, {
+          zoomControl: false,
+          attributionControl: false,
+          dragging: false,
+          touchZoom: false,
+          doubleClickZoom: false,
+          scrollWheelZoom: false,
+        }).setView([userLat, userLng], 17);
 
-    // Initialize map
-    leafletMapRef.current = L.map(mapRef.current, {
-      zoomControl: false,
-      attributionControl: false,
-      dragging: false,
-      touchZoom: false,
-      doubleClickZoom: false,
-      scrollWheelZoom: false,
-    }).setView([userLat, userLng], 17);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(leafletMapRef.current);
+        LRef.current.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(leafletMapRef.current);
+        
+        setLoading(false);
+        updateMapLayers();
+      } catch (error) {
+        console.error('Failed to load map:', error);
+        setLoading(false);
+      }
+    };
+    
+    loadMap();
 
     return () => {
       if (leafletMapRef.current) {
@@ -58,25 +68,28 @@ const AttendanceLocationPreview: React.FC<AttendanceLocationPreviewProps> = ({
     };
   }, []);
 
-  useEffect(() => {
-    if (!leafletMapRef.current) return;
+  const updateMapLayers = () => {
+    if (!leafletMapRef.current || !LRef.current) return;
+    
+    const L = LRef.current;
+    const map = leafletMapRef.current;
 
     // Clear existing layers
-    leafletMapRef.current.eachLayer((layer) => {
-      if (!(layer instanceof L.TileLayer)) {
+    map.eachLayer((layer: any) => {
+      if (!(layer._url)) { // Keep tile layer
         layer.remove();
       }
     });
 
     // Draw polygon geofence if available
     if (polygonCoords && polygonCoords.length >= 3) {
-      const latLngs = polygonCoords.map(c => [c.lat, c.lng] as L.LatLngTuple);
+      const latLngs = polygonCoords.map(c => [c.lat, c.lng]);
       L.polygon(latLngs, {
         color: '#22c55e',
         fillColor: '#22c55e',
         fillOpacity: 0.2,
         weight: 2,
-      }).addTo(leafletMapRef.current);
+      }).addTo(map);
     }
 
     // Draw accuracy circle
@@ -87,7 +100,7 @@ const AttendanceLocationPreview: React.FC<AttendanceLocationPreviewProps> = ({
       fillOpacity: 0.1,
       weight: 1,
       dashArray: '4, 4',
-    }).addTo(leafletMapRef.current);
+    }).addTo(map);
 
     // Custom user marker
     const userIcon = L.divIcon({
@@ -106,25 +119,38 @@ const AttendanceLocationPreview: React.FC<AttendanceLocationPreviewProps> = ({
       iconAnchor: [10, 10],
     });
 
-    L.marker([userLat, userLng], { icon: userIcon }).addTo(leafletMapRef.current);
+    L.marker([userLat, userLng], { icon: userIcon }).addTo(map);
 
     // Fit bounds
     if (polygonCoords && polygonCoords.length >= 3) {
       const bounds = L.latLngBounds([
         [userLat, userLng],
-        ...polygonCoords.map(c => [c.lat, c.lng] as L.LatLngTuple)
+        ...polygonCoords.map(c => [c.lat, c.lng])
       ]);
-      leafletMapRef.current.fitBounds(bounds, { padding: [30, 30] });
+      map.fitBounds(bounds, { padding: [30, 30] });
     } else {
-      leafletMapRef.current.setView([userLat, userLng], 17);
+      map.setView([userLat, userLng], 17);
     }
-  }, [userLat, userLng, accuracy, polygonCoords]);
+  };
+
+  useEffect(() => {
+    if (!loading && leafletMapRef.current) {
+      updateMapLayers();
+    }
+  }, [userLat, userLng, accuracy, polygonCoords, loading]);
 
   return (
     <Card className={className}>
       <CardContent className="p-0 overflow-hidden rounded-lg">
         {/* Map */}
-        <div ref={mapRef} className="w-full h-[200px]" style={{ zIndex: 0 }} />
+        <div className="relative">
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          )}
+          <div ref={mapRef} className="w-full h-[200px]" style={{ zIndex: 0 }} />
+        </div>
         
         {/* Status Bar */}
         <div className={`p-3 flex items-center gap-3 ${

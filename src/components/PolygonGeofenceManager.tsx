@@ -4,20 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map } from 'lucide-react';
+import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { calculatePolygonArea, getPolygonCenter, PolygonCoordinate } from '@/utils/polygonValidator';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-// Fix Leaflet default marker icon issue
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
 
 interface GeofenceArea {
   id: string;
@@ -36,19 +26,46 @@ const PolygonGeofenceManager: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mapLoading, setMapLoading] = useState(true);
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
   
   const mapRef = useRef<HTMLDivElement>(null);
-  const leafletMapRef = useRef<L.Map | null>(null);
-  const markersRef = useRef<L.Marker[]>([]);
-  const polygonLayerRef = useRef<L.Polygon | null>(null);
-  const geofenceLayersRef = useRef<L.Polygon[]>([]);
+  const leafletMapRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const polygonLayerRef = useRef<any>(null);
+  const geofenceLayersRef = useRef<any[]>([]);
+  const LRef = useRef<any>(null);
 
   useEffect(() => {
     fetchGeofences();
+    loadLeaflet();
   }, []);
 
+  const loadLeaflet = async () => {
+    try {
+      // Dynamically import Leaflet
+      const L = await import('leaflet');
+      await import('leaflet/dist/leaflet.css');
+      
+      // Fix default marker icons
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+      });
+      
+      LRef.current = L.default || L;
+      setLeafletLoaded(true);
+      setMapLoading(false);
+    } catch (error) {
+      console.error('Failed to load Leaflet:', error);
+      setMapLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (mapRef.current && !leafletMapRef.current) {
+    if (leafletLoaded && mapRef.current && !leafletMapRef.current) {
       initializeMap();
     }
     
@@ -58,19 +75,19 @@ const PolygonGeofenceManager: React.FC = () => {
         leafletMapRef.current = null;
       }
     };
-  }, []);
+  }, [leafletLoaded]);
 
   useEffect(() => {
-    if (leafletMapRef.current) {
+    if (leafletMapRef.current && leafletLoaded) {
       drawExistingGeofences();
     }
-  }, [geofences]);
+  }, [geofences, leafletLoaded]);
 
   const initializeMap = () => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !LRef.current) return;
     
-    // Default to Jakarta
-    const defaultCenter: L.LatLngExpression = [-6.2088, 106.8456];
+    const L = LRef.current;
+    const defaultCenter = [-6.2088, 106.8456];
     
     leafletMapRef.current = L.map(mapRef.current).setView(defaultCenter, 15);
     
@@ -78,7 +95,6 @@ const PolygonGeofenceManager: React.FC = () => {
       attribution: '© OpenStreetMap contributors'
     }).addTo(leafletMapRef.current);
     
-    // Try to get current location
     navigator.geolocation.getCurrentPosition(
       (position) => {
         if (leafletMapRef.current) {
@@ -101,7 +117,6 @@ const PolygonGeofenceManager: React.FC = () => {
 
       if (error) throw error;
       
-      // Parse coordinates from JSON
       const parsed = (data || []).map(g => ({
         ...g,
         coordinates: g.coordinates ? (g.coordinates as unknown as PolygonCoordinate[]) : null
@@ -119,15 +134,16 @@ const PolygonGeofenceManager: React.FC = () => {
   };
 
   const drawExistingGeofences = () => {
-    if (!leafletMapRef.current) return;
+    if (!leafletMapRef.current || !LRef.current) return;
     
-    // Clear existing layers
+    const L = LRef.current;
+    
     geofenceLayersRef.current.forEach(layer => layer.remove());
     geofenceLayersRef.current = [];
     
     geofences.forEach(geofence => {
       if (geofence.coordinates && geofence.coordinates.length >= 3) {
-        const latLngs = geofence.coordinates.map(c => [c.lat, c.lng] as L.LatLngTuple);
+        const latLngs = geofence.coordinates.map(c => [c.lat, c.lng]);
         const polygon = L.polygon(latLngs, {
           color: geofence.is_active ? '#22c55e' : '#9ca3af',
           fillColor: geofence.is_active ? '#22c55e' : '#9ca3af',
@@ -138,7 +154,6 @@ const PolygonGeofenceManager: React.FC = () => {
         polygon.bindPopup(`<strong>${geofence.name}</strong><br/>Status: ${geofence.is_active ? 'Aktif' : 'Nonaktif'}`);
         geofenceLayersRef.current.push(polygon);
       } else if (geofence.center_lat && geofence.center_lng && geofence.radius) {
-        // Draw circle for radius-based geofence
         const circle = L.circle([geofence.center_lat, geofence.center_lng], {
           radius: geofence.radius,
           color: geofence.is_active ? '#22c55e' : '#9ca3af',
@@ -153,13 +168,11 @@ const PolygonGeofenceManager: React.FC = () => {
   };
 
   const startDrawing = () => {
-    if (!leafletMapRef.current) return;
+    if (!leafletMapRef.current || !LRef.current) return;
     
     setIsDrawing(true);
     setCurrentPolygon([]);
     clearDrawingLayers();
-    
-    leafletMapRef.current.on('click', handleMapClick);
     
     toast({
       title: "Mode Menggambar",
@@ -167,57 +180,62 @@ const PolygonGeofenceManager: React.FC = () => {
     });
   };
 
-  const handleMapClick = useCallback((e: L.LeafletMouseEvent) => {
-    if (!isDrawing || !leafletMapRef.current) return;
-    
-    const { lat, lng } = e.latlng;
-    const newPoint: PolygonCoordinate = { lat, lng };
-    
-    setCurrentPolygon(prev => {
-      const updated = [...prev, newPoint];
-      
-      // Add marker
-      const marker = L.marker([lat, lng], {
-        draggable: true,
-      }).addTo(leafletMapRef.current!);
-      
-      marker.on('drag', (event) => {
-        const newPos = (event.target as L.Marker).getLatLng();
-        const markerIndex = markersRef.current.indexOf(marker);
-        setCurrentPolygon(p => {
-          const newPolygon = [...p];
-          newPolygon[markerIndex] = { lat: newPos.lat, lng: newPos.lng };
-          return newPolygon;
-        });
-      });
-      
-      markersRef.current.push(marker);
-      
-      // Update polygon layer
-      updatePolygonLayer(updated);
-      
-      return updated;
-    });
-  }, [isDrawing]);
-
   useEffect(() => {
-    if (leafletMapRef.current) {
-      leafletMapRef.current.off('click');
-      if (isDrawing) {
-        leafletMapRef.current.on('click', handleMapClick);
-      }
+    if (!leafletMapRef.current || !LRef.current) return;
+    
+    const L = LRef.current;
+    const map = leafletMapRef.current;
+    
+    const handleMapClick = (e: any) => {
+      if (!isDrawing) return;
+      
+      const { lat, lng } = e.latlng;
+      const newPoint: PolygonCoordinate = { lat, lng };
+      
+      setCurrentPolygon(prev => {
+        const updated = [...prev, newPoint];
+        
+        const marker = L.marker([lat, lng], {
+          draggable: true,
+        }).addTo(map);
+        
+        marker.on('drag', (event: any) => {
+          const newPos = event.target.getLatLng();
+          const markerIndex = markersRef.current.indexOf(marker);
+          setCurrentPolygon(p => {
+            const newPolygon = [...p];
+            newPolygon[markerIndex] = { lat: newPos.lat, lng: newPos.lng };
+            return newPolygon;
+          });
+        });
+        
+        markersRef.current.push(marker);
+        updatePolygonLayer(updated);
+        
+        return updated;
+      });
+    };
+    
+    if (isDrawing) {
+      map.on('click', handleMapClick);
     }
-  }, [isDrawing, handleMapClick]);
+    
+    return () => {
+      map.off('click', handleMapClick);
+    };
+  }, [isDrawing, leafletLoaded]);
 
   const updatePolygonLayer = (coords: PolygonCoordinate[]) => {
-    if (!leafletMapRef.current) return;
+    if (!leafletMapRef.current || !LRef.current) return;
+    
+    const L = LRef.current;
     
     if (polygonLayerRef.current) {
       polygonLayerRef.current.remove();
     }
     
     if (coords.length >= 3) {
-      const latLngs = coords.map(c => [c.lat, c.lng] as L.LatLngTuple);
+      const latLngs = coords.map(c => [c.lat, c.lng]);
       polygonLayerRef.current = L.polygon(latLngs, {
         color: '#3b82f6',
         fillColor: '#3b82f6',
@@ -229,8 +247,10 @@ const PolygonGeofenceManager: React.FC = () => {
   };
 
   useEffect(() => {
-    updatePolygonLayer(currentPolygon);
-  }, [currentPolygon]);
+    if (leafletLoaded) {
+      updatePolygonLayer(currentPolygon);
+    }
+  }, [currentPolygon, leafletLoaded]);
 
   const clearDrawingLayers = () => {
     markersRef.current.forEach(m => m.remove());
@@ -262,10 +282,6 @@ const PolygonGeofenceManager: React.FC = () => {
     setCurrentPolygon([]);
     setEditingId(null);
     setName('');
-    
-    if (leafletMapRef.current) {
-      leafletMapRef.current.off('click');
-    }
   };
 
   const savePolygon = async () => {
@@ -291,8 +307,6 @@ const PolygonGeofenceManager: React.FC = () => {
     
     try {
       const center = getPolygonCenter(currentPolygon);
-      
-      // Convert coordinates to JSON-compatible format
       const coordinatesJson = currentPolygon.map(c => ({ lat: c.lat, lng: c.lng }));
       
       const geofenceData = {
@@ -300,7 +314,7 @@ const PolygonGeofenceManager: React.FC = () => {
         coordinates: coordinatesJson as unknown as any,
         center_lat: center?.lat || null,
         center_lng: center?.lng || null,
-        radius: null, // Polygon mode doesn't use radius
+        radius: null,
         is_active: true,
       };
       
@@ -344,6 +358,10 @@ const PolygonGeofenceManager: React.FC = () => {
   };
 
   const editGeofence = (geofence: GeofenceArea) => {
+    if (!LRef.current || !leafletMapRef.current) return;
+    
+    const L = LRef.current;
+    
     setEditingId(geofence.id);
     setName(geofence.name);
     
@@ -351,33 +369,27 @@ const PolygonGeofenceManager: React.FC = () => {
       setCurrentPolygon(geofence.coordinates);
       setIsDrawing(true);
       
-      // Add markers for existing polygon
       clearDrawingLayers();
       geofence.coordinates.forEach(coord => {
-        if (leafletMapRef.current) {
-          const marker = L.marker([coord.lat, coord.lng], {
-            draggable: true,
-          }).addTo(leafletMapRef.current);
-          
-          marker.on('drag', (event) => {
-            const newPos = (event.target as L.Marker).getLatLng();
-            const markerIndex = markersRef.current.indexOf(marker);
-            setCurrentPolygon(p => {
-              const newPolygon = [...p];
-              newPolygon[markerIndex] = { lat: newPos.lat, lng: newPos.lng };
-              return newPolygon;
-            });
+        const marker = L.marker([coord.lat, coord.lng], {
+          draggable: true,
+        }).addTo(leafletMapRef.current);
+        
+        marker.on('drag', (event: any) => {
+          const newPos = event.target.getLatLng();
+          const markerIndex = markersRef.current.indexOf(marker);
+          setCurrentPolygon(p => {
+            const newPolygon = [...p];
+            newPolygon[markerIndex] = { lat: newPos.lat, lng: newPos.lng };
+            return newPolygon;
           });
-          
-          markersRef.current.push(marker);
-        }
+        });
+        
+        markersRef.current.push(marker);
       });
       
-      // Zoom to polygon
-      if (leafletMapRef.current) {
-        const bounds = L.latLngBounds(geofence.coordinates.map(c => [c.lat, c.lng]));
-        leafletMapRef.current.fitBounds(bounds, { padding: [50, 50] });
-      }
+      const bounds = L.latLngBounds(geofence.coordinates.map(c => [c.lat, c.lng]));
+      leafletMapRef.current.fitBounds(bounds, { padding: [50, 50] });
     }
   };
 
@@ -449,7 +461,7 @@ const PolygonGeofenceManager: React.FC = () => {
           {/* Drawing Controls */}
           <div className="flex flex-wrap gap-2">
             {!isDrawing ? (
-              <Button onClick={startDrawing}>
+              <Button onClick={startDrawing} disabled={!leafletLoaded}>
                 <Plus className="h-4 w-4 mr-2" />
                 Gambar Area Baru
               </Button>
@@ -506,11 +518,18 @@ const PolygonGeofenceManager: React.FC = () => {
           )}
           
           {/* Map Container */}
-          <div 
-            ref={mapRef} 
-            className="w-full h-[400px] rounded-lg border overflow-hidden"
-            style={{ zIndex: 0 }}
-          />
+          <div className="relative">
+            {mapLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-lg z-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            )}
+            <div 
+              ref={mapRef} 
+              className="w-full h-[400px] rounded-lg border overflow-hidden"
+              style={{ zIndex: 0 }}
+            />
+          </div>
         </CardContent>
       </Card>
       
@@ -562,6 +581,7 @@ const PolygonGeofenceManager: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => editGeofence(geofence)}
+                        disabled={!leafletLoaded}
                       >
                         <Edit className="h-4 w-4 mr-2" />
                         Edit
