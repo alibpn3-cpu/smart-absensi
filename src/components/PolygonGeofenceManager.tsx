@@ -41,11 +41,29 @@ const PolygonGeofenceManager: React.FC = () => {
   const geofenceLayersRef = useRef<any[]>([]);
   const LRef = useRef<any>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  
+  // Refs to hold latest state for click handler closure
+  const editingGeofenceRef = useRef<GeofenceArea | null>(null);
+  const currentPolygonRef = useRef<PolygonCoordinate[]>([]);
+  const radiusRef = useRef<number>(100);
 
   useEffect(() => {
     fetchGeofences();
     loadLeaflet();
   }, []);
+
+  // Sync refs with state
+  useEffect(() => {
+    editingGeofenceRef.current = editingGeofence;
+  }, [editingGeofence]);
+
+  useEffect(() => {
+    currentPolygonRef.current = currentPolygon;
+  }, [currentPolygon]);
+
+  useEffect(() => {
+    radiusRef.current = radius;
+  }, [radius]);
 
   const loadLeaflet = async () => {
     try {
@@ -184,14 +202,23 @@ const PolygonGeofenceManager: React.FC = () => {
     const map = leafletMapRef.current;
     
     map.on('click', (e: any) => {
-      // Only allow adding points for polygon mode (new or editing polygon)
-      if (editingGeofence && !editingGeofence.coordinates) {
+      // Use refs to get latest state (avoid closure bug)
+      const currentGeofence = editingGeofenceRef.current;
+      const polygonPoints = currentPolygonRef.current;
+      const currentRadius = radiusRef.current;
+      
+      // Check if in polygon mode: coordinates exists AND has at least 1 point
+      const isPolygonMode = currentGeofence?.coordinates && currentGeofence.coordinates.length > 0;
+      
+      // If NOT polygon mode (radius mode or new mode without polygon), handle radius
+      if (currentGeofence && !isPolygonMode && polygonPoints.length === 0) {
         // Radius mode - move center
         const { lat, lng } = e.latlng;
-        drawRadiusCircle(lat, lng, radius);
+        drawRadiusCircle(lat, lng, currentRadius);
         return;
       }
       
+      // Polygon mode - add new point
       const { lat, lng } = e.latlng;
       const newPoint: PolygonCoordinate = { lat, lng };
       
