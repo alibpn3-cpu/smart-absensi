@@ -815,20 +815,57 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     setLoading(true);
     
     try {
-      // Get location
-      const location = await requestLocationPermission();
+      // Check if kiosk has a pre-assigned geofence area
+      const kioskGeofenceAreaId = localStorage.getItem('kiosk_geofence_area');
+      let locationAddress = '';
+      let locationLat: number | null = null;
+      let locationLng: number | null = null;
       
-      // Check geofence for WFO
-      const geofenceResult = await checkGeofence(location.lat, location.lng, location.accuracy);
-      
-      if (!geofenceResult.isInGeofence && action.action === 'check-in') {
-        toast({
-          title: "❌ Di Luar Area Kantor",
-          description: "Anda harus berada di area kantor untuk check in WFO di Kiosk Mode",
-          variant: "destructive"
-        });
-        resetKioskState();
-        return;
+      if (kioskGeofenceAreaId) {
+        // Kiosk has assigned geofence - BYPASS GPS check
+        console.log('📍 Kiosk Mode: Using pre-assigned geofence area, bypassing GPS');
+        
+        // Get the geofence name from database
+        const { data: geofenceData } = await supabase
+          .from('geofence_areas')
+          .select('name, center_lat, center_lng')
+          .eq('id', kioskGeofenceAreaId)
+          .maybeSingle();
+        
+        if (geofenceData) {
+          locationAddress = geofenceData.name;
+          locationLat = geofenceData.center_lat;
+          locationLng = geofenceData.center_lng;
+          console.log(`✅ Using kiosk geofence: ${locationAddress}`);
+        } else {
+          // Fallback if geofence not found
+          console.warn('⚠️ Kiosk geofence not found, falling back to GPS');
+          const location = await requestLocationPermission();
+          locationAddress = location.address;
+          locationLat = location.lat;
+          locationLng = location.lng;
+        }
+      } else {
+        // No pre-assigned geofence - use GPS validation
+        console.log('📍 Kiosk Mode: No assigned area, using GPS validation');
+        const location = await requestLocationPermission();
+        
+        // Check geofence for WFO
+        const geofenceResult = await checkGeofence(location.lat, location.lng, location.accuracy);
+        
+        if (!geofenceResult.isInGeofence && action.action === 'check-in') {
+          toast({
+            title: "❌ Di Luar Area Kantor",
+            description: "Anda harus berada di area kantor untuk check in WFO di Kiosk Mode",
+            variant: "destructive"
+          });
+          resetKioskState();
+          return;
+        }
+        
+        locationAddress = geofenceResult.geofenceName || location.address;
+        locationLat = location.lat;
+        locationLng = location.lng;
       }
       
       // Get today's attendance for this staff
@@ -890,8 +927,6 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const offM = pad(Math.abs(tzMin) % 60);
       const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
       
-      const locationAddress = geofenceResult.geofenceName || location.address;
-      
       if (action.action === 'check-in') {
         const { error } = await supabase
           .from('attendance_records')
@@ -903,15 +938,15 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             attendance_type: action.type,
             check_in_time: formattedTime,
             checkin_location_address: locationAddress,
-            checkin_location_lat: location.lat,
-            checkin_location_lng: location.lng
+            checkin_location_lat: locationLat,
+            checkin_location_lng: locationLng
           });
         
         if (error) throw error;
         
         toast({
           title: `✅ Clock In Berhasil`,
-          description: `${staff.name} - ${locationAddress}\n📍 ${location.coordinates}`
+          description: `${staff.name} - ${locationAddress}`
         });
       } else {
         const hoursWorked = existingAttendance?.check_in_time 
@@ -923,8 +958,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           .update({
             check_out_time: formattedTime,
             checkout_location_address: locationAddress,
-            checkout_location_lat: location.lat,
-            checkout_location_lng: location.lng,
+            checkout_location_lat: locationLat,
+            checkout_location_lng: locationLng,
             hours_worked: hoursWorked
           })
           .eq('id', existingAttendance.id);
@@ -933,7 +968,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         
         toast({
           title: `✅ Clock Out Berhasil`,
-          description: `${staff.name} - ${locationAddress}\n📍 ${location.coordinates}`
+          description: `${staff.name} - ${locationAddress}`
         });
       }
       
