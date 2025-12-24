@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trophy, Medal, Award, Star } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Trophy, Medal, Award, Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 
 interface RankingUser {
@@ -23,25 +25,54 @@ interface MedalTier {
 const RankingCard = () => {
   const [rankings, setRankings] = useState<MedalTier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentMonth, setCurrentMonth] = useState('');
+  
+  // Month/Year selection
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  const months = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  // Generate available years (current year - 2 to current year)
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 3 }, (_, i) => currentYear - 2 + i);
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      if (selectedMonth === 0) {
+        setSelectedMonth(11);
+        setSelectedYear(prev => prev - 1);
+      } else {
+        setSelectedMonth(prev => prev - 1);
+      }
+    } else {
+      if (selectedMonth === 11) {
+        setSelectedMonth(0);
+        setSelectedYear(prev => prev + 1);
+      } else {
+        setSelectedMonth(prev => prev + 1);
+      }
+    }
+  };
 
   useEffect(() => {
     const fetchRankings = async () => {
+      setIsLoading(true);
       try {
-        // Get current month date range
-        const now = new Date();
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-        const today = now.toISOString().split('T')[0];
+        // Get selected month date range
+        const firstDay = new Date(selectedYear, selectedMonth, 1);
+        const lastDay = new Date(selectedYear, selectedMonth + 1, 0);
         const firstDayStr = firstDay.toISOString().split('T')[0];
-        
-        setCurrentMonth(now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }));
+        const lastDayStr = lastDay.toISOString().split('T')[0];
 
-        // Get all scores for this month
+        // Get all scores for selected month
         const { data: scores, error } = await supabase
           .from('daily_scores')
           .select('staff_uid, staff_name, final_score')
           .gte('score_date', firstDayStr)
-          .lte('score_date', today);
+          .lte('score_date', lastDayStr);
 
         if (error) throw error;
 
@@ -128,7 +159,7 @@ const RankingCard = () => {
     };
 
     fetchRankings();
-  }, []);
+  }, [selectedMonth, selectedYear]);
 
   if (isLoading) {
     return (
@@ -144,57 +175,102 @@ const RankingCard = () => {
     );
   }
 
-  if (rankings.length === 0) {
-    return (
-      <Card className="border-0 shadow-lg bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-900/50 dark:to-gray-900/50">
-        <CardContent className="p-4 text-center">
-          <Trophy className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">
-            Belum ada data ranking bulan ini
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card className="border-0 shadow-lg overflow-hidden">
       <CardHeader className="pb-2 pt-3 px-4 bg-gradient-to-r from-primary/10 to-primary/5">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <Trophy className="h-4 w-4 text-primary" />
-          Ranking {currentMonth}
+          Ranking Bulanan
         </CardTitle>
+        {/* Month/Year Selector */}
+        <div className="flex items-center gap-1 mt-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => navigateMonth('prev')}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Select
+            value={selectedMonth.toString()}
+            onValueChange={(v) => setSelectedMonth(parseInt(v))}
+          >
+            <SelectTrigger className="h-7 text-xs w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {months.map((month, idx) => (
+                <SelectItem key={idx} value={idx.toString()}>
+                  {month}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={selectedYear.toString()}
+            onValueChange={(v) => setSelectedYear(parseInt(v))}
+          >
+            <SelectTrigger className="h-7 text-xs w-16">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((year) => (
+                <SelectItem key={year} value={year.toString()}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => navigateMonth('next')}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="p-3 space-y-2">
-        {rankings.map((tier) => (
-          <div key={tier.name} className={`rounded-lg p-2 ${tier.bgColor}`}>
-            <div className={`flex items-center gap-1.5 mb-1.5 ${tier.color}`}>
-              {tier.icon}
-              <span className="text-xs font-semibold">{tier.name}</span>
-              <span className="text-xs opacity-70">≥{tier.minScore}</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {tier.users.map((user, idx) => (
-                <div key={user.staff_uid} className="flex items-center gap-2 bg-background/80 rounded-full px-2 py-1">
-                  <Avatar className="h-6 w-6 border border-border">
-                    <AvatarImage src={user.photo_url} alt={user.staff_name} />
-                    <AvatarFallback className="text-[10px] bg-primary/10">
-                      {user.staff_name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs font-medium truncate max-w-[80px]">
-                      {user.staff_name.split(' ')[0]}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {user.avg_score.toFixed(1)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {rankings.length === 0 ? (
+          <div className="text-center py-4">
+            <Trophy className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Belum ada data ranking untuk {months[selectedMonth]} {selectedYear}
+            </p>
           </div>
-        ))}
+        ) : (
+          rankings.map((tier) => (
+            <div key={tier.name} className={`rounded-lg p-2 ${tier.bgColor}`}>
+              <div className={`flex items-center gap-1.5 mb-1.5 ${tier.color}`}>
+                {tier.icon}
+                <span className="text-xs font-semibold">{tier.name}</span>
+                <span className="text-xs opacity-70">≥{tier.minScore}</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {tier.users.map((user) => (
+                  <div key={user.staff_uid} className="flex items-center gap-2 bg-background/80 rounded-full px-2 py-1">
+                    <Avatar className="h-6 w-6 border border-border">
+                      <AvatarImage src={user.photo_url} alt={user.staff_name} />
+                      <AvatarFallback className="text-[10px] bg-primary/10">
+                        {user.staff_name.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-medium truncate max-w-[80px]">
+                        {user.staff_name.split(' ')[0]}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {user.avg_score.toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
       </CardContent>
     </Card>
   );

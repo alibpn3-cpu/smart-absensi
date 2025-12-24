@@ -37,6 +37,7 @@ const AdManager = React.lazy(() => import('../components/AdManager'));
 import ActivityLogViewer from '../components/ActivityLogViewer';
 import NotCheckedInList from '../components/NotCheckedInList';
 const DashboardAnalytics = React.lazy(() => import('../components/DashboardAnalytics'));
+const ScoreReport = React.lazy(() => import('../components/ScoreReport'));
 import { PieChart as RePieChart, Pie, Cell } from 'recharts';
 
 interface AttendanceRecord {
@@ -378,7 +379,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
-          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSuperAdmin ? 'grid-cols-3 sm:grid-cols-11' : 'grid-cols-3 sm:grid-cols-7'}`}>
+          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSuperAdmin ? 'grid-cols-3 sm:grid-cols-12' : 'grid-cols-3 sm:grid-cols-8'}`}>
             <TabsTrigger value="attendance" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Attendance</span>
               <span className="sm:hidden">Absen</span>
@@ -418,6 +419,11 @@ const Dashboard = () => {
                 </TabsTrigger>
               </>
             )}
+            <TabsTrigger value="scores" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Scores</span>
+              <span className="sm:hidden">Score</span>
+            </TabsTrigger>
             <TabsTrigger value="export" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Export</span>
@@ -759,6 +765,12 @@ const Dashboard = () => {
 
           <TabsContent value="logs">
             <ActivityLogViewer />
+          </TabsContent>
+
+          <TabsContent value="scores">
+            <React.Suspense fallback={<div className="text-center py-8">Loading Score Report...</div>}>
+              <ScoreReport />
+            </React.Suspense>
           </TabsContent>
 
           <TabsContent value="export">
