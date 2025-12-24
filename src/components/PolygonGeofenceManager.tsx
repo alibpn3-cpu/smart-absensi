@@ -4,17 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2, ExternalLink, Circle, RefreshCw } from 'lucide-react';
+import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2, ExternalLink, Circle, RefreshCw, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { calculatePolygonArea, getPolygonCenter, PolygonCoordinate, sanitizeCoordinates, circleToPolygon } from '@/utils/polygonValidator';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
 import * as turf from '@turf/turf';
 
 interface GeofenceArea {
@@ -31,7 +24,7 @@ const PolygonGeofenceManager: React.FC = () => {
   const [geofences, setGeofences] = useState<GeofenceArea[]>([]);
   const [currentPolygon, setCurrentPolygon] = useState<PolygonCoordinate[]>([]);
   const [editingGeofence, setEditingGeofence] = useState<GeofenceArea | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isNewMode, setIsNewMode] = useState(false);
   const [name, setName] = useState('');
   const [radius, setRadius] = useState<number>(100);
@@ -40,12 +33,14 @@ const PolygonGeofenceManager: React.FC = () => {
   const [leafletLoaded, setLeafletLoaded] = useState(false);
   
   const mapRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const polygonLayerRef = useRef<any>(null);
   const circleLayerRef = useRef<any>(null);
   const geofenceLayersRef = useRef<any[]>([]);
   const LRef = useRef<any>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   useEffect(() => {
     fetchGeofences();
@@ -55,7 +50,7 @@ const PolygonGeofenceManager: React.FC = () => {
   const loadLeaflet = async () => {
     try {
       const L = await import('leaflet');
-      await import('leaflet/dist/leaflet.css');
+      // CSS is now imported globally in index.css
       
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
@@ -73,33 +68,67 @@ const PolygonGeofenceManager: React.FC = () => {
     }
   };
 
-  // Initialize map when dialog opens
+  // Initialize map when editor opens (inline panel)
   useEffect(() => {
-    if (isDialogOpen && leafletLoaded && mapRef.current) {
-      // Longer delay to ensure dialog DOM is fully ready
-      const timer = setTimeout(() => {
-        if (!leafletMapRef.current) {
-          initializeMap();
-        }
-        // Force invalidateSize after map is initialized
-        setTimeout(() => {
-          if (leafletMapRef.current) {
-            leafletMapRef.current.invalidateSize();
+    if (isEditorOpen && leafletLoaded && mapRef.current) {
+      // Use requestAnimationFrame to wait for container to be ready
+      let attempts = 0;
+      const maxAttempts = 20;
+      
+      const checkAndInit = () => {
+        attempts++;
+        const container = mapRef.current;
+        
+        if (container && container.offsetWidth > 0 && container.offsetHeight > 0) {
+          if (!leafletMapRef.current) {
+            try {
+              initializeMap();
+            } catch (e) {
+              console.error('Map init error:', e);
+              toast({
+                title: "Error",
+                description: "Gagal menginisialisasi peta",
+                variant: "destructive"
+              });
+            }
           }
-        }, 100);
-      }, 300);
-      return () => clearTimeout(timer);
+          // Call invalidateSize multiple times to ensure proper rendering
+          [0, 100, 300, 600].forEach(delay => {
+            setTimeout(() => {
+              leafletMapRef.current?.invalidateSize();
+            }, delay);
+          });
+        } else if (attempts < maxAttempts) {
+          requestAnimationFrame(checkAndInit);
+        }
+      };
+      
+      // Start checking after a short delay
+      setTimeout(checkAndInit, 50);
+      
+      // Setup ResizeObserver for dynamic size changes
+      if (mapRef.current && !resizeObserverRef.current) {
+        resizeObserverRef.current = new ResizeObserver(() => {
+          leafletMapRef.current?.invalidateSize();
+        });
+        resizeObserverRef.current.observe(mapRef.current);
+      }
     }
-  }, [isDialogOpen, leafletLoaded]);
+  }, [isEditorOpen, leafletLoaded]);
 
-  // Cleanup map when dialog closes
+  // Cleanup map when editor closes
   useEffect(() => {
-    if (!isDialogOpen && leafletMapRef.current) {
+    if (!isEditorOpen && leafletMapRef.current) {
       leafletMapRef.current.remove();
       leafletMapRef.current = null;
       clearDrawingLayers();
+      
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+        resizeObserverRef.current = null;
+      }
     }
-  }, [isDialogOpen]);
+  }, [isEditorOpen]);
 
   const initializeMap = () => {
     if (!mapRef.current || !LRef.current) return;
@@ -267,10 +296,10 @@ const PolygonGeofenceManager: React.FC = () => {
   };
 
   useEffect(() => {
-    if (leafletLoaded && isDialogOpen) {
+    if (leafletLoaded && isEditorOpen) {
       updatePolygonLayer(currentPolygon);
     }
-  }, [currentPolygon, leafletLoaded, isDialogOpen]);
+  }, [currentPolygon, leafletLoaded, isEditorOpen]);
 
   // Update circle when radius changes
   useEffect(() => {
@@ -341,26 +370,34 @@ const PolygonGeofenceManager: React.FC = () => {
     setCurrentPolygon([]);
   };
 
-  const openNewDialog = () => {
+  const openNewEditor = () => {
     setEditingGeofence(null);
     setIsNewMode(true);
     setName('');
     setCurrentPolygon([]);
     setRadius(100);
-    setIsDialogOpen(true);
+    setIsEditorOpen(true);
+    // Scroll to editor after a short delay
+    setTimeout(() => {
+      editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
-  const openEditDialog = (geofence: GeofenceArea) => {
+  const openEditEditor = (geofence: GeofenceArea) => {
     setEditingGeofence(geofence);
     setIsNewMode(false);
     setName(geofence.name);
     setRadius(geofence.radius || 100);
     setCurrentPolygon([]);
-    setIsDialogOpen(true);
+    setIsEditorOpen(true);
+    // Scroll to editor after a short delay
+    setTimeout(() => {
+      editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
-  const closeDialog = () => {
-    setIsDialogOpen(false);
+  const closeEditor = () => {
+    setIsEditorOpen(false);
     setEditingGeofence(null);
     setIsNewMode(false);
     setName('');
@@ -444,7 +481,7 @@ const PolygonGeofenceManager: React.FC = () => {
         });
       }
       
-      closeDialog();
+      closeEditor();
       fetchGeofences();
     } catch (error) {
       console.error('Error saving geofence:', error);
@@ -579,7 +616,7 @@ const PolygonGeofenceManager: React.FC = () => {
             <Map className="h-5 w-5" />
             Semua Area Geofence
           </CardTitle>
-          <Button onClick={openNewDialog} disabled={!leafletLoaded}>
+          <Button onClick={openNewEditor} disabled={!leafletLoaded || isEditorOpen}>
             <Plus className="h-4 w-4 mr-2" />
             Tambah Area Baru
           </Button>
@@ -596,7 +633,11 @@ const PolygonGeofenceManager: React.FC = () => {
               {geofences.map((geofence) => (
                 <div
                   key={geofence.id}
-                  className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                  className={`border rounded-lg p-4 transition-colors ${
+                    editingGeofence?.id === geofence.id 
+                      ? 'bg-primary/10 border-primary' 
+                      : 'hover:bg-muted/50'
+                  }`}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex-1">
@@ -636,8 +677,8 @@ const PolygonGeofenceManager: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => openEditDialog(geofence)}
-                        disabled={!leafletLoaded}
+                        onClick={() => openEditEditor(geofence)}
+                        disabled={!leafletLoaded || (isEditorOpen && editingGeofence?.id !== geofence.id)}
                       >
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
@@ -646,6 +687,7 @@ const PolygonGeofenceManager: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => deleteGeofence(geofence.id)}
+                        disabled={isEditorOpen && editingGeofence?.id === geofence.id}
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
                         Hapus
@@ -671,22 +713,26 @@ const PolygonGeofenceManager: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Edit/Create Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+      {/* Inline Editor Panel (instead of Dialog for better Leaflet compatibility) */}
+      {isEditorOpen && (
+        <Card ref={editorRef} className="border-primary">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="flex items-center gap-2">
               <Map className="h-5 w-5" />
               {editingGeofence ? `Edit: ${editingGeofence.name}` : 'Buat Area Geofence Baru'}
-            </DialogTitle>
-            <DialogDescription>
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={closeEditor}>
+              <ChevronUp className="h-4 w-4 mr-1" />
+              Tutup
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
               {isRadiusMode 
                 ? 'Klik pada peta untuk memindahkan titik tengah, atau ubah radius di bawah.'
                 : 'Klik pada peta untuk menambahkan titik polygon. Drag marker untuk mengubah posisi.'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
+            </p>
+            
             {/* Name Input */}
             <div className="space-y-2">
               <Label htmlFor="geofence-name">Nama Area</Label>
@@ -770,7 +816,7 @@ const PolygonGeofenceManager: React.FC = () => {
             
             {/* Action Buttons */}
             <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button variant="outline" onClick={closeDialog}>
+              <Button variant="outline" onClick={closeEditor}>
                 <X className="h-4 w-4 mr-2" />
                 Batal
               </Button>
@@ -782,9 +828,9 @@ const PolygonGeofenceManager: React.FC = () => {
                 {loading ? 'Menyimpan...' : (editingGeofence ? 'Simpan Perubahan' : 'Buat Area')}
               </Button>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
