@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2, ExternalLink, Circle } from 'lucide-react';
+import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2, ExternalLink, Circle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { calculatePolygonArea, getPolygonCenter, PolygonCoordinate, sanitizeCoordinates } from '@/utils/polygonValidator';
+import { calculatePolygonArea, getPolygonCenter, PolygonCoordinate, sanitizeCoordinates, circleToPolygon } from '@/utils/polygonValidator';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import * as turf from '@turf/turf';
 
 interface GeofenceArea {
   id: string;
@@ -74,11 +75,19 @@ const PolygonGeofenceManager: React.FC = () => {
 
   // Initialize map when dialog opens
   useEffect(() => {
-    if (isDialogOpen && leafletLoaded && mapRef.current && !leafletMapRef.current) {
-      // Small delay to ensure DOM is ready
+    if (isDialogOpen && leafletLoaded && mapRef.current) {
+      // Longer delay to ensure dialog DOM is fully ready
       const timer = setTimeout(() => {
-        initializeMap();
-      }, 100);
+        if (!leafletMapRef.current) {
+          initializeMap();
+        }
+        // Force invalidateSize after map is initialized
+        setTimeout(() => {
+          if (leafletMapRef.current) {
+            leafletMapRef.current.invalidateSize();
+          }
+        }, 100);
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [isDialogOpen, leafletLoaded]);
@@ -504,6 +513,63 @@ const PolygonGeofenceManager: React.FC = () => {
   const polygonArea = calculatePolygonArea(currentPolygon);
   const isRadiusMode = editingGeofence && !editingGeofence.coordinates;
 
+  // Convert radius-based geofence to polygon
+  const convertRadiusToPolygon = () => {
+    if (!editingGeofence?.center_lat || !editingGeofence?.center_lng) {
+      toast({
+        title: "Gagal",
+        description: "Titik tengah tidak ditemukan",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const centerLng = editingGeofence.center_lng;
+    const centerLat = editingGeofence.center_lat;
+    const radiusKm = (editingGeofence.radius || 100) / 1000;
+
+    try {
+      // Use Turf.js to create circle polygon
+      const circlePolygon = turf.circle([centerLng, centerLat], radiusKm, { 
+        steps: 32, 
+        units: 'kilometers' 
+      });
+
+      const coords: PolygonCoordinate[] = circlePolygon.geometry.coordinates[0]
+        .slice(0, -1) // Remove last duplicate point
+        .map(([lng, lat]) => ({ lat, lng }));
+
+      // Clear existing circle layer
+      if (circleLayerRef.current) {
+        circleLayerRef.current.remove();
+        circleLayerRef.current = null;
+      }
+
+      // Update state to polygon mode
+      setEditingGeofence({
+        ...editingGeofence,
+        coordinates: coords,
+        radius: null
+      });
+      setCurrentPolygon(coords);
+
+      // Load polygon markers for editing
+      loadPolygonForEditing(coords);
+
+      toast({
+        title: "Berhasil",
+        description: `Radius ${editingGeofence.radius}m dikonversi menjadi polygon ${coords.length} titik`
+      });
+    } catch (error) {
+      console.error('Error converting to polygon:', error);
+      toast({
+        title: "Gagal",
+        description: "Gagal mengkonversi ke polygon",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Main Geofence List Card */}
@@ -635,16 +701,29 @@ const PolygonGeofenceManager: React.FC = () => {
             
             {/* Radius Input (only for radius mode) */}
             {isRadiusMode && (
-              <div className="space-y-2">
-                <Label htmlFor="geofence-radius">Radius (meter)</Label>
-                <Input
-                  id="geofence-radius"
-                  type="number"
-                  value={radius}
-                  onChange={(e) => setRadius(Number(e.target.value))}
-                  min={10}
-                  max={10000}
-                />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="geofence-radius">Radius (meter)</Label>
+                  <Input
+                    id="geofence-radius"
+                    type="number"
+                    value={radius}
+                    onChange={(e) => setRadius(Number(e.target.value))}
+                    min={10}
+                    max={10000}
+                  />
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={convertRadiusToPolygon}
+                  className="w-full"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Konversi ke Polygon (32 titik)
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Konversi radius menjadi polygon agar dapat diedit titik per titik
+                </p>
               </div>
             )}
             
