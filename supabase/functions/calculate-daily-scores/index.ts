@@ -118,10 +118,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get today's date
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    console.log(`📅 Processing scores for date: ${todayStr}`);
+    // Get today's date in WIB (Asia/Jakarta) timezone
+    // This ensures correct date calculation when cron runs at 23:59 WIB
+    const wibTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
+    const todayStr = wibTime.toISOString().split('T')[0];
+    console.log(`📅 Processing scores for date: ${todayStr} (WIB timezone)`);
 
     // Get all attendance records for today that have check_in but might not have check_out
     const { data: attendanceRecords, error: attendanceError } = await supabase
