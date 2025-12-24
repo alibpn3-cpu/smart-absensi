@@ -1,98 +1,92 @@
-const CACHE_NAME = 'smart-zone-absensi-v2.1.0'; // Updated version for auto-update
-const urlsToCache = [
-  '/',
-  '/manifest.json'
-];
+const APP_VERSION = 'v2.3.0';
+const CACHE_NAME = `smart-zone-absensi-${APP_VERSION}`;
+const urlsToCache = ['/', '/manifest.json'];
 
-// Install event - cache resources
+const TARGET_HOSTS = new Set(['absen.petrolog.my.id']);
+
+// Install event - cache minimal shell
 self.addEventListener('install', (event) => {
-  console.log('🔧 SW: Installing new version');
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('✅ SW: Cache opened');
-        return cache.addAll(urlsToCache);
-      })
-      .then(() => {
-        console.log('✅ SW: Resources cached');
-        // Wait in 'installed' state until client requests SKIP_WAITING
-      })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
   );
 });
 
 // Activate event - clean old caches
 self.addEventListener('activate', (event) => {
-  console.log('🚀 SW: Activating new version');
+  const host = self.location.hostname;
+
+  // Do NOT run SW on preview/dev hosts (prevents stale module caching and React hook errors)
+  if (!TARGET_HOSTS.has(host)) {
+    event.waitUntil(
+      (async () => {
+        const names = await caches.keys();
+        await Promise.all(names.map((n) => caches.delete(n)));
+        await self.registration.unregister();
+      })()
+    );
+    return;
+  }
+
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
+    caches.keys().then((cacheNames) =>
+      Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('🗑️ SW: Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
+          if (cacheName !== CACHE_NAME) return caches.delete(cacheName);
         })
-      );
-    }).then(() => {
-      console.log('✅ SW: Claiming clients');
-      // Take control of all pages immediately
-      return self.clients.claim();
+      )
+    ).then(() => self.clients.claim())
+  );
+});
+
+// Fetch strategy:
+// - Scripts/styles: network-first (avoid serving stale JS/CSS)
+// - Supabase/API: network-first
+// - Other assets: cache-first (with background update)
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Never cache dev server module URLs
+  if (url.searchParams.has('t') || url.searchParams.has('v') || url.pathname.startsWith('/src/')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  const dest = event.request.destination;
+  const isScriptOrStyle = dest === 'script' || dest === 'style' || dest === 'worker';
+
+  const isApi = url.hostname.includes('supabase.co') || url.pathname.includes('/api/');
+
+  if (isScriptOrStyle || isApi) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Cache-first for other assets
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      const fetchPromise = fetch(event.request)
+        .then((response) => {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+          return response;
+        })
+        .catch(() => cached);
+
+      return cached || fetchPromise;
     })
   );
 });
 
-// Fetch event - network first strategy for API calls, cache first for assets
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-  
-  // Network first for API calls (Supabase)
-  if (url.hostname.includes('supabase.co') || url.pathname.includes('/api/')) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          // Clone response before caching
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME)
-            .then((cache) => cache.put(event.request, responseToCache));
-          return response;
-        })
-        .catch(() => {
-          // Fallback to cache if network fails
-          return caches.match(event.request);
-        })
-    );
-    return;
-  }
-  
-  // Cache first for static assets
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        if (response) {
-          // Return cached version but update cache in background
-          fetch(event.request).then((networkResponse) => {
-            caches.open(CACHE_NAME)
-              .then((cache) => cache.put(event.request, networkResponse));
-          }).catch(() => {});
-          return response;
-        }
-        // Not in cache, fetch from network
-        return fetch(event.request)
-          .then((networkResponse) => {
-            // Cache the new resource
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME)
-              .then((cache) => cache.put(event.request, responseToCache));
-            return networkResponse;
-          });
-      })
-  );
-});
-
-// Listen for messages from client
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    console.log('⏭️ SW: Received SKIP_WAITING message');
     self.skipWaiting();
   }
 });
