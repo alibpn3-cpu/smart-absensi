@@ -12,9 +12,33 @@ export interface ValidationResult {
   areaName?: string;
 }
 
+// Validate if a coordinate object is valid
+const isValidCoordinate = (coord: unknown): coord is PolygonCoordinate => {
+  if (!coord || typeof coord !== 'object') return false;
+  const c = coord as Record<string, unknown>;
+  return (
+    typeof c.lat === 'number' &&
+    typeof c.lng === 'number' &&
+    !isNaN(c.lat) &&
+    !isNaN(c.lng) &&
+    isFinite(c.lat) &&
+    isFinite(c.lng)
+  );
+};
+
+// Sanitize coordinates array - filter out invalid ones
+export const sanitizeCoordinates = (coords: unknown[]): PolygonCoordinate[] => {
+  if (!Array.isArray(coords)) return [];
+  return coords.filter(isValidCoordinate);
+};
+
 // Convert polygon coordinates to Turf format [lng, lat][]
 const toTurfCoordinates = (coords: PolygonCoordinate[]): [number, number][] => {
-  const turfCoords = coords.map(c => [c.lng, c.lat] as [number, number]);
+  // First sanitize the coordinates
+  const validCoords = sanitizeCoordinates(coords);
+  if (validCoords.length < 3) return [];
+  
+  const turfCoords = validCoords.map(c => [c.lng, c.lat] as [number, number]);
   // Close the polygon by adding first point at the end if not already closed
   if (turfCoords.length > 0) {
     const first = turfCoords[0];
@@ -74,10 +98,12 @@ export const isPointInAnyPolygon = (
 
 // Calculate polygon area in square meters
 export const calculatePolygonArea = (coords: PolygonCoordinate[]): number => {
-  if (coords.length < 3) return 0;
+  const validCoords = sanitizeCoordinates(coords);
+  if (validCoords.length < 3) return 0;
   
   try {
-    const turfCoords = toTurfCoordinates(coords);
+    const turfCoords = toTurfCoordinates(validCoords);
+    if (turfCoords.length < 4) return 0; // Need at least 4 points (3 + closing point)
     const polygon = turf.polygon([turfCoords]);
     return turf.area(polygon);
   } catch (error) {
@@ -88,10 +114,12 @@ export const calculatePolygonArea = (coords: PolygonCoordinate[]): number => {
 
 // Get the center of a polygon
 export const getPolygonCenter = (coords: PolygonCoordinate[]): PolygonCoordinate | null => {
-  if (coords.length < 3) return null;
+  const validCoords = sanitizeCoordinates(coords);
+  if (validCoords.length < 3) return null;
   
   try {
-    const turfCoords = toTurfCoordinates(coords);
+    const turfCoords = toTurfCoordinates(validCoords);
+    if (turfCoords.length < 4) return null;
     const polygon = turf.polygon([turfCoords]);
     const center = turf.centroid(polygon);
     return {

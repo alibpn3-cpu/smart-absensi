@@ -89,6 +89,13 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   const [isDinasFastCheckout, setIsDinasFastCheckout] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   
+  // GPS status tracking for indicator
+  const [gpsStatus, setGpsStatus] = useState<{
+    accuracy: number | null;
+    isLoading: boolean;
+    lastUpdate: Date | null;
+  }>({ accuracy: null, isLoading: false, lastUpdate: null });
+  
   // StatusPresensiDialog state
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ type: 'regular' | 'overtime'; action: 'check-in' | 'check-out' } | null>(null);
@@ -286,6 +293,38 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     setPermissions(newPermissions);
     localStorage.setItem('attendance_permissions', JSON.stringify(newPermissions));
   };
+
+  // Check GPS status for indicator
+  const checkGpsStatus = async () => {
+    setGpsStatus(prev => ({ ...prev, isLoading: true }));
+    try {
+      const result = await getEnhancedLocation({
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 5000,
+        multipleReadings: false, // Quick single reading for status check
+      });
+      setGpsStatus({
+        accuracy: result.accuracy,
+        isLoading: false,
+        lastUpdate: new Date(result.timestamp),
+      });
+    } catch (error) {
+      console.error('GPS check failed:', error);
+      setGpsStatus({
+        accuracy: null,
+        isLoading: false,
+        lastUpdate: null,
+      });
+    }
+  };
+
+  // Auto-check GPS when user is logged in
+  useEffect(() => {
+    if (isUserLoggedIn && !sharedDeviceMode) {
+      checkGpsStatus();
+    }
+  }, [isUserLoggedIn, sharedDeviceMode]);
 
   const fetchStaffUsers = async () => {
     const { data, error } = await supabase
@@ -2045,48 +2084,13 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           </Card>
         )}
 
-        {/* Today's Attendance Status - Show for logged in user */}
-        {isUserLoggedIn && !sharedDeviceMode && todayAttendance && (
-          <Card className="border-0 shadow-xl">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span className="font-semibold">Status Hari Ini</span>
-                </div>
-                <Badge variant={
-                  todayAttendance.status === 'wfo' ? 'default' :
-                  todayAttendance.status === 'wfh' ? 'secondary' : 'outline'
-                }>
-                  {todayAttendance.status?.toUpperCase()}
-                </Badge>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Clock In:</span>
-                  <span className="font-medium">
-                    {formatCheckTime(todayAttendance.check_in_time as string)}
-                  </span>
-                </div>
-                {todayAttendance.check_out_time && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Clock Out:</span>
-                    <span className="font-medium">
-                      {formatCheckTime(todayAttendance.check_out_time as string)}
-                    </span>
-                  </div>
-                )}
-                {todayAttendance.checkin_location_address && (
-                  <div>
-                    <span className="text-muted-foreground block">Lokasi:</span>
-                    <span className="font-medium text-xs">
-                      {todayAttendance.status === 'wfo' && wfoLocationName ? wfoLocationName : (todayAttendance.checkin_location_address || '-')}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        {/* GPS Status Indicator - Show for logged in user */}
+        {isUserLoggedIn && !sharedDeviceMode && (
+          <LocationAccuracyIndicator
+            accuracy={gpsStatus.accuracy}
+            isLoading={gpsStatus.isLoading}
+            onRetry={checkGpsStatus}
+          />
         )}
 
         {/* Action Buttons */}
