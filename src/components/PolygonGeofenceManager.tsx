@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
 import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2, ExternalLink, Circle, RefreshCw, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -869,18 +870,43 @@ const PolygonGeofenceManager: React.FC = () => {
               />
             </div>
             
-            {/* Radius Input (only for radius mode) */}
-            {isRadiusMode && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="geofence-radius">Radius (meter)</Label>
+            {/* Radius Input - tampilkan jika radius mode ATAU polygon kosong dan ada center */}
+            {(isRadiusMode || (currentPolygon.length === 0 && editingGeofence?.center_lat)) && (
+              <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="geofence-radius">Radius</Label>
+                    <span className="text-sm font-medium text-primary">{radius} meter</span>
+                  </div>
+                  <Slider
+                    value={[radius]}
+                    onValueChange={([value]) => {
+                      setRadius(value);
+                      radiusRef.current = value;
+                      if (editingGeofence?.center_lat && editingGeofence?.center_lng) {
+                        drawRadiusCircle(editingGeofence.center_lat, editingGeofence.center_lng, value);
+                      }
+                    }}
+                    min={10}
+                    max={1000}
+                    step={10}
+                    className="w-full"
+                  />
                   <Input
                     id="geofence-radius"
                     type="number"
                     value={radius}
-                    onChange={(e) => setRadius(Number(e.target.value))}
+                    onChange={(e) => {
+                      const newRadius = Math.max(10, Math.min(10000, Number(e.target.value)));
+                      setRadius(newRadius);
+                      radiusRef.current = newRadius;
+                      if (editingGeofence?.center_lat && editingGeofence?.center_lng) {
+                        drawRadiusCircle(editingGeofence.center_lat, editingGeofence.center_lng, newRadius);
+                      }
+                    }}
                     min={10}
                     max={10000}
+                    className="text-center"
                   />
                 </div>
                 <Button 
@@ -892,7 +918,7 @@ const PolygonGeofenceManager: React.FC = () => {
                   Ubah ke Mode Polygon
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Titik tengah akan menjadi titik pertama. Klik peta untuk tambah titik lain.
+                  Klik peta untuk pindahkan titik tengah. Geser slider untuk ubah radius.
                 </p>
               </div>
             )}
@@ -957,7 +983,14 @@ const PolygonGeofenceManager: React.FC = () => {
               </Button>
               <Button 
                 onClick={saveGeofence} 
-                disabled={(!isRadiusMode && currentPolygon.length < 3) || !name.trim() || loading}
+                disabled={
+                  !name.trim() || 
+                  loading || 
+                  // Polygon mode: butuh minimal 3 titik
+                  (!isRadiusMode && currentPolygon.length >= 1 && currentPolygon.length < 3) ||
+                  // Radius mode: butuh center point
+                  (isRadiusMode && (!editingGeofence?.center_lat || !editingGeofence?.center_lng))
+                }
               >
                 <Save className="h-4 w-4 mr-2" />
                 {loading ? 'Menyimpan...' : (editingGeofence ? 'Simpan Perubahan' : 'Buat Area')}
