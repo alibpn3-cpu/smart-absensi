@@ -190,7 +190,7 @@ const Login = () => {
                 <Shield className="h-8 w-8 text-primary" />
               </div>
             </div>
-            <CardTitle className="text-2xl">Admin Login</CardTitle>
+            <CardTitle className="text-2xl">Superadmin Login</CardTitle>
             <p className="text-muted-foreground">
               Enter your credentials to access the dashboard
             </p>
