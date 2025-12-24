@@ -387,8 +387,8 @@ const Dashboard = () => {
             </TabsTrigger>
             <TabsTrigger value="notcheckedin" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <Users className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Belum Absen</span>
-              <span className="sm:hidden">Blm</span>
+              <span className="hidden sm:inline">In/Out Status</span>
+              <span className="sm:hidden">I/O</span>
             </TabsTrigger>
             <TabsTrigger value="analytics" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
