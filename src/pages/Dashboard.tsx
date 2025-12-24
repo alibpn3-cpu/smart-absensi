@@ -26,7 +26,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import GeofenceManager from '../components/GeofenceManager';
+// GeofenceManager removed - using only PolygonGeofenceManager now
 const PolygonGeofenceManager = React.lazy(() => import('../components/PolygonGeofenceManager'));
 import EmployeeManager from '../components/EmployeeManager';
 import AdminManager from '../components/AdminManager';
@@ -766,22 +766,9 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="geofence">
-            <div className="space-y-6">
-              {/* Polygon Geofence Manager with Leaflet Map */}
-              <React.Suspense fallback={<div className="text-center py-8">Loading map...</div>}>
-                <PolygonGeofenceManager />
-              </React.Suspense>
-              
-              {/* Legacy Radius-based Geofence Manager */}
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle className="text-title-primary">Radius-based Geofence (Legacy)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <GeofenceManager />
-                </CardContent>
-              </Card>
-            </div>
+            <React.Suspense fallback={<div className="text-center py-8">Loading map...</div>}>
+              <PolygonGeofenceManager />
+            </React.Suspense>
           </TabsContent>
 
           <TabsContent value="settings">
