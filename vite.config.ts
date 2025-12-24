@@ -25,11 +25,14 @@ export default defineConfig(({ mode }) => ({
       // Force single React instance
       "react": path.resolve(__dirname, "./node_modules/react"),
       "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
+      "react/jsx-runtime": path.resolve(__dirname, "./node_modules/react/jsx-runtime"),
     },
     dedupe: [
       'react', 
       'react-dom',
       'react/jsx-runtime',
+      'leaflet',
+      '@turf/turf',
     ],
   },
   optimizeDeps: {
@@ -37,7 +40,14 @@ export default defineConfig(({ mode }) => ({
       'react', 
       'react-dom',
       'react/jsx-runtime',
+      'leaflet',
     ],
-    force: true,
+    exclude: [],
+  },
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+    },
   },
 }));
