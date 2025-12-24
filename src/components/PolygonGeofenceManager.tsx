@@ -197,22 +197,9 @@ const PolygonGeofenceManager: React.FC = () => {
       
       setCurrentPolygon(prev => {
         const updated = [...prev, newPoint];
+        const pointIndex = updated.length - 1;
         
-        const marker = L.marker([lat, lng], {
-          draggable: true,
-        }).addTo(map);
-        
-        marker.on('drag', (event: any) => {
-          const newPos = event.target.getLatLng();
-          const markerIndex = markersRef.current.indexOf(marker);
-          setCurrentPolygon(p => {
-            const newPolygon = [...p];
-            newPolygon[markerIndex] = { lat: newPos.lat, lng: newPos.lng };
-            return newPolygon;
-          });
-        });
-        
-        markersRef.current.push(marker);
+        addMarkerWithPopup(lat, lng, pointIndex);
         updatePolygonLayer(updated);
         
         return updated;
@@ -220,27 +207,93 @@ const PolygonGeofenceManager: React.FC = () => {
     });
   };
 
-  const loadPolygonForEditing = (coords: PolygonCoordinate[]) => {
+  const addMarkerWithPopup = (lat: number, lng: number, index: number) => {
     if (!leafletMapRef.current || !LRef.current) return;
     
     const L = LRef.current;
     
-    coords.forEach(coord => {
-      const marker = L.marker([coord.lat, coord.lng], {
-        draggable: true,
-      }).addTo(leafletMapRef.current);
-      
-      marker.on('drag', (event: any) => {
-        const newPos = event.target.getLatLng();
-        const markerIndex = markersRef.current.indexOf(marker);
-        setCurrentPolygon(p => {
-          const newPolygon = [...p];
+    const marker = L.marker([lat, lng], {
+      draggable: true,
+    }).addTo(leafletMapRef.current);
+    
+    // Popup untuk hapus titik
+    const popupContent = document.createElement('div');
+    popupContent.innerHTML = `
+      <div style="text-align: center; min-width: 80px;">
+        <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 500;">Titik ${index + 1}</p>
+        <button class="delete-point-btn" style="background: #ef4444; color: white; padding: 4px 12px; border-radius: 4px; border: none; font-size: 11px; cursor: pointer;">
+          Hapus Titik
+        </button>
+      </div>
+    `;
+    
+    const deleteBtn = popupContent.querySelector('.delete-point-btn');
+    deleteBtn?.addEventListener('click', () => {
+      removePointAtIndex(markersRef.current.indexOf(marker));
+      marker.closePopup();
+    });
+    
+    marker.bindPopup(popupContent);
+    
+    marker.on('drag', (event: any) => {
+      const newPos = event.target.getLatLng();
+      const markerIndex = markersRef.current.indexOf(marker);
+      setCurrentPolygon(p => {
+        const newPolygon = [...p];
+        if (markerIndex >= 0 && markerIndex < newPolygon.length) {
           newPolygon[markerIndex] = { lat: newPos.lat, lng: newPos.lng };
-          return newPolygon;
+        }
+        return newPolygon;
+      });
+    });
+    
+    markersRef.current.push(marker);
+    return marker;
+  };
+
+  const removePointAtIndex = (index: number) => {
+    if (index < 0) return;
+    
+    setCurrentPolygon(prev => {
+      if (prev.length <= 1) {
+        toast({
+          title: "Tidak bisa hapus",
+          description: "Minimal harus ada 1 titik",
+          variant: "destructive"
         });
+        return prev;
+      }
+      
+      // Remove marker from map
+      const marker = markersRef.current[index];
+      if (marker) marker.remove();
+      markersRef.current.splice(index, 1);
+      
+      // Update remaining markers popup labels
+      markersRef.current.forEach((m, i) => {
+        const popup = m.getPopup();
+        if (popup) {
+          const content = popup.getContent();
+          if (content instanceof HTMLElement) {
+            const p = content.querySelector('p');
+            if (p) p.textContent = `Titik ${i + 1}`;
+          }
+        }
       });
       
-      markersRef.current.push(marker);
+      const updated = prev.filter((_, i) => i !== index);
+      updatePolygonLayer(updated);
+      
+      toast({ title: "Titik dihapus" });
+      return updated;
+    });
+  };
+
+  const loadPolygonForEditing = (coords: PolygonCoordinate[]) => {
+    if (!leafletMapRef.current || !LRef.current) return;
+    
+    coords.forEach((coord, index) => {
+      addMarkerWithPopup(coord.lat, coord.lng, index);
     });
     
     updatePolygonLayer(coords);
@@ -550,7 +603,7 @@ const PolygonGeofenceManager: React.FC = () => {
   const polygonArea = calculatePolygonArea(currentPolygon);
   const isRadiusMode = editingGeofence && !editingGeofence.coordinates;
 
-  // Convert radius-based geofence to polygon
+  // Convert radius-based geofence to polygon mode with only center point
   const convertRadiusToPolygon = () => {
     if (!editingGeofence?.center_lat || !editingGeofence?.center_lng) {
       toast({
@@ -561,50 +614,36 @@ const PolygonGeofenceManager: React.FC = () => {
       return;
     }
 
-    const centerLng = editingGeofence.center_lng;
     const centerLat = editingGeofence.center_lat;
-    const radiusKm = (editingGeofence.radius || 100) / 1000;
+    const centerLng = editingGeofence.center_lng;
 
-    try {
-      // Use Turf.js to create circle polygon
-      const circlePolygon = turf.circle([centerLng, centerLat], radiusKm, { 
-        steps: 32, 
-        units: 'kilometers' 
-      });
+    // Only 1 point: center point
+    const coords: PolygonCoordinate[] = [{ lat: centerLat, lng: centerLng }];
 
-      const coords: PolygonCoordinate[] = circlePolygon.geometry.coordinates[0]
-        .slice(0, -1) // Remove last duplicate point
-        .map(([lng, lat]) => ({ lat, lng }));
-
-      // Clear existing circle layer
-      if (circleLayerRef.current) {
-        circleLayerRef.current.remove();
-        circleLayerRef.current = null;
-      }
-
-      // Update state to polygon mode
-      setEditingGeofence({
-        ...editingGeofence,
-        coordinates: coords,
-        radius: null
-      });
-      setCurrentPolygon(coords);
-
-      // Load polygon markers for editing
-      loadPolygonForEditing(coords);
-
-      toast({
-        title: "Berhasil",
-        description: `Radius ${editingGeofence.radius}m dikonversi menjadi polygon ${coords.length} titik`
-      });
-    } catch (error) {
-      console.error('Error converting to polygon:', error);
-      toast({
-        title: "Gagal",
-        description: "Gagal mengkonversi ke polygon",
-        variant: "destructive"
-      });
+    // Clear existing circle layer
+    if (circleLayerRef.current) {
+      circleLayerRef.current.remove();
+      circleLayerRef.current = null;
     }
+
+    // Clear existing markers
+    clearDrawingLayers();
+
+    // Update state to polygon mode
+    setEditingGeofence({
+      ...editingGeofence,
+      coordinates: coords,
+      radius: null
+    });
+    setCurrentPolygon(coords);
+
+    // Add marker for center point
+    addMarkerWithPopup(centerLat, centerLng, 0);
+
+    toast({
+      title: "Mode Polygon Aktif",
+      description: "Klik pada peta untuk menambah titik polygon. Minimal 3 titik untuk menyimpan."
+    });
   };
 
   return (
@@ -765,10 +804,10 @@ const PolygonGeofenceManager: React.FC = () => {
                   className="w-full"
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  Konversi ke Polygon (32 titik)
+                  Ubah ke Mode Polygon
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Konversi radius menjadi polygon agar dapat diedit titik per titik
+                  Titik tengah akan menjadi titik pertama. Klik peta untuk tambah titik lain.
                 </p>
               </div>
             )}
