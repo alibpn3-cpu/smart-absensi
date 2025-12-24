@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,10 @@ import AttendanceStatusList from './AttendanceStatusList';
 import StatusPresensiDialog from './StatusPresensiDialog';
 import DebugLogger from './DebugLogger';
 import LocationAccuracyIndicator from './LocationAccuracyIndicator';
+import ScoreCard from './ScoreCard';
+import P2HToolboxCard from './P2HToolboxCard';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
+import { saveScore } from '@/hooks/useScoreCalculation';
 import { format } from 'date-fns';
 import { getEnhancedLocation, getAccuracyLevel, clearLocationCache } from '@/utils/enhancedGeolocation';
 import { isPointInPolygon, PolygonCoordinate } from '@/utils/polygonValidator';
@@ -31,6 +35,7 @@ interface StaffUser {
   work_area: string;
   photo_url?: string;
   division?: string;
+  employee_type?: string;
 }
 
 interface AttendanceRecord {
@@ -146,8 +151,18 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   
   // Check if user is logged in (non-kiosk mode)
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
-
-  // Load shared device mode from localStorage (per-device setting)
+  
+  // Feature flags
+  const featureFlags = useFeatureFlags();
+  
+  // P2H/Toolbox checklist state for primary employees
+  const [p2hChecked, setP2hChecked] = useState(false);
+  const [toolboxChecked, setToolboxChecked] = useState(false);
+  
+  const handleChecklistChange = useCallback((p2h: boolean, toolbox: boolean) => {
+    setP2hChecked(p2h);
+    setToolboxChecked(toolbox);
+  }, []);
   const loadSharedDeviceMode = () => {
     const localKioskMode = localStorage.getItem('shared_device_mode');
     setSharedDeviceMode(localKioskMode === 'true');
@@ -1263,6 +1278,25 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         localStorage.setItem('attendance_status', attendanceStatus);
       }
 
+      // Calculate and save score on clock out (non-blocking side effect)
+      if (isCheckOut && featureFlags.scoreEnabled && selectedStaff) {
+        try {
+          await saveScore({
+            staffUid: selectedStaff.uid,
+            staffName: selectedStaff.name,
+            checkInTime: todayAttendance?.check_in_time || '',
+            checkOutTime: formattedTime,
+            employeeType: selectedStaff.employee_type || 'staff',
+            workArea: selectedStaff.work_area,
+            p2hChecked,
+            toolboxChecked
+          });
+          console.log('✅ Score saved successfully');
+        } catch (scoreError) {
+          console.error('Score calculation failed (non-blocking):', scoreError);
+        }
+      }
+
       toast({
         title: "Berhasil",
         description: `Berhasil ${isCheckOut ? 'clock out' : 'clock in'}! Lokasi: ${locationAddress}`
@@ -2090,6 +2124,20 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             accuracy={gpsStatus.accuracy}
             isLoading={gpsStatus.isLoading}
             onRetry={checkGpsStatus}
+          />
+        )}
+
+        {/* Score Card - Yesterday's score (if feature enabled) */}
+        {featureFlags.scoreEnabled && selectedStaff && !sharedDeviceMode && (
+          <ScoreCard staffUid={selectedStaff.uid} />
+        )}
+
+        {/* P2H/Toolbox Card - Only for primary employees (if feature enabled) */}
+        {featureFlags.scoreEnabled && selectedStaff?.employee_type === 'primary' && !sharedDeviceMode && (
+          <P2HToolboxCard
+            staffUid={selectedStaff.uid}
+            staffName={selectedStaff.name}
+            onChecklistChange={handleChecklistChange}
           />
         )}
 

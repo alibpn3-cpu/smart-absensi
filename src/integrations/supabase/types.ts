@@ -226,6 +226,66 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_scores: {
+        Row: {
+          calculation_method: string | null
+          check_in_time: string | null
+          check_out_time: string | null
+          clock_in_score: number
+          clock_out_score: number
+          created_at: string
+          employee_type: string | null
+          final_score: number
+          id: string
+          is_late: boolean | null
+          p2h_score: number
+          score_date: string
+          staff_name: string
+          staff_uid: string
+          toolbox_score: number
+          updated_at: string
+          work_area: string | null
+        }
+        Insert: {
+          calculation_method?: string | null
+          check_in_time?: string | null
+          check_out_time?: string | null
+          clock_in_score?: number
+          clock_out_score?: number
+          created_at?: string
+          employee_type?: string | null
+          final_score?: number
+          id?: string
+          is_late?: boolean | null
+          p2h_score?: number
+          score_date?: string
+          staff_name: string
+          staff_uid: string
+          toolbox_score?: number
+          updated_at?: string
+          work_area?: string | null
+        }
+        Update: {
+          calculation_method?: string | null
+          check_in_time?: string | null
+          check_out_time?: string | null
+          clock_in_score?: number
+          clock_out_score?: number
+          created_at?: string
+          employee_type?: string | null
+          final_score?: number
+          id?: string
+          is_late?: boolean | null
+          p2h_score?: number
+          score_date?: string
+          staff_name?: string
+          staff_uid?: string
+          toolbox_score?: number
+          updated_at?: string
+          work_area?: string | null
+        }
+        Relationships: []
+      }
       debug_logs: {
         Row: {
           console_logs: string[] | null
@@ -322,10 +382,44 @@ export type Database = {
         }
         Relationships: []
       }
+      p2h_toolbox_checklist: {
+        Row: {
+          checklist_date: string
+          created_at: string
+          id: string
+          p2h_checked: boolean | null
+          staff_name: string
+          staff_uid: string
+          toolbox_checked: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          checklist_date?: string
+          created_at?: string
+          id?: string
+          p2h_checked?: boolean | null
+          staff_name: string
+          staff_uid: string
+          toolbox_checked?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          checklist_date?: string
+          created_at?: string
+          id?: string
+          p2h_checked?: boolean | null
+          staff_name?: string
+          staff_uid?: string
+          toolbox_checked?: boolean | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       staff_users: {
         Row: {
           created_at: string
           division: string | null
+          employee_type: string | null
           id: string
           is_active: boolean
           is_admin: boolean | null
@@ -341,6 +435,7 @@ export type Database = {
         Insert: {
           created_at?: string
           division?: string | null
+          employee_type?: string | null
           id?: string
           is_active?: boolean
           is_admin?: boolean | null
@@ -356,6 +451,7 @@ export type Database = {
         Update: {
           created_at?: string
           division?: string | null
+          employee_type?: string | null
           id?: string
           is_active?: boolean
           is_admin?: boolean | null
