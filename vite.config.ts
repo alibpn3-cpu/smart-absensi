@@ -22,32 +22,13 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // Force single React instance
-      "react": path.resolve(__dirname, "./node_modules/react"),
-      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
-      "react/jsx-runtime": path.resolve(__dirname, "./node_modules/react/jsx-runtime"),
     },
-    dedupe: [
-      'react', 
-      'react-dom',
-      'react/jsx-runtime',
-      'leaflet',
-      '@turf/turf',
-    ],
+    // Ensure a single React instance across all deps
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime'],
   },
   optimizeDeps: {
-    include: [
-      'react', 
-      'react-dom',
-      'react/jsx-runtime',
-      'leaflet',
-    ],
-    exclude: [],
-  },
-  build: {
-    commonjsOptions: {
-      include: [/node_modules/],
-      transformMixedEsModules: true,
-    },
+    // Leaflet is heavy; prebundle it for stability
+    include: ['leaflet'],
+    force: true,
   },
 }));
