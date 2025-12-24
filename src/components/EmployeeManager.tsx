@@ -28,6 +28,7 @@ interface StaffUser {
   created_at: string;
   photo_url?: string;
   is_admin?: boolean;
+  employee_type?: string;
 }
 
 // Combobox component for editable dropdowns with auto-uppercase
@@ -127,7 +128,8 @@ const EmployeeManager = () => {
     position: '',
     work_area: '',
     division: '',
-    photo_url: ''
+    photo_url: '',
+    employee_type: 'staff'
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
@@ -391,7 +393,8 @@ const EmployeeManager = () => {
       position: '',
       work_area: '',
       division: '',
-      photo_url: ''
+      photo_url: '',
+      employee_type: 'staff'
     });
     setEditingEmployee(null);
     setPhotoFile(null);
@@ -407,7 +410,8 @@ const EmployeeManager = () => {
         position: employee.position,
         work_area: employee.work_area,
         division: employee.division || '',
-        photo_url: employee.photo_url || ''
+        photo_url: employee.photo_url || '',
+        employee_type: employee.employee_type || 'staff'
       });
       setPhotoPreview(employee.photo_url || '');
     } else {
@@ -444,7 +448,8 @@ const EmployeeManager = () => {
         position: formData.position,
         work_area: formData.work_area,
         division: formData.division || null,
-        photo_url: photoUrl
+        photo_url: photoUrl,
+        employee_type: formData.employee_type || 'staff'
       };
 
       if (editingEmployee) {
@@ -1192,6 +1197,25 @@ const EmployeeManager = () => {
                       options={divisions}
                       placeholder="Pilih atau ketik division baru"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="employee_type">Employee Type</Label>
+                    <Select
+                      value={formData.employee_type}
+                      onValueChange={(value) => setFormData({...formData, employee_type: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select employee type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="staff">Staff</SelectItem>
+                        <SelectItem value="primary">Primary (Operator)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Primary: jam masuk 07:00, wajib P2H & Toolbox. Staff: jam masuk 08:00/08:30.
+                    </p>
                   </div>
 
                   <div className="space-y-2">

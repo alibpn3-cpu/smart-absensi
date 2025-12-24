@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Settings, Save, Image, Monitor, AlertTriangle, Sparkles, Upload, Loader2, X, Building2 } from 'lucide-react';
+import FeatureFlagSettings from './FeatureFlagSettings';
 
 const AppSettings = () => {
   const [logoUrl, setLogoUrl] = useState('');
@@ -143,92 +144,99 @@ const AppSettings = () => {
   };
 
   return (
-    <Card className="bg-white border-gray-200">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-black">
-          <Settings className="h-5 w-5" />
-          Application Settings
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {loading ? (
-          <div className="text-center py-8 text-black">Loading settings...</div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="appTitle" className="text-black flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Application Title
-              </Label>
-              <Input id="appTitle" type="text" value={appTitle} onChange={(e) => setAppTitle(e.target.value)} placeholder="Smart Zone Absensi" className="bg-white border-gray-300 text-black" />
-            </div>
-
-            {/* App Logo Upload */}
-            <div className="space-y-2">
-              <Label className="text-black flex items-center gap-2">
-                <Image className="h-4 w-4" />
-                Logo Aplikasi (Header, Favicon)
-              </Label>
-              <div className="flex gap-2">
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, false)} className="hidden" />
-                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadingLogo} className="flex-1">
-                  {uploadingLogo ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading...</> : <><Upload className="h-4 w-4 mr-2" />Upload Logo Aplikasi</>}
-                </Button>
-                {logoUrl && <Button type="button" variant="outline" onClick={() => setLogoUrl('')} className="text-destructive"><X className="h-4 w-4" /></Button>}
-              </div>
-              {logoUrl && <img src={logoUrl} alt="App Logo" className="h-12 w-12 object-contain rounded-lg border" />}
-            </div>
-
-            {/* Company Logo Upload */}
-            <div className="space-y-2">
-              <Label className="text-black flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Logo Perusahaan (Kiosk Mode - Card Besar)
-              </Label>
-              <div className="flex gap-2">
-                <input ref={companyFileInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, true)} className="hidden" />
-                <Button type="button" variant="outline" onClick={() => companyFileInputRef.current?.click()} disabled={uploadingCompanyLogo} className="flex-1">
-                  {uploadingCompanyLogo ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading...</> : <><Upload className="h-4 w-4 mr-2" />Upload Logo Perusahaan</>}
-                </Button>
-                {companyLogoUrl && <Button type="button" variant="outline" onClick={() => setCompanyLogoUrl('')} className="text-destructive"><X className="h-4 w-4" /></Button>}
-              </div>
-              {companyLogoUrl && <img src={companyLogoUrl} alt="Company Logo" className="h-20 w-auto object-contain rounded-lg border p-2" />}
-              <p className="text-xs text-gray-600">Logo ini akan tampil sebagai card besar di Kiosk Mode</p>
-            </div>
-
-            {/* Version Control */}
-            <div className="space-y-4 pt-4 border-t border-gray-200">
-              <h3 className="font-semibold text-black flex items-center gap-2"><Sparkles className="h-4 w-4" />Version Control</h3>
+    <>
+      <Card className="bg-white border-gray-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-black">
+            <Settings className="h-5 w-5" />
+            Application Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {loading ? (
+            <div className="text-center py-8 text-black">Loading settings...</div>
+          ) : (
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="appVersion" className="text-black">App Version</Label>
-                <Input id="appVersion" type="text" value={appVersion} onChange={(e) => setAppVersion(e.target.value)} placeholder="v2.2.0" className="bg-white border-gray-300 text-black" />
+                <Label htmlFor="appTitle" className="text-black flex items-center gap-2">
+                  <Settings className="h-4 w-4" />
+                  Application Title
+                </Label>
+                <Input id="appTitle" type="text" value={appTitle} onChange={(e) => setAppTitle(e.target.value)} placeholder="Smart Zone Absensi" className="bg-white border-gray-300 text-black" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="changelog" className="text-black">Changelog</Label>
-                <Textarea id="changelog" value={changelog} onChange={(e) => setChangelog(e.target.value)} placeholder="• Fitur baru" rows={4} className="bg-white border-gray-300 text-black resize-none" />
-              </div>
-            </div>
 
-            {/* Kiosk Mode */}
-            <div className="space-y-2 pt-4 border-t border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="sharedDeviceMode" className="text-black flex items-center gap-2"><Monitor className="h-4 w-4" />Shared Device Mode (Kiosk)</Label>
-                  <p className="text-xs text-gray-600">Mode untuk perangkat absensi bersama.</p>
+              {/* App Logo Upload */}
+              <div className="space-y-2">
+                <Label className="text-black flex items-center gap-2">
+                  <Image className="h-4 w-4" />
+                  Logo Aplikasi (Header, Favicon)
+                </Label>
+                <div className="flex gap-2">
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, false)} className="hidden" />
+                  <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadingLogo} className="flex-1">
+                    {uploadingLogo ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading...</> : <><Upload className="h-4 w-4 mr-2" />Upload Logo Aplikasi</>}
+                  </Button>
+                  {logoUrl && <Button type="button" variant="outline" onClick={() => setLogoUrl('')} className="text-destructive"><X className="h-4 w-4" /></Button>}
                 </div>
-                <Switch id="sharedDeviceMode" checked={sharedDeviceMode} onCheckedChange={handleSharedDeviceModeChange} />
+                {logoUrl && <img src={logoUrl} alt="App Logo" className="h-12 w-12 object-contain rounded-lg border" />}
+              </div>
+
+              {/* Company Logo Upload */}
+              <div className="space-y-2">
+                <Label className="text-black flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Logo Perusahaan (Kiosk Mode - Card Besar)
+                </Label>
+                <div className="flex gap-2">
+                  <input ref={companyFileInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, true)} className="hidden" />
+                  <Button type="button" variant="outline" onClick={() => companyFileInputRef.current?.click()} disabled={uploadingCompanyLogo} className="flex-1">
+                    {uploadingCompanyLogo ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading...</> : <><Upload className="h-4 w-4 mr-2" />Upload Logo Perusahaan</>}
+                  </Button>
+                  {companyLogoUrl && <Button type="button" variant="outline" onClick={() => setCompanyLogoUrl('')} className="text-destructive"><X className="h-4 w-4" /></Button>}
+                </div>
+                {companyLogoUrl && <img src={companyLogoUrl} alt="Company Logo" className="h-20 w-auto object-contain rounded-lg border p-2" />}
+                <p className="text-xs text-gray-600">Logo ini akan tampil sebagai card besar di Kiosk Mode</p>
+              </div>
+
+              {/* Version Control */}
+              <div className="space-y-4 pt-4 border-t border-gray-200">
+                <h3 className="font-semibold text-black flex items-center gap-2"><Sparkles className="h-4 w-4" />Version Control</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="appVersion" className="text-black">App Version</Label>
+                  <Input id="appVersion" type="text" value={appVersion} onChange={(e) => setAppVersion(e.target.value)} placeholder="v2.2.0" className="bg-white border-gray-300 text-black" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="changelog" className="text-black">Changelog</Label>
+                  <Textarea id="changelog" value={changelog} onChange={(e) => setChangelog(e.target.value)} placeholder="• Fitur baru" rows={4} className="bg-white border-gray-300 text-black resize-none" />
+                </div>
+              </div>
+
+              {/* Kiosk Mode */}
+              <div className="space-y-2 pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="sharedDeviceMode" className="text-black flex items-center gap-2"><Monitor className="h-4 w-4" />Shared Device Mode (Kiosk)</Label>
+                    <p className="text-xs text-gray-600">Mode untuk perangkat absensi bersama.</p>
+                  </div>
+                  <Switch id="sharedDeviceMode" checked={sharedDeviceMode} onCheckedChange={handleSharedDeviceModeChange} />
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <Button onClick={saveSettings} disabled={saving} className="bg-blue-600 text-white hover:bg-blue-700">
+                  <Save className="h-4 w-4 mr-2" />{saving ? 'Saving...' : 'Save Settings'}
+                </Button>
               </div>
             </div>
-
-            <div className="flex justify-end pt-4">
-              <Button onClick={saveSettings} disabled={saving} className="bg-blue-600 text-white hover:bg-blue-700">
-                <Save className="h-4 w-4 mr-2" />{saving ? 'Saving...' : 'Save Settings'}
-              </Button>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          )}
+        </CardContent>
+      </Card>
+      
+      {/* Feature Flags Section */}
+      <div className="mt-6">
+        <FeatureFlagSettings />
+      </div>
+    </>
   );
 };
 
