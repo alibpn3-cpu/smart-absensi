@@ -13,6 +13,7 @@ interface StatusPresensiDialogProps {
   actionType: 'check-in' | 'check-out' | 'in-extend' | 'out-extend';
   defaultStatus?: 'wfo' | 'wfh' | 'dinas';
   loading?: boolean;
+  checkInStatus?: 'wfo' | 'wfh' | 'dinas' | null; // Status saat check-in untuk membatasi pilihan checkout
 }
 
 const StatusPresensiDialog: React.FC<StatusPresensiDialogProps> = ({
@@ -21,18 +22,53 @@ const StatusPresensiDialog: React.FC<StatusPresensiDialogProps> = ({
   onConfirm,
   actionType,
   defaultStatus = 'wfo',
-  loading = false
+  loading = false,
+  checkInStatus = null
 }) => {
   const [status, setStatus] = useState<'wfo' | 'wfh' | 'dinas'>(defaultStatus);
   const [reason, setReason] = useState('');
 
+  // Determine allowed statuses based on check-in status for checkout
+  const isCheckout = actionType === 'check-out' || actionType === 'out-extend';
+  
+  const getAllowedStatuses = (): ('wfo' | 'wfh' | 'dinas')[] => {
+    if (!isCheckout || !checkInStatus) {
+      // Check-in: semua pilihan tersedia
+      return ['wfo', 'wfh', 'dinas'];
+    }
+    
+    // Checkout: batasi berdasarkan status check-in
+    switch (checkInStatus) {
+      case 'wfo':
+        // WFO check-in hanya bisa checkout WFO atau Dinas (tidak mungkin WFH)
+        return ['wfo', 'dinas'];
+      case 'wfh':
+        // WFH check-in hanya bisa checkout WFH
+        return ['wfh'];
+      case 'dinas':
+        // Dinas check-in hanya bisa checkout Dinas
+        return ['dinas'];
+      default:
+        return ['wfo', 'wfh', 'dinas'];
+    }
+  };
+  
+  const allowedStatuses = getAllowedStatuses();
+
   // Reset form when dialog opens
   useEffect(() => {
     if (isOpen) {
-      setStatus(defaultStatus);
+      // Set default status based on allowed statuses
+      if (isCheckout && checkInStatus && allowedStatuses.includes(checkInStatus)) {
+        setStatus(checkInStatus);
+      } else if (allowedStatuses.includes(defaultStatus)) {
+        setStatus(defaultStatus);
+      } else {
+        setStatus(allowedStatuses[0]);
+      }
       setReason('');
     }
-  }, [isOpen, defaultStatus]);
+  }, [isOpen, defaultStatus, checkInStatus, isCheckout]);
 
   const handleConfirm = () => {
     onConfirm(status, reason);
@@ -68,48 +104,61 @@ const StatusPresensiDialog: React.FC<StatusPresensiDialogProps> = ({
         <div className="space-y-6 py-4">
           {/* Status Selection */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">Status Presensi</Label>
+            <Label className="text-sm font-medium">
+              Status Presensi
+              {isCheckout && checkInStatus && (
+                <span className="text-xs text-muted-foreground ml-2">
+                  (Check-in: {checkInStatus.toUpperCase()})
+                </span>
+              )}
+            </Label>
             <RadioGroup
               value={status}
               onValueChange={(value) => setStatus(value as 'wfo' | 'wfh' | 'dinas')}
-              className="grid grid-cols-3 gap-3"
+              className={`grid gap-3 ${allowedStatuses.length === 1 ? 'grid-cols-1' : allowedStatuses.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}
               disabled={loading}
             >
-              <div>
-                <RadioGroupItem value="wfo" id="wfo" className="peer sr-only" />
-                <Label
-                  htmlFor="wfo"
-                  className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 cursor-pointer transition-all"
-                >
-                  <Building2 className="h-6 w-6 mb-2 text-primary" />
-                  <span className="text-sm font-medium">WFO</span>
-                  <span className="text-xs text-muted-foreground">Di Kantor</span>
-                </Label>
-              </div>
+              {allowedStatuses.includes('wfo') && (
+                <div>
+                  <RadioGroupItem value="wfo" id="wfo" className="peer sr-only" />
+                  <Label
+                    htmlFor="wfo"
+                    className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 cursor-pointer transition-all"
+                  >
+                    <Building2 className="h-6 w-6 mb-2 text-primary" />
+                    <span className="text-sm font-medium">WFO</span>
+                    <span className="text-xs text-muted-foreground">Di Kantor</span>
+                  </Label>
+                </div>
+              )}
 
-              <div>
-                <RadioGroupItem value="wfh" id="wfh" className="peer sr-only" />
-                <Label
-                  htmlFor="wfh"
-                  className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 cursor-pointer transition-all"
-                >
-                  <Home className="h-6 w-6 mb-2 text-blue-500" />
-                  <span className="text-sm font-medium">WFH</span>
-                  <span className="text-xs text-muted-foreground">Di Rumah</span>
-                </Label>
-              </div>
+              {allowedStatuses.includes('wfh') && (
+                <div>
+                  <RadioGroupItem value="wfh" id="wfh" className="peer sr-only" />
+                  <Label
+                    htmlFor="wfh"
+                    className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 cursor-pointer transition-all"
+                  >
+                    <Home className="h-6 w-6 mb-2 text-blue-500" />
+                    <span className="text-sm font-medium">WFH</span>
+                    <span className="text-xs text-muted-foreground">Di Rumah</span>
+                  </Label>
+                </div>
+              )}
 
-              <div>
-                <RadioGroupItem value="dinas" id="dinas" className="peer sr-only" />
-                <Label
-                  htmlFor="dinas"
-                  className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 cursor-pointer transition-all"
-                >
-                  <Car className="h-6 w-6 mb-2 text-orange-500" />
-                  <span className="text-sm font-medium">Dinas</span>
-                  <span className="text-xs text-muted-foreground">Luar Kantor</span>
-                </Label>
-              </div>
+              {allowedStatuses.includes('dinas') && (
+                <div>
+                  <RadioGroupItem value="dinas" id="dinas" className="peer sr-only" />
+                  <Label
+                    htmlFor="dinas"
+                    className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 cursor-pointer transition-all"
+                  >
+                    <Car className="h-6 w-6 mb-2 text-orange-500" />
+                    <span className="text-sm font-medium">Dinas</span>
+                    <span className="text-xs text-muted-foreground">Luar Kantor</span>
+                  </Label>
+                </div>
+              )}
             </RadioGroup>
           </div>
 
