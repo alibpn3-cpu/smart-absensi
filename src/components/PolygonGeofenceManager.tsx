@@ -522,16 +522,20 @@ const PolygonGeofenceManager: React.FC = () => {
           is_active: editingGeofence.is_active,
         };
       } else {
-        // Polygon mode
+        // Polygon mode - also save radius as backup for fallback
         const center = getPolygonCenter(currentPolygon);
         const coordinatesJson = currentPolygon.map(c => ({ lat: c.lat, lng: c.lng }));
+        
+        // Calculate estimated radius from polygon area for backup
+        const area = calculatePolygonArea(currentPolygon);
+        const estimatedRadius = Math.round(Math.sqrt(area / Math.PI));
         
         geofenceData = {
           name: name.trim(),
           coordinates: coordinatesJson as unknown as any,
           center_lat: center?.lat || null,
           center_lng: center?.lng || null,
-          radius: null,
+          radius: estimatedRadius || radius || 100, // Keep radius as backup
           is_active: editingGeofence?.is_active ?? true,
         };
       }
@@ -660,7 +664,7 @@ const PolygonGeofenceManager: React.FC = () => {
     setEditingGeofence({
       ...editingGeofence,
       coordinates: coords,
-      radius: null
+      radius: radius // Keep radius as backup
     });
     setCurrentPolygon(coords);
 
@@ -670,6 +674,60 @@ const PolygonGeofenceManager: React.FC = () => {
     toast({
       title: "Mode Polygon Aktif",
       description: "Klik pada peta untuk menambah titik polygon. Minimal 3 titik untuk menyimpan."
+    });
+  };
+
+  // Convert polygon-based geofence back to radius mode
+  const convertPolygonToRadius = () => {
+    if (currentPolygon.length === 0) {
+      toast({
+        title: "Gagal",
+        description: "Tidak ada polygon untuk dikonversi",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Calculate center from polygon
+    const center = getPolygonCenter(currentPolygon);
+    if (!center) {
+      toast({
+        title: "Gagal",
+        description: "Gagal menghitung titik tengah polygon",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Calculate estimated radius from polygon area
+    const area = calculatePolygonArea(currentPolygon);
+    const estimatedRadius = Math.max(50, Math.round(Math.sqrt(area / Math.PI)));
+
+    // Clear polygon layers
+    clearDrawingLayers();
+
+    // Update state to radius mode
+    setEditingGeofence({
+      ...editingGeofence!,
+      coordinates: null, // null = radius mode
+      center_lat: center.lat,
+      center_lng: center.lng,
+      radius: estimatedRadius
+    });
+    setCurrentPolygon([]);
+    setRadius(estimatedRadius);
+
+    // Draw circle on map
+    drawRadiusCircle(center.lat, center.lng, estimatedRadius);
+
+    // Center map on new circle
+    if (leafletMapRef.current) {
+      leafletMapRef.current.setView([center.lat, center.lng], 16);
+    }
+
+    toast({
+      title: "Mode Radius Aktif",
+      description: `Diubah ke mode radius dengan jari-jari ~${estimatedRadius}m`
     });
   };
 
@@ -863,6 +921,17 @@ const PolygonGeofenceManager: React.FC = () => {
                   <Trash2 className="h-4 w-4 mr-2" />
                   Hapus Semua
                 </Button>
+                {currentPolygon.length > 0 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={convertPolygonToRadius}
+                    className="ml-auto"
+                  >
+                    <Circle className="h-4 w-4 mr-2" />
+                    Ubah ke Mode Radius
+                  </Button>
+                )}
               </div>
             )}
             
