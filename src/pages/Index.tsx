@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Shield, User, LogIn } from 'lucide-react';
+import { Shield, User, LogIn } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import AttendanceForm from '../components/AttendanceForm';
 import AdPopup from '../components/AdPopup';
@@ -25,6 +25,31 @@ const Index = () => {
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [sharedDeviceMode, setSharedDeviceMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [secretClickCount, setSecretClickCount] = useState(0);
+  const secretClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Hidden click handler for superadmin access
+  const handleSecretClick = () => {
+    const newCount = secretClickCount + 1;
+    setSecretClickCount(newCount);
+    
+    // Reset counter after 3 seconds of no clicks
+    if (secretClickTimeoutRef.current) {
+      clearTimeout(secretClickTimeoutRef.current);
+    }
+    secretClickTimeoutRef.current = setTimeout(() => {
+      setSecretClickCount(0);
+    }, 3000);
+    
+    // Navigate to superadmin login after 5 clicks
+    if (newCount >= 5) {
+      navigate('/login');
+      setSecretClickCount(0);
+      if (secretClickTimeoutRef.current) {
+        clearTimeout(secretClickTimeoutRef.current);
+      }
+    }
+  };
 
   // Auto-detect timezone from device
   const getDeviceTimezone = () => {
@@ -164,7 +189,7 @@ const Index = () => {
                   }}
                 />
               )}
-              <div>
+              <div onClick={handleSecretClick} className="cursor-default select-none">
                 <h1 className="text-2xl sm:text-3xl font-bold text-title-primary">{appTitle}</h1>
               </div>
             </div>
@@ -208,15 +233,6 @@ const Index = () => {
                 </Button>
               )}
 
-              {/* Settings/Admin Login - only for superadmin access */}
-              <Button
-                variant="outline" 
-                size="sm"
-                onClick={() => navigate('/login')}
-                className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 p-2"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
             </div>
           </div>
         </div>
