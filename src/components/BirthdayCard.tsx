@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Cake } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel';
+import Autoplay from 'embla-carousel-autoplay';
+import { cn } from '@/lib/utils';
 
 interface Birthday {
   id: string;
@@ -11,13 +14,26 @@ interface Birthday {
   level: string;
 }
 
+const ITEMS_PER_SLIDE = 5;
+
 const BirthdayCard = () => {
   const [upcomingBirthdays, setUpcomingBirthdays] = useState<Birthday[]>([]);
   const [isToday, setIsToday] = useState(false);
+  const [api, setApi] = useState<CarouselApi>();
+  const [current, setCurrent] = useState(0);
 
   useEffect(() => {
     fetchBirthdays();
   }, []);
+
+  useEffect(() => {
+    if (!api) return;
+
+    setCurrent(api.selectedScrollSnap());
+    api.on('select', () => {
+      setCurrent(api.selectedScrollSnap());
+    });
+  }, [api]);
 
   const fetchBirthdays = async () => {
     try {
@@ -65,9 +81,33 @@ const BirthdayCard = () => {
     }
   };
 
+  // Split birthdays into slides of 5 items each
+  const splitIntoSlides = (birthdays: Birthday[], perSlide: number): Birthday[][] => {
+    const slides: Birthday[][] = [];
+    for (let i = 0; i < birthdays.length; i += perSlide) {
+      slides.push(birthdays.slice(i, i + perSlide));
+    }
+    return slides;
+  };
+
+  const birthdaySlides = splitIntoSlides(upcomingBirthdays, ITEMS_PER_SLIDE);
+
   if (upcomingBirthdays.length === 0) {
     return null;
   }
+
+  const renderBirthdayList = (birthdays: Birthday[]) => (
+    <div className="flex flex-col gap-1">
+      {birthdays.map((birthday) => (
+        <span
+          key={birthday.id}
+          className="text-sm font-bold text-pink-600 dark:text-pink-400"
+        >
+          {birthday.nama} ({birthday.lokasi})
+        </span>
+      ))}
+    </div>
+  );
 
   return (
     <Card className="bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-950/20 dark:to-purple-950/20 border-pink-200 dark:border-pink-800 shadow-lg">
@@ -85,16 +125,41 @@ const BirthdayCard = () => {
             <p className="text-sm font-semibold text-pink-700 dark:text-pink-300 mb-2">
               {isToday ? '🎉 Selamat Ulang Tahun! 🎉' : '🎂 Ulang Tahun Minggu Ini'}
             </p>
-            <div className="flex flex-col gap-1">
-              {upcomingBirthdays.map((birthday) => (
-                <span
-                  key={birthday.id}
-                  className="text-sm font-bold text-pink-600 dark:text-pink-400"
+            
+            {birthdaySlides.length > 1 ? (
+              <div>
+                <Carousel
+                  setApi={setApi}
+                  opts={{ loop: true }}
+                  plugins={[
+                    Autoplay({ delay: 4000, stopOnInteraction: false })
+                  ]}
+                  className="w-full"
                 >
-                  {birthday.nama} ({birthday.lokasi})
-                </span>
-              ))}
-            </div>
+                  <CarouselContent>
+                    {birthdaySlides.map((slide, slideIndex) => (
+                      <CarouselItem key={slideIndex}>
+                        {renderBirthdayList(slide)}
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                </Carousel>
+                {/* Dot Indicators */}
+                <div className="flex justify-center gap-1.5 mt-2">
+                  {birthdaySlides.map((_, index) => (
+                    <div
+                      key={index}
+                      className={cn(
+                        "w-2 h-2 rounded-full transition-colors duration-300",
+                        index === current ? "bg-pink-500" : "bg-pink-200 dark:bg-pink-800"
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              renderBirthdayList(upcomingBirthdays)
+            )}
           </div>
         </div>
       </CardContent>
