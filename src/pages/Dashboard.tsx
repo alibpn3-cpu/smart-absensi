@@ -39,6 +39,7 @@ import ActivityLogViewer from '../components/ActivityLogViewer';
 import NotCheckedInList from '../components/NotCheckedInList';
 const DashboardAnalytics = React.lazy(() => import('../components/DashboardAnalytics'));
 const ScoreReport = React.lazy(() => import('../components/ScoreReport'));
+const RankingOverrideManager = React.lazy(() => import('../components/RankingOverrideManager'));
 import { PieChart as RePieChart, Pie, Cell } from 'recharts';
 
 interface AttendanceRecord {
@@ -774,10 +775,15 @@ const Dashboard = () => {
             <ActivityLogViewer />
           </TabsContent>
 
-          <TabsContent value="scores">
+          <TabsContent value="scores" className="space-y-6">
             <React.Suspense fallback={<div className="text-center py-8">Loading Score Report...</div>}>
               <ScoreReport />
             </React.Suspense>
+            {isSuperAdmin && (
+              <React.Suspense fallback={<div className="text-center py-8">Loading...</div>}>
+                <RankingOverrideManager />
+              </React.Suspense>
+            )}
           </TabsContent>
 
           <TabsContent value="export">

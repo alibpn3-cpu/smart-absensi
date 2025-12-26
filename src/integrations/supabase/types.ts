@@ -382,6 +382,48 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_ranking_overrides: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          display_score: number | null
+          id: string
+          month: number
+          photo_url: string | null
+          staff_name: string
+          staff_uid: string
+          tier: string
+          updated_at: string | null
+          year: number
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          display_score?: number | null
+          id?: string
+          month: number
+          photo_url?: string | null
+          staff_name: string
+          staff_uid: string
+          tier: string
+          updated_at?: string | null
+          year: number
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          display_score?: number | null
+          id?: string
+          month?: number
+          photo_url?: string | null
+          staff_name?: string
+          staff_uid?: string
+          tier?: string
+          updated_at?: string | null
+          year?: number
+        }
+        Relationships: []
+      }
       p2h_toolbox_checklist: {
         Row: {
           checklist_date: string
