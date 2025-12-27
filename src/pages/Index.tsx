@@ -178,14 +178,14 @@ const Index = () => {
         <div className="flex flex-col items-center space-y-2">
           <div className="flex items-center justify-between w-full max-w-md gap-3">
             <div className="flex items-center gap-3 flex-1 justify-center">
-              {/* Logo in header - only for NON-kiosk mode */}
-              {logoUrl && !sharedDeviceMode && (
+              {/* App Logo in header - show in both modes */}
+              {logoUrl && (
                 <img 
                   src={logoUrl} 
-                  alt="Company Logo" 
+                  alt="App Logo" 
                   className="h-12 w-12 sm:h-16 sm:w-16 object-contain bg-transparent"
                   onError={(e) => {
-                    console.log('Logo failed to load');
+                    console.log('App logo failed to load');
                   }}
                 />
               )}
@@ -243,22 +243,6 @@ const Index = () => {
       <div className="relative z-10 flex items-center justify-center px-4 pt-2">
         <div className="w-full max-w-md">
           <AttendanceForm companyLogoUrl={companyLogoUrl} />
-          
-          {/* App Logo at Bottom - ONLY for Kiosk Mode */}
-          {sharedDeviceMode && logoUrl && (
-            <div className="mt-6 flex justify-center">
-              <div className="p-4 bg-card/50 rounded-xl backdrop-blur-sm border border-border/50">
-                <img 
-                  src={logoUrl} 
-                  alt="App Logo" 
-                  className="h-20 w-auto max-w-[200px] object-contain"
-                  onError={(e) => {
-                    console.log('App logo failed to load');
-                  }}
-                />
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
