@@ -24,6 +24,8 @@ import DebugLogger from './DebugLogger';
 import LocationAccuracyIndicator from './LocationAccuracyIndicator';
 import ScoreCard from './ScoreCard';
 import P2HToolboxCard from './P2HToolboxCard';
+import AttendanceStatusCard from './AttendanceStatusCard';
+import CompanyLogoCard from './CompanyLogoCard';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { saveScore } from '@/hooks/useScoreCalculation';
 import { format } from 'date-fns';
@@ -1945,13 +1947,22 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   return (
     <div className="min-h-screen bg-background p-4 pt-2">
       <div className="max-w-md mx-auto space-y-2 animate-fade-in">
-        {/* Birthday Card */}
-        <BirthdayCard />
         
-        {/* Ranking Card - Terpisah di bawah Birthday Card */}
-        {featureFlags.scoreEnabled && <RankingCard />}
+        {/* ========== CARD 1: Status In/Out Personal ========== */}
+        {isUserLoggedIn && !sharedDeviceMode && selectedStaff && (
+          <AttendanceStatusCard
+            checkInTime={regularAttendance?.check_in_time || null}
+            checkOutTime={regularAttendance?.check_out_time || null}
+            status={regularAttendance?.status as 'wfo' | 'wfh' | 'dinas' | null}
+          />
+        )}
         
-        {/* Header with Date/Time */}
+        {/* Kiosk Mode: Attendance Status List shows who has/hasn't checked in */}
+        {sharedDeviceMode && (
+          <AttendanceStatusList selectedWorkArea={selectedWorkArea} />
+        )}
+        
+        {/* ========== CARD 2: Jam Analog + Digital ========== */}
         <Card className="bg-card border shadow-lg">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-center gap-4 px-4">
@@ -2084,50 +2095,15 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           </CardHeader>
         </Card>
 
-        {/* Attendance Status List - Shows who has/hasn't checked in */}
-        <AttendanceStatusList selectedWorkArea={isUserLoggedIn && !sharedDeviceMode ? selectedStaff?.work_area || 'all' : selectedWorkArea} />
+        {/* ========== CARD 3: Birthday Card ========== */}
+        <BirthdayCard />
 
-        {/* KIOSK MODE: Show Area Tugas dropdown */}
+        {/* ========== KIOSK MODE: CARD 4 - Company Logo Card (2x height) ========== */}
         {sharedDeviceMode && (
-          <Card className="border-0 shadow-xl">
-            <CardContent className="p-4">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-primary" />
-                  <label className="text-sm font-semibold">Area Tugas</label>
-                </div>
-                
-                <Select
-                  onValueChange={handleWorkAreaSelect} 
-                  value={selectedWorkArea}
-                >
-                  <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
-                    <SelectValue placeholder="Pilih area tugas..." />
-                  </SelectTrigger>
-                  <SelectContent 
-                    className="bg-popover border-border shadow-lg max-h-[280px] overflow-y-auto z-50 data-[state=open]:duration-100"
-                    position="popper"
-                  >
-                    <SelectItem value="all" className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground font-semibold">
-                      🌍 Semua Area
-                    </SelectItem>
-                    {workAreas.filter(Boolean).map((area) => (
-                      <SelectItem 
-                        key={area} 
-                        value={area}
-                        className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground"
-                      >
-                        📍 {area}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+          <CompanyLogoCard logoUrl={companyLogoUrl} />
         )}
-
-        {/* USER LOGIN MODE: Show User Profile Card */}
+        
+        {/* ========== USER MODE: CARD 4 - User Detail Card ========== */}
         {isUserLoggedIn && !sharedDeviceMode && selectedStaff && (
           <Card className="border-0 shadow-xl bg-gradient-to-br from-primary/5 to-primary/10">
             <CardContent className="p-4">
@@ -2156,29 +2132,6 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
               </div>
             </CardContent>
           </Card>
-        )}
-
-        {/* GPS Status Indicator - Show for logged in user */}
-        {isUserLoggedIn && !sharedDeviceMode && (
-          <LocationAccuracyIndicator
-            accuracy={gpsStatus.accuracy}
-            isLoading={gpsStatus.isLoading}
-            onRetry={checkGpsStatus}
-          />
-        )}
-
-        {/* Score Card - Yesterday's score (if feature enabled) */}
-        {featureFlags.scoreEnabled && selectedStaff && !sharedDeviceMode && (
-          <ScoreCard staffUid={selectedStaff.uid} />
-        )}
-
-        {/* P2H/Toolbox Card - Only for primary employees (if feature enabled) */}
-        {featureFlags.scoreEnabled && selectedStaff?.employee_type === 'primary' && !sharedDeviceMode && (
-          <P2HToolboxCard
-            staffUid={selectedStaff.uid}
-            staffName={selectedStaff.name}
-            onChecklistChange={handleChecklistChange}
-          />
         )}
 
         {/* Action Buttons */}
@@ -2333,23 +2286,73 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           </CardContent>
         </Card>
 
-        {/* Company Logo Card - ONLY for Kiosk Mode */}
-        {sharedDeviceMode && companyLogoUrl && (
+        {/* ========== KIOSK MODE: CARD 6 - Area Tugas ========== */}
+        {sharedDeviceMode && (
           <Card className="border-0 shadow-xl">
-            <CardContent className="p-6 flex items-center justify-center" style={{ minHeight: '180px' }}>
-              <img 
-                src={companyLogoUrl} 
-                alt="Company Logo" 
-                className="max-h-[160px] max-w-full object-contain"
-                onError={(e) => {
-                  console.log('Company logo failed to load');
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
+            <CardContent className="p-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <label className="text-sm font-semibold">Area Tugas</label>
+                </div>
+                
+                <Select
+                  onValueChange={handleWorkAreaSelect} 
+                  value={selectedWorkArea}
+                >
+                  <SelectTrigger className="h-12 border-2 hover:border-primary transition-colors">
+                    <SelectValue placeholder="Pilih area tugas..." />
+                  </SelectTrigger>
+                  <SelectContent 
+                    className="bg-popover border-border shadow-lg max-h-[280px] overflow-y-auto z-50 data-[state=open]:duration-100"
+                    position="popper"
+                  >
+                    <SelectItem value="all" className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground font-semibold">
+                      🌍 Semua Area
+                    </SelectItem>
+                    {workAreas.filter(Boolean).map((area) => (
+                      <SelectItem 
+                        key={area} 
+                        value={area}
+                        className="cursor-pointer hover:bg-accent/50 focus:bg-accent/50 px-3 py-2 text-popover-foreground"
+                      >
+                        📍 {area}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardContent>
           </Card>
         )}
 
+        {/* ========== CARD 7: Ranking Card ========== */}
+        {featureFlags.scoreEnabled && <RankingCard />}
+
+        {/* ========== USER MODE: CARD 8 - GPS Status Indicator ========== */}
+        {isUserLoggedIn && !sharedDeviceMode && (
+          <LocationAccuracyIndicator
+            accuracy={gpsStatus.accuracy}
+            isLoading={gpsStatus.isLoading}
+            onRetry={checkGpsStatus}
+          />
+        )}
+
+        {/* ========== USER MODE: P2H/Toolbox Card (if applicable) ========== */}
+        {featureFlags.scoreEnabled && selectedStaff?.employee_type === 'primary' && !sharedDeviceMode && (
+          <P2HToolboxCard
+            staffUid={selectedStaff.uid}
+            staffName={selectedStaff.name}
+            onChecklistChange={handleChecklistChange}
+          />
+        )}
+
+        {/* ========== USER MODE: Attendance Status List ========== */}
+        {isUserLoggedIn && !sharedDeviceMode && (
+          <AttendanceStatusList selectedWorkArea={selectedStaff?.work_area || 'all'} />
+        )}
+
+        {/* ========== FOOTER: Version + Update + Debug ========== */}
         <div className="text-center text-xs text-muted-foreground mt-2 space-y-2">
           <div>Versi aplikasi : {appVersion} IT Division 2025</div>
           <div className="flex items-center justify-center gap-3 flex-wrap">
