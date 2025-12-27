@@ -128,7 +128,7 @@ const AttendanceStatusList: React.FC<AttendanceStatusListProps> = ({ selectedWor
             <CardTitle className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                <span>Status Absensi - {selectedWorkArea}</span>
+                <span>Status In/Out - {selectedWorkArea}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="default" className="bg-green-500 text-white">

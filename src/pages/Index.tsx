@@ -242,18 +242,18 @@ const Index = () => {
       {/* Main Attendance Form */}
       <div className="relative z-10 flex items-center justify-center px-4 pt-2">
         <div className="w-full max-w-md">
-          <AttendanceForm />
+          <AttendanceForm companyLogoUrl={companyLogoUrl} />
           
-          {/* Company Logo at Bottom - ONLY for Kiosk Mode */}
+          {/* App Logo at Bottom - ONLY for Kiosk Mode */}
           {sharedDeviceMode && logoUrl && (
             <div className="mt-6 flex justify-center">
               <div className="p-4 bg-card/50 rounded-xl backdrop-blur-sm border border-border/50">
                 <img 
                   src={logoUrl} 
-                  alt="Company Logo" 
+                  alt="App Logo" 
                   className="h-20 w-auto max-w-[200px] object-contain"
                   onError={(e) => {
-                    console.log('Logo failed to load');
+                    console.log('App logo failed to load');
                   }}
                 />
               </div>
