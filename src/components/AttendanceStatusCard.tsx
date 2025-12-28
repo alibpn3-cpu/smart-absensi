@@ -63,8 +63,8 @@ const AttendanceStatusCard: React.FC<AttendanceStatusCardProps> = ({
     if (hasCheckedIn) {
       return {
         icon: <Clock className="h-6 w-6 text-green-500 animate-pulse" />,
-        title: 'Sudah Check-In',
-        subtitle: `${getStatusLabel(status)} - Menunggu Check-Out`,
+        title: 'Sudah Clock-In',
+        subtitle: `${getStatusLabel(status)} - Menunggu Clock-Out`,
         bgClass: 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800',
         textClass: 'text-green-700 dark:text-green-300',
         showTimes: true,
@@ -73,7 +73,7 @@ const AttendanceStatusCard: React.FC<AttendanceStatusCardProps> = ({
 
     return {
       icon: <AlertCircle className="h-6 w-6 text-amber-500" />,
-      title: 'Belum Check-In',
+      title: 'Belum Clock-In',
       subtitle: 'Silakan lakukan presensi',
       bgClass: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800',
       textClass: 'text-amber-700 dark:text-amber-300',

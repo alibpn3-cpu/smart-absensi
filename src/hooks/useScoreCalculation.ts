@@ -168,3 +168,26 @@ export const getYesterdayScore = async (staffUid: string): Promise<number | null
     return null;
   }
 };
+
+// Get today's score for a user (used after clock-out)
+export const getTodayScore = async (staffUid: string): Promise<number | null> => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data, error } = await supabase
+      .from('daily_scores')
+      .select('final_score')
+      .eq('staff_uid', staffUid)
+      .eq('score_date', today)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return Number(data.final_score);
+  } catch (error) {
+    console.error('Error fetching today score:', error);
+    return null;
+  }
+};

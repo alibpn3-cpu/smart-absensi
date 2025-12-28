@@ -430,9 +430,11 @@ export type Database = {
           created_at: string
           id: string
           p2h_checked: boolean | null
+          p2h_photo_url: string | null
           staff_name: string
           staff_uid: string
           toolbox_checked: boolean | null
+          toolbox_photo_url: string | null
           updated_at: string
         }
         Insert: {
@@ -440,9 +442,11 @@ export type Database = {
           created_at?: string
           id?: string
           p2h_checked?: boolean | null
+          p2h_photo_url?: string | null
           staff_name: string
           staff_uid: string
           toolbox_checked?: boolean | null
+          toolbox_photo_url?: string | null
           updated_at?: string
         }
         Update: {
@@ -450,9 +454,11 @@ export type Database = {
           created_at?: string
           id?: string
           p2h_checked?: boolean | null
+          p2h_photo_url?: string | null
           staff_name?: string
           staff_uid?: string
           toolbox_checked?: boolean | null
+          toolbox_photo_url?: string | null
           updated_at?: string
         }
         Relationships: []
