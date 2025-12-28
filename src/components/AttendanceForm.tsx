@@ -23,6 +23,7 @@ import StatusPresensiDialog from './StatusPresensiDialog';
 import DebugLogger from './DebugLogger';
 import LocationAccuracyIndicator from './LocationAccuracyIndicator';
 import ScoreCard from './ScoreCard';
+import ScorePopup from './ScorePopup';
 import P2HToolboxCard from './P2HToolboxCard';
 import AttendanceStatusCard from './AttendanceStatusCard';
 import CompanyLogoCard from './CompanyLogoCard';
@@ -112,6 +113,10 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   
   // Kiosk mode state
   const [kioskPendingAction, setKioskPendingAction] = useState<{ type: 'regular' | 'overtime'; action: 'check-in' | 'check-out' } | null>(null);
+  
+  // Score popup state
+  const [showScorePopup, setShowScorePopup] = useState(false);
+  const [scorePopupStaff, setScorePopupStaff] = useState<{ uid: string; name: string } | null>(null);
   
   // Audio for button click
   const playClickSound = () => {
@@ -1331,6 +1336,14 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             toolboxChecked
           });
           console.log('✅ Score saved successfully');
+          
+          // Show score popup after successful clock-out (both modes)
+          const today = new Date().toISOString().split('T')[0];
+          const popupKey = `score_popup_shown_${today}_${selectedStaff.uid}`;
+          if (!localStorage.getItem(popupKey)) {
+            setScorePopupStaff({ uid: selectedStaff.uid, name: selectedStaff.name });
+            setShowScorePopup(true);
+          }
         } catch (scoreError) {
           console.error('Score calculation failed (non-blocking):', scoreError);
         }
@@ -1347,8 +1360,10 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       setPendingCheckoutLocation(null);
       
       // Reset for shared device mode after successful attendance (both check-in AND check-out)
+      // Delay reset to allow score popup to show
       if (sharedDeviceMode) {
         console.log('📱 Shared device mode: Resetting form after attendance');
+        const resetDelay = isCheckOut && featureFlags.scoreEnabled ? 5000 : 2000; // Longer delay if popup shown
         setTimeout(() => {
           setSelectedStaff(null);
           setAttendanceStatus('wfo');
@@ -1362,7 +1377,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             title: "✅ Absensi Berhasil",
             description: "Silakan scan QR Code untuk user berikutnya"
           });
-        }, 2000);
+        }, resetDelay);
       }
       
       // Always fetch attendance after successful action
@@ -1948,13 +1963,18 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     <div className="min-h-screen bg-background p-4 pt-2">
       <div className="max-w-md mx-auto space-y-2 animate-fade-in">
         
-        {/* ========== CARD 1: Status In/Out Personal ========== */}
+        {/* ========== CARD 1: Status In/Out Personal (USER MODE ONLY) ========== */}
         {isUserLoggedIn && !sharedDeviceMode && selectedStaff && (
           <AttendanceStatusCard
             checkInTime={regularAttendance?.check_in_time || null}
             checkOutTime={regularAttendance?.check_out_time || null}
             status={regularAttendance?.status as 'wfo' | 'wfh' | 'dinas' | null}
           />
+        )}
+        
+        {/* ========== SCORE CARD - Above Clock (USER MODE ONLY) ========== */}
+        {featureFlags.scoreEnabled && isUserLoggedIn && !sharedDeviceMode && selectedStaff && (
+          <ScoreCard staffUid={selectedStaff.uid} />
         )}
         
         {/* Kiosk Mode: Attendance Status List shows who has/hasn't checked in */}
@@ -2338,8 +2358,12 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           />
         )}
 
-        {/* ========== USER MODE: P2H/Toolbox Card (if applicable) ========== */}
-        {featureFlags.scoreEnabled && selectedStaff?.employee_type === 'primary' && !sharedDeviceMode && (
+        {/* ========== USER MODE: P2H/Toolbox Card (if primary & already checked in) ========== */}
+        {featureFlags.scoreEnabled && 
+         selectedStaff?.employee_type === 'primary' && 
+         !sharedDeviceMode && 
+         regularAttendance?.check_in_time && 
+         !regularAttendance?.check_out_time && (
           <P2HToolboxCard
             staffUid={selectedStaff.uid}
             staffName={selectedStaff.name}
@@ -2578,6 +2602,19 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             }}
             loading={loading}
             onCameraError={handleCameraError}
+          />
+        )}
+
+        {/* Score Popup - Shows after clock-out (both modes) */}
+        {scorePopupStaff && (
+          <ScorePopup
+            isOpen={showScorePopup}
+            onClose={() => {
+              setShowScorePopup(false);
+              setScorePopupStaff(null);
+            }}
+            staffUid={scorePopupStaff.uid}
+            staffName={scorePopupStaff.name}
           />
         )}
       </div>
