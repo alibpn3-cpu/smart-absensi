@@ -130,6 +130,7 @@ export type Database = {
           checkout_location_address: string | null
           checkout_location_lat: number | null
           checkout_location_lng: number | null
+          checkout_status: string | null
           created_at: string
           date: string
           hours_worked: number | null
@@ -153,6 +154,7 @@ export type Database = {
           checkout_location_address?: string | null
           checkout_location_lat?: number | null
           checkout_location_lng?: number | null
+          checkout_status?: string | null
           created_at?: string
           date?: string
           hours_worked?: number | null
@@ -176,6 +178,7 @@ export type Database = {
           checkout_location_address?: string | null
           checkout_location_lat?: number | null
           checkout_location_lng?: number | null
+          checkout_status?: string | null
           created_at?: string
           date?: string
           hours_worked?: number | null

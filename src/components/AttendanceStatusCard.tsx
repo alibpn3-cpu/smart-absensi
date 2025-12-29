@@ -1,12 +1,14 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle, Clock, AlertCircle, LogIn, LogOut } from 'lucide-react';
+import { CheckCircle, Clock, AlertCircle, LogIn, LogOut, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AttendanceStatusCardProps {
   checkInTime: string | null;
   checkOutTime: string | null;
   status: 'wfo' | 'wfh' | 'dinas' | null;
+  checkinLocationAddress?: string | null;
+  checkoutLocationAddress?: string | null;
   className?: string;
 }
 
@@ -14,6 +16,8 @@ const AttendanceStatusCard: React.FC<AttendanceStatusCardProps> = ({
   checkInTime,
   checkOutTime,
   status,
+  checkinLocationAddress,
+  checkoutLocationAddress,
   className,
 }) => {
   // Determine current state
@@ -34,6 +38,15 @@ const AttendanceStatusCard: React.FC<AttendanceStatusCardProps> = ({
     } catch {
       return timeString;
     }
+  };
+
+  // Shorten address for display (get first meaningful part)
+  const shortenAddress = (address: string | null | undefined): string | null => {
+    if (!address) return null;
+    // Get first part before comma, max 30 chars
+    const parts = address.split(',');
+    const firstPart = parts[0].trim();
+    return firstPart.length > 30 ? firstPart.substring(0, 27) + '...' : firstPart;
   };
 
   // Get status label
@@ -82,41 +95,60 @@ const AttendanceStatusCard: React.FC<AttendanceStatusCardProps> = ({
   };
 
   const config = getConfig();
+  const shortCheckinLocation = shortenAddress(checkinLocationAddress);
+  const shortCheckoutLocation = shortenAddress(checkoutLocationAddress);
 
   return (
     <Card className={cn('border shadow-lg', config.bgClass, className)}>
       <CardContent className="p-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-start gap-4">
           {/* Status Icon */}
-          <div className="shrink-0">
+          <div className="shrink-0 mt-1">
             {config.icon}
           </div>
 
           {/* Status Info */}
-          <div className="flex-1 min-w-0">
-            <h3 className={cn('font-semibold text-base', config.textClass)}>
-              {config.title}
-            </h3>
-            <p className="text-sm text-muted-foreground truncate">
-              {config.subtitle}
-            </p>
-          </div>
-
-          {/* Times */}
-          {config.showTimes && (
-            <div className="flex items-center gap-3 text-sm shrink-0">
-              <div className="flex items-center gap-1.5">
-                <LogIn className="h-4 w-4 text-green-500" />
-                <span className="font-medium">{formatTime(checkInTime)}</span>
-              </div>
-              {hasCheckedOut && (
-                <div className="flex items-center gap-1.5">
-                  <LogOut className="h-4 w-4 text-red-500" />
-                  <span className="font-medium">{formatTime(checkOutTime)}</span>
-                </div>
-              )}
+          <div className="flex-1 min-w-0 space-y-2">
+            <div>
+              <h3 className={cn('font-semibold text-base', config.textClass)}>
+                {config.title}
+              </h3>
+              <p className="text-sm text-muted-foreground truncate">
+                {config.subtitle}
+              </p>
             </div>
-          )}
+
+            {/* Times and Locations */}
+            {config.showTimes && (
+              <div className="flex flex-col gap-1.5 text-sm">
+                {/* Clock In */}
+                <div className="flex items-center gap-2">
+                  <LogIn className="h-4 w-4 text-green-500 shrink-0" />
+                  <span className="font-medium">{formatTime(checkInTime)}</span>
+                  {shortCheckinLocation && (
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground truncate">
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{shortCheckinLocation}</span>
+                    </span>
+                  )}
+                </div>
+                
+                {/* Clock Out */}
+                {hasCheckedOut && (
+                  <div className="flex items-center gap-2">
+                    <LogOut className="h-4 w-4 text-red-500 shrink-0" />
+                    <span className="font-medium">{formatTime(checkOutTime)}</span>
+                    {shortCheckoutLocation && (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground truncate">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{shortCheckoutLocation}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

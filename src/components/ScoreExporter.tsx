@@ -112,6 +112,30 @@ const ScoreExporter = () => {
       return null;
     }
 
+    // Fetch P2H/Toolbox checklist data
+    if (data && data.length > 0) {
+      const dates = [...new Set(data.map((r: any) => r.score_date))];
+      const uids = [...new Set(data.map((r: any) => r.staff_uid))];
+      
+      const { data: checklistData } = await supabase
+        .from('p2h_toolbox_checklist')
+        .select('*')
+        .in('checklist_date', dates)
+        .in('staff_uid', uids);
+      
+      // Create lookup map
+      const checklistMap = new Map();
+      checklistData?.forEach((c: any) => {
+        checklistMap.set(`${c.staff_uid}_${c.checklist_date}`, c);
+      });
+      
+      // Attach checklist data to each score record
+      return data.map((record: any) => ({
+        ...record,
+        checklist: checklistMap.get(`${record.staff_uid}_${record.score_date}`) || null
+      }));
+    }
+
     return data;
   };
 
@@ -129,7 +153,7 @@ const ScoreExporter = () => {
       }
 
       if (exportFormat === 'excel') {
-        exportToExcel(data);
+        await exportToExcel(data);
       } else if (exportFormat === 'pdf') {
         exportToPDF(data);
       } else {
@@ -140,7 +164,31 @@ const ScoreExporter = () => {
     }
   };
 
-  const exportToExcel = (data: any[]) => {
+  const exportToExcel = async (data: any[]) => {
+    // Generate photo URLs for P2H/Toolbox
+    const photoUrls = await Promise.all(
+      data.map(async (record) => {
+        let p2hUrl = null;
+        let toolboxUrl = null;
+        
+        if (record.checklist?.p2h_photo_url) {
+          const { data: urlData } = supabase.storage
+            .from('p2h-photos')
+            .getPublicUrl(record.checklist.p2h_photo_url);
+          p2hUrl = urlData?.publicUrl || null;
+        }
+        
+        if (record.checklist?.toolbox_photo_url) {
+          const { data: urlData } = supabase.storage
+            .from('p2h-photos')
+            .getPublicUrl(record.checklist.toolbox_photo_url);
+          toolboxUrl = urlData?.publicUrl || null;
+        }
+        
+        return { p2h: p2hUrl, toolbox: toolboxUrl };
+      })
+    );
+
     const excelData = data.map((record, index) => ({
       'No': index + 1,
       'UID': record.staff_uid,
@@ -156,11 +204,34 @@ const ScoreExporter = () => {
       'Score Toolbox': record.toolbox_score,
       'Final Score': record.final_score,
       'Terlambat': record.is_late ? 'Ya' : 'Tidak',
+      'Foto P2H': photoUrls[index]?.p2h ? 'Lihat Foto' : '-',
+      'Foto Toolbox': photoUrls[index]?.toolbox ? 'Lihat Foto' : '-',
       'Metode Kalkulasi': record.calculation_method || 'manual'
     }));
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(excelData);
+
+    // Add hyperlinks for P2H and Toolbox photos
+    data.forEach((record, index) => {
+      const rowIndex = index + 2;
+      
+      if (photoUrls[index]?.p2h) {
+        ws[`O${rowIndex}`] = {
+          t: 's',
+          v: 'Lihat Foto',
+          l: { Target: photoUrls[index].p2h, Tooltip: 'Buka foto P2H' }
+        };
+      }
+      
+      if (photoUrls[index]?.toolbox) {
+        ws[`P${rowIndex}`] = {
+          t: 's',
+          v: 'Lihat Foto',
+          l: { Target: photoUrls[index].toolbox, Tooltip: 'Buka foto Toolbox' }
+        };
+      }
+    });
 
     // Set column widths
     ws['!cols'] = [
@@ -178,6 +249,8 @@ const ScoreExporter = () => {
       { wch: 10 },  // Toolbox
       { wch: 12 },  // Final
       { wch: 10 },  // Terlambat
+      { wch: 12 },  // Foto P2H
+      { wch: 12 },  // Foto Toolbox
       { wch: 12 }   // Metode
     ];
 

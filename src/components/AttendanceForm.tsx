@@ -207,9 +207,17 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             position: session.position,
             work_area: session.work_area,
             photo_url: session.photo_url,
-            division: session.division
+            division: session.division,
+            employee_type: session.employee_type // Include employee_type for P2HToolboxCard visibility
           });
           setSelectedWorkArea(session.work_area);
+          
+          // Debug log for P2HToolboxCard visibility
+          console.log('🔍 Session loaded:', {
+            uid: session.uid,
+            name: session.name,
+            employee_type: session.employee_type
+          });
         } catch (error) {
           console.error('Error parsing session:', error);
         }
@@ -1969,6 +1977,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             checkInTime={regularAttendance?.check_in_time || null}
             checkOutTime={regularAttendance?.check_out_time || null}
             status={regularAttendance?.status as 'wfo' | 'wfh' | 'dinas' | null}
+            checkinLocationAddress={regularAttendance?.checkin_location_address}
+            checkoutLocationAddress={regularAttendance?.checkout_location_address}
           />
         )}
         
