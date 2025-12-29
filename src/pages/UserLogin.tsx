@@ -17,6 +17,7 @@ interface UserSession {
   division?: string;
   photo_url?: string;
   is_admin: boolean;
+  employee_type?: string;
 }
 
 const UserLogin = () => {
@@ -72,7 +73,7 @@ const UserLogin = () => {
       // Find staff by UID
       const { data: staff, error } = await supabase
         .from('staff_users')
-        .select('uid, name, position, work_area, division, photo_url, is_active, password_hash, is_first_login, is_admin')
+        .select('uid, name, position, work_area, division, photo_url, is_active, password_hash, is_first_login, is_admin, employee_type')
         .eq('uid', credentials.uid.toUpperCase().trim())
         .maybeSingle();
 
@@ -120,7 +121,8 @@ const UserLogin = () => {
         work_area: staff.work_area,
         division: staff.division || undefined,
         photo_url: staff.photo_url || undefined,
-        is_admin: staff.is_admin || false
+        is_admin: staff.is_admin || false,
+        employee_type: staff.employee_type || 'staff'
       };
 
       // Check if first login - require password change

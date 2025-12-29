@@ -199,6 +199,22 @@ const AttendanceExporter = () => {
         return;
       }
 
+      // Fetch P2H/Toolbox checklist data for all records
+      const dates = [...new Set(attendanceData.map((r: any) => r.date))];
+      const uids = [...new Set(attendanceData.map((r: any) => r.staff_uid))];
+      
+      const { data: checklistData } = await supabase
+        .from('p2h_toolbox_checklist')
+        .select('*')
+        .in('checklist_date', dates)
+        .in('staff_uid', uids);
+      
+      // Create lookup map for checklist data
+      const checklistMap = new Map();
+      checklistData?.forEach((c: any) => {
+        checklistMap.set(`${c.staff_uid}_${c.checklist_date}`, c);
+      });
+
       // Prepare data for Excel (resolve geofence name for WFO)
       const { data: geofences } = await supabase
         .from('geofence_areas')
@@ -233,11 +249,11 @@ const AttendanceExporter = () => {
       };
 
       const excelData = attendanceData.map((record: any, index: number) => {
-        const geofenceName = record.status === 'wfo' && record.checkin_location_lat && record.checkin_location_lng
+        const checkinGeofenceName = record.checkin_location_lat && record.checkin_location_lng
           ? findGeofenceName(Number(record.checkin_location_lat), Number(record.checkin_location_lng))
           : null;
         
-        const checkoutGeofenceName = record.status === 'wfo' && record.checkout_location_lat && record.checkout_location_lng
+        const checkoutGeofenceName = record.checkout_location_lat && record.checkout_location_lng
           ? findGeofenceName(Number(record.checkout_location_lat), Number(record.checkout_location_lng))
           : null;
         
@@ -247,6 +263,9 @@ const AttendanceExporter = () => {
           
         const emp = allEmployees.find((s: any) => s.uid === record.staff_uid);
         
+        // Get P2H/Toolbox checklist for this record
+        const checklist = checklistMap.get(`${record.staff_uid}_${record.date}`);
+        
         return {
           'No': index + 1,
           'UID Karyawan': record.staff_uid,
@@ -255,21 +274,28 @@ const AttendanceExporter = () => {
           'Area Kerja': emp?.work_area || '-',
           'Divisi': emp?.division || '-',
           'Tanggal': new Date(record.date).toLocaleDateString('id-ID'),
-          'Status': record.status.toUpperCase(),
+          'Status Clock-In': record.status?.toUpperCase() || '-',
+          'Status Clock-Out': record.checkout_status?.toUpperCase() || record.status?.toUpperCase() || '-',
           'Jenis Absensi': record.attendance_type === 'overtime' ? 'LEMBUR' : 'REGULAR',
           'Waktu Clock In': formatTimeForExport(record.check_in_time),
           'Waktu Clock Out': formatTimeForExport(record.check_out_time),
           'Total Jam Kerja': record.hours_worked || calculateWorkHours(record.check_in_time, record.check_out_time),
-          'Alamat Lokasi Clock In': geofenceName || record.checkin_location_address || '-',
-          'Koordinat Clock In': record.checkin_location_lat && record.checkin_location_lng 
+          'Geofence Clock-In': checkinGeofenceName || '-',
+          'Alamat Clock-In': record.checkin_location_address || '-',
+          'Koordinat Clock-In': record.checkin_location_lat && record.checkin_location_lng 
             ? `${record.checkin_location_lat}, ${record.checkin_location_lng}` 
             : '-',
-          'Alamat Lokasi Clock Out': checkoutAddress || '-',
-          'Koordinat Clock Out': checkoutLat && checkoutLng 
+          'Geofence Clock-Out': checkoutGeofenceName || '-',
+          'Alamat Clock-Out': checkoutAddress || '-',
+          'Koordinat Clock-Out': checkoutLat && checkoutLng 
             ? `${checkoutLat}, ${checkoutLng}` 
             : '-',
-          'Foto Clock In': record.selfie_checkin_url || record.selfie_photo_url ? 'Lihat Foto' : '-',
-          'Foto Clock Out': record.selfie_checkout_url ? 'Lihat Foto' : '-',
+          'Foto Clock-In': record.selfie_checkin_url || record.selfie_photo_url ? 'Lihat Foto' : '-',
+          'Foto Clock-Out': record.selfie_checkout_url ? 'Lihat Foto' : '-',
+          'P2H': checklist?.p2h_checked ? 'Ya' : 'Tidak',
+          'Foto P2H': checklist?.p2h_photo_url ? 'Lihat Foto' : '-',
+          'Toolbox': checklist?.toolbox_checked ? 'Ya' : 'Tidak',
+          'Foto Toolbox': checklist?.toolbox_photo_url ? 'Lihat Foto' : '-',
           'Alasan': record.reason || '-'
         };
       });
@@ -278,21 +304,24 @@ const AttendanceExporter = () => {
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(excelData);
 
-      // Generate signed URLs for private photos (both check-in and check-out)
+      // Generate signed URLs for all photos
       const signedPhotoUrls = await Promise.all(
         attendanceData.map(async (record: any) => {
           const checkinUrl = record.selfie_checkin_url || record.selfie_photo_url;
           const checkoutUrl = record.selfie_checkout_url;
+          const checklist = checklistMap.get(`${record.staff_uid}_${record.date}`);
           
           let checkinSigned = null;
           let checkoutSigned = null;
+          let p2hSigned = null;
+          let toolboxSigned = null;
           
+          // Attendance photos from attendance-photos bucket
           if (checkinUrl) {
             try {
-              const { data } = await supabase
-                .storage
+              const { data } = await supabase.storage
                 .from('attendance-photos')
-                .createSignedUrl(checkinUrl, 60 * 60 * 24 * 14); // 14 days
+                .createSignedUrl(checkinUrl, 60 * 60 * 24 * 14);
               checkinSigned = data?.signedUrl || null;
             } catch (e) {
               console.error('Error generating check-in signed URL:', e);
@@ -301,27 +330,49 @@ const AttendanceExporter = () => {
           
           if (checkoutUrl) {
             try {
-              const { data } = await supabase
-                .storage
+              const { data } = await supabase.storage
                 .from('attendance-photos')
-                .createSignedUrl(checkoutUrl, 60 * 60 * 24 * 14); // 14 days
+                .createSignedUrl(checkoutUrl, 60 * 60 * 24 * 14);
               checkoutSigned = data?.signedUrl || null;
             } catch (e) {
               console.error('Error generating check-out signed URL:', e);
             }
           }
           
-          return { checkin: checkinSigned, checkout: checkoutSigned };
+          // P2H/Toolbox photos from p2h-photos bucket (public bucket - use getPublicUrl)
+          if (checklist?.p2h_photo_url) {
+            try {
+              const { data } = supabase.storage
+                .from('p2h-photos')
+                .getPublicUrl(checklist.p2h_photo_url);
+              p2hSigned = data?.publicUrl || null;
+            } catch (e) {
+              console.error('Error getting P2H photo URL:', e);
+            }
+          }
+          
+          if (checklist?.toolbox_photo_url) {
+            try {
+              const { data } = supabase.storage
+                .from('p2h-photos')
+                .getPublicUrl(checklist.toolbox_photo_url);
+              toolboxSigned = data?.publicUrl || null;
+            } catch (e) {
+              console.error('Error getting Toolbox photo URL:', e);
+            }
+          }
+          
+          return { checkin: checkinSigned, checkout: checkoutSigned, p2h: p2hSigned, toolbox: toolboxSigned };
         })
       );
 
       // Add hyperlinks after creating the sheet
       attendanceData.forEach((record: any, index: number) => {
-        const rowIndex = index + 2; // +2 because row 1 is header and Excel is 1-indexed
+        const rowIndex = index + 2;
         
-        // Add clock-in coordinate hyperlink
+        // Koordinat Clock-In hyperlink (Column P)
         if (record.checkin_location_lat && record.checkin_location_lng) {
-          const coordCell = `N${rowIndex}`; // Column N is Koordinat Clock In (was M before new column)
+          const coordCell = `P${rowIndex}`;
           const mapsUrl = `https://www.google.com/maps?q=${record.checkin_location_lat},${record.checkin_location_lng}`;
           ws[coordCell] = {
             t: 's',
@@ -330,11 +381,11 @@ const AttendanceExporter = () => {
           };
         }
         
-        // Add clock-out coordinate hyperlink (with fallback to clock-in if needed)
+        // Koordinat Clock-Out hyperlink (Column S)
         const cLat = record.checkout_location_lat ?? (record.check_out_time ? record.checkin_location_lat : null);
         const cLng = record.checkout_location_lng ?? (record.check_out_time ? record.checkin_location_lng : null);
         if (cLat && cLng) {
-          const coordCell = `P${rowIndex}`; // Column P is Koordinat Clock Out (was O before new column)
+          const coordCell = `S${rowIndex}`;
           const mapsUrl = `https://www.google.com/maps?q=${cLat},${cLng}`;
           ws[coordCell] = {
             t: 's',
@@ -343,26 +394,41 @@ const AttendanceExporter = () => {
           };
         }
         
-        // Add photo hyperlinks (signed URLs)
         const photoUrls = signedPhotoUrls[index];
         
-        // Clock-in photo
+        // Foto Clock-In (Column T)
         if (photoUrls?.checkin) {
-          const checkinPhotoCell = `Q${rowIndex}`; // Column Q is Foto Clock In (was P before new column)
-          ws[checkinPhotoCell] = {
+          ws[`T${rowIndex}`] = {
             t: 's',
             v: 'Lihat Foto',
             l: { Target: photoUrls.checkin, Tooltip: 'Buka foto clock-in' }
           };
         }
         
-        // Clock-out photo
+        // Foto Clock-Out (Column U)
         if (photoUrls?.checkout) {
-          const checkoutPhotoCell = `R${rowIndex}`; // Column R is Foto Clock Out (was Q before new column)
-          ws[checkoutPhotoCell] = {
+          ws[`U${rowIndex}`] = {
             t: 's',
             v: 'Lihat Foto',
             l: { Target: photoUrls.checkout, Tooltip: 'Buka foto clock-out' }
+          };
+        }
+        
+        // Foto P2H (Column W)
+        if (photoUrls?.p2h) {
+          ws[`W${rowIndex}`] = {
+            t: 's',
+            v: 'Lihat Foto',
+            l: { Target: photoUrls.p2h, Tooltip: 'Buka foto P2H' }
+          };
+        }
+        
+        // Foto Toolbox (Column Y)
+        if (photoUrls?.toolbox) {
+          ws[`Y${rowIndex}`] = {
+            t: 's',
+            v: 'Lihat Foto',
+            l: { Target: photoUrls.toolbox, Tooltip: 'Buka foto Toolbox' }
           };
         }
       });
@@ -376,17 +442,24 @@ const AttendanceExporter = () => {
         { wch: 15 },  // Area Kerja
         { wch: 12 },  // Divisi
         { wch: 12 },  // Tanggal
-        { wch: 8 },   // Status
-        { wch: 12 },  // Jenis Absensi (NEW)
+        { wch: 12 },  // Status Clock-In
+        { wch: 12 },  // Status Clock-Out
+        { wch: 12 },  // Jenis Absensi
         { wch: 18 },  // Clock In
         { wch: 18 },  // Clock Out
         { wch: 12 },  // Total Jam
-        { wch: 35 },  // Alamat Clock In
-        { wch: 20 },  // Koordinat Clock In
-        { wch: 35 },  // Alamat Clock Out
-        { wch: 20 },  // Koordinat Clock Out
-        { wch: 15 },  // Foto Clock In
-        { wch: 15 },  // Foto Clock Out
+        { wch: 20 },  // Geofence Clock-In
+        { wch: 35 },  // Alamat Clock-In
+        { wch: 20 },  // Koordinat Clock-In
+        { wch: 20 },  // Geofence Clock-Out
+        { wch: 35 },  // Alamat Clock-Out
+        { wch: 20 },  // Koordinat Clock-Out
+        { wch: 12 },  // Foto Clock-In
+        { wch: 12 },  // Foto Clock-Out
+        { wch: 8 },   // P2H
+        { wch: 12 },  // Foto P2H
+        { wch: 8 },   // Toolbox
+        { wch: 12 },  // Foto Toolbox
         { wch: 20 }   // Alasan
       ];
       ws['!cols'] = colWidths;
@@ -444,8 +517,25 @@ const AttendanceExporter = () => {
       });
       return null;
     }
+    
+    // Fetch P2H/Toolbox checklist data
+    const dates = [...new Set(attendanceData.map((r: any) => r.date))];
+    const uids = [...new Set(attendanceData.map((r: any) => r.staff_uid))];
+    
+    const { data: checklistData } = await supabase
+      .from('p2h_toolbox_checklist')
+      .select('*')
+      .in('checklist_date', dates)
+      .in('staff_uid', uids);
+    
+    const checklistMap = new Map();
+    checklistData?.forEach((c: any) => {
+      checklistMap.set(`${c.staff_uid}_${c.checklist_date}`, c);
+    });
+    
     return attendanceData.map((record: any, index: number) => {
       const emp = allEmployees.find((s: any) => s.uid === record.staff_uid);
+      const checklist = checklistMap.get(`${record.staff_uid}_${record.date}`);
       return {
         no: index + 1,
         uid: record.staff_uid,
@@ -454,13 +544,16 @@ const AttendanceExporter = () => {
         workArea: emp?.work_area || '-',
         division: emp?.division || '-',
         date: new Date(record.date).toLocaleDateString('id-ID'),
-        status: record.status.toUpperCase(),
+        statusIn: record.status?.toUpperCase() || '-',
+        statusOut: record.checkout_status?.toUpperCase() || record.status?.toUpperCase() || '-',
         attendanceType: record.attendance_type === 'overtime' ? 'LEMBUR' : 'REGULAR',
         checkIn: formatTimeForExport(record.check_in_time),
         checkOut: formatTimeForExport(record.check_out_time),
         hoursWorked: record.hours_worked || calculateWorkHours(record.check_in_time, record.check_out_time),
         checkinAddress: record.checkin_location_address || '-',
         checkoutAddress: record.checkout_location_address || '-',
+        p2h: checklist?.p2h_checked ? 'Ya' : 'Tidak',
+        toolbox: checklist?.toolbox_checked ? 'Ya' : 'Tidak',
         reason: record.reason || '-'
       };
     });
@@ -487,9 +580,9 @@ const AttendanceExporter = () => {
       
       // Table
       autoTable(doc, {
-        head: [['No', 'Nama', 'Tanggal', 'Status', 'Jenis', 'Clock In', 'Clock Out', 'Jam Kerja', 'Lokasi Clock In']],
+        head: [['No', 'Nama', 'Tanggal', 'Status In', 'Status Out', 'Jenis', 'Clock In', 'Clock Out', 'Jam Kerja', 'Lokasi']],
         body: data.map((r) => [
-          r.no, r.name, r.date, r.status, r.attendanceType, r.checkIn, r.checkOut, r.hoursWorked, r.checkinAddress
+          r.no, r.name, r.date, r.statusIn, r.statusOut, r.attendanceType, r.checkIn, r.checkOut, r.hoursWorked, r.checkinAddress
         ]),
         startY: 32,
         styles: { fontSize: 8, cellPadding: 2 },
@@ -525,9 +618,9 @@ const AttendanceExporter = () => {
       if (!data) { setLoading(false); return; }
 
       const BOM = '\uFEFF';
-      const headers = ['No', 'UID', 'Nama', 'Jabatan', 'Area Kerja', 'Divisi', 'Tanggal', 'Status', 'Jenis Absensi', 'Clock In', 'Clock Out', 'Jam Kerja', 'Lokasi Clock In', 'Lokasi Clock Out', 'Alasan'];
+      const headers = ['No', 'UID', 'Nama', 'Jabatan', 'Area Kerja', 'Divisi', 'Tanggal', 'Status In', 'Status Out', 'Jenis Absensi', 'Clock In', 'Clock Out', 'Jam Kerja', 'Lokasi Clock In', 'Lokasi Clock Out', 'P2H', 'Toolbox', 'Alasan'];
       const rows = data.map((r) => [
-        r.no, r.uid, r.name, r.position, r.workArea, r.division, r.date, r.status, r.attendanceType, r.checkIn, r.checkOut, r.hoursWorked, r.checkinAddress, r.checkoutAddress, r.reason
+        r.no, r.uid, r.name, r.position, r.workArea, r.division, r.date, r.statusIn, r.statusOut, r.attendanceType, r.checkIn, r.checkOut, r.hoursWorked, r.checkinAddress, r.checkoutAddress, r.p2h, r.toolbox, r.reason
       ]);
       
       const csvContent = BOM + [
@@ -558,7 +651,7 @@ const AttendanceExporter = () => {
           <td>${r.no}</td>
           <td>${r.name}</td>
           <td>${r.date}</td>
-          <td><span class="badge ${r.status.toLowerCase()}">${r.status}</span></td>
+          <td><span class="badge ${r.statusIn.toLowerCase()}">${r.statusIn}</span></td>
           <td>${r.attendanceType}</td>
           <td>${r.checkIn}</td>
           <td>${r.checkOut}</td>
