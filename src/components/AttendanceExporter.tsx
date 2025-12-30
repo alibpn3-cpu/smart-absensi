@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Download, FileSpreadsheet, Calendar, Filter, FileText, FileJson } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -42,6 +43,7 @@ const AttendanceExporter = () => {
   const [loading, setLoading] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [exportFormat, setExportFormat] = useState<'excel' | 'pdf' | 'csv' | 'html'>('excel');
+  const [skipBlankDates, setSkipBlankDates] = useState(false);
 
   React.useEffect(() => {
     fetchEmployees();
@@ -82,6 +84,19 @@ const AttendanceExporter = () => {
       setWorkAreas(areas);
     }
     setLoadingEmployees(false);
+  };
+
+  // Generate all dates in a range
+  const generateDateRange = (start: string, end: string): string[] => {
+    const dates: string[] = [];
+    const current = new Date(start);
+    const endDate = new Date(end);
+    
+    while (current <= endDate) {
+      dates.push(current.toISOString().split('T')[0]);
+      current.setDate(current.getDate() + 1);
+    }
+    return dates;
   };
 
   const fetchAttendanceData = async () => {
@@ -137,6 +152,85 @@ const AttendanceExporter = () => {
     return data;
   };
 
+  // Fetch attendance data with date range filling (for exports that show all dates)
+  const fetchAttendanceDataWithDateRange = async () => {
+    const attendanceData = await fetchAttendanceData();
+    if (!attendanceData) return null;
+    
+    // If skipBlankDates is true, just return the raw data
+    if (skipBlankDates) {
+      return attendanceData;
+    }
+    
+    // Generate all dates in range
+    const allDates = generateDateRange(filters.startDate, filters.endDate);
+    
+    // Create attendance map for quick lookup
+    const attendanceMap = new Map();
+    attendanceData.forEach((record: any) => {
+      const key = `${record.staff_uid}_${record.date}`;
+      attendanceMap.set(key, record);
+    });
+    
+    // Determine target UIDs
+    let targetUids: string[];
+    if (filters.employeeUid !== 'all') {
+      targetUids = [filters.employeeUid];
+    } else if (filters.workArea !== 'all') {
+      targetUids = allEmployees
+        .filter((s) => s.work_area === filters.workArea)
+        .map((s) => s.uid);
+    } else {
+      // Get unique UIDs from attendance data
+      targetUids = [...new Set(attendanceData.map((r: any) => r.staff_uid))];
+    }
+    
+    // Generate data for all dates
+    const result: any[] = [];
+    for (const uid of targetUids) {
+      const emp = allEmployees.find((e) => e.uid === uid);
+      for (const date of allDates) {
+        const record = attendanceMap.get(`${uid}_${date}`);
+        if (record) {
+          result.push(record);
+        } else {
+          // Create empty record for this date
+          result.push({
+            staff_uid: uid,
+            staff_name: emp?.name || uid,
+            date: date,
+            status: null,
+            checkout_status: null,
+            attendance_type: null,
+            check_in_time: null,
+            check_out_time: null,
+            hours_worked: null,
+            checkin_location_address: null,
+            checkin_location_lat: null,
+            checkin_location_lng: null,
+            checkout_location_address: null,
+            checkout_location_lat: null,
+            checkout_location_lng: null,
+            selfie_checkin_url: null,
+            selfie_checkout_url: null,
+            selfie_photo_url: null,
+            reason: null,
+            _isEmpty: true // Flag to identify empty records
+          });
+        }
+      }
+    }
+    
+    // Sort by date descending, then by name
+    result.sort((a, b) => {
+      const dateCompare = b.date.localeCompare(a.date);
+      if (dateCompare !== 0) return dateCompare;
+      return (a.staff_name || '').localeCompare(b.staff_name || '');
+    });
+    
+    return result;
+  };
+
   const formatTimeForExport = (timeString: string | null) => {
     if (!timeString) return '-';
     try {
@@ -187,7 +281,7 @@ const AttendanceExporter = () => {
     setLoading(true);
     
     try {
-      const attendanceData = await fetchAttendanceData();
+      const attendanceData = await fetchAttendanceDataWithDateRange();
       
       if (!attendanceData || attendanceData.length === 0) {
         toast({
@@ -508,7 +602,7 @@ const AttendanceExporter = () => {
   };
 
   const getExportData = async () => {
-    const attendanceData = await fetchAttendanceData();
+    const attendanceData = await fetchAttendanceDataWithDateRange();
     if (!attendanceData || attendanceData.length === 0) {
       toast({
         title: "Tidak Ada Data",
@@ -536,25 +630,26 @@ const AttendanceExporter = () => {
     return attendanceData.map((record: any, index: number) => {
       const emp = allEmployees.find((s: any) => s.uid === record.staff_uid);
       const checklist = checklistMap.get(`${record.staff_uid}_${record.date}`);
+      const isEmpty = record._isEmpty === true;
       return {
         no: index + 1,
         uid: record.staff_uid,
-        name: record.staff_name,
+        name: record.staff_name || emp?.name || '-',
         position: emp?.position || '-',
         workArea: emp?.work_area || '-',
         division: emp?.division || '-',
         date: new Date(record.date).toLocaleDateString('id-ID'),
-        statusIn: record.status?.toUpperCase() || '-',
-        statusOut: record.checkout_status?.toUpperCase() || record.status?.toUpperCase() || '-',
-        attendanceType: record.attendance_type === 'overtime' ? 'LEMBUR' : 'REGULAR',
-        checkIn: formatTimeForExport(record.check_in_time),
-        checkOut: formatTimeForExport(record.check_out_time),
-        hoursWorked: record.hours_worked || calculateWorkHours(record.check_in_time, record.check_out_time),
-        checkinAddress: record.checkin_location_address || '-',
-        checkoutAddress: record.checkout_location_address || '-',
+        statusIn: isEmpty ? '-' : (record.status?.toUpperCase() || '-'),
+        statusOut: isEmpty ? '-' : (record.checkout_status?.toUpperCase() || record.status?.toUpperCase() || '-'),
+        attendanceType: isEmpty ? '-' : (record.attendance_type === 'overtime' ? 'LEMBUR' : 'REGULAR'),
+        checkIn: isEmpty ? '-' : formatTimeForExport(record.check_in_time),
+        checkOut: isEmpty ? '-' : formatTimeForExport(record.check_out_time),
+        hoursWorked: isEmpty ? '-' : (record.hours_worked || calculateWorkHours(record.check_in_time, record.check_out_time)),
+        checkinAddress: isEmpty ? '-' : (record.checkin_location_address || '-'),
+        checkoutAddress: isEmpty ? '-' : (record.checkout_location_address || '-'),
         p2h: checklist?.p2h_checked ? 'Ya' : 'Tidak',
         toolbox: checklist?.toolbox_checked ? 'Ya' : 'Tidak',
-        reason: record.reason || '-'
+        reason: isEmpty ? '-' : (record.reason || '-')
       };
     });
   };
@@ -857,6 +952,18 @@ const AttendanceExporter = () => {
               <div>📋 Status: {filters.status === 'all' ? 'Semua Status' : filters.status.toUpperCase()}</div>
               <div>🏢 Area Tugas: {filters.workArea === 'all' ? 'Semua Area' : filters.workArea}</div>
               <div>👤 Karyawan: {filters.employeeUid === 'all' ? 'Semua Karyawan' : employees.find(e => e.uid === filters.employeeUid)?.name || filters.employeeUid}</div>
+            </div>
+            
+            {/* Skip Blank Dates Checkbox */}
+            <div className="flex items-center space-x-2 mt-3 pt-3 border-t border-muted">
+              <Checkbox
+                id="skipBlankDates"
+                checked={skipBlankDates}
+                onCheckedChange={(checked) => setSkipBlankDates(checked === true)}
+              />
+              <Label htmlFor="skipBlankDates" className="text-sm cursor-pointer">
+                Skip tanggal tanpa data presensi
+              </Label>
             </div>
           </div>
 

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Shield, User, LogIn } from 'lucide-react';
+import { Shield, User, LogIn, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import AttendanceForm from '../components/AttendanceForm';
 import AdPopup from '../components/AdPopup';
+import { toast } from '@/hooks/use-toast';
 
 interface UserSession {
   uid: string;
@@ -49,6 +50,21 @@ const Index = () => {
         clearTimeout(secretClickTimeoutRef.current);
       }
     }
+  };
+
+  // Exit browser handler
+  const handleExit = () => {
+    // Try to close the window first
+    window.close();
+    
+    // If window.close() doesn't work, show instruction
+    setTimeout(() => {
+      toast({
+        title: "Untuk Keluar",
+        description: "Silakan tutup tab/browser secara manual atau tekan tombol home pada perangkat Anda.",
+        duration: 5000
+      });
+    }, 500);
   };
 
   // Auto-detect timezone from device
@@ -195,6 +211,18 @@ const Index = () => {
             </div>
             
             <div className="flex items-center gap-2">
+              {/* Exit button - always visible */}
+              <Button
+                variant="outline" 
+                size="sm"
+                onClick={handleExit}
+                className="bg-red-500/10 border-red-500/20 text-red-600 hover:bg-red-500/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 px-2 py-1 h-8 text-xs"
+                title="Keluar dari aplikasi"
+              >
+                <LogOut className="h-3 w-3 mr-1" />
+                Keluar
+              </Button>
+
               {/* Profile button - only show when logged in (not kiosk) */}
               {userSession && !sharedDeviceMode && (
                 <Button

@@ -32,25 +32,9 @@ const StatusPresensiDialog: React.FC<StatusPresensiDialogProps> = ({
   const isCheckout = actionType === 'check-out' || actionType === 'out-extend';
   
   const getAllowedStatuses = (): ('wfo' | 'wfh' | 'dinas')[] => {
-    if (!isCheckout || !checkInStatus) {
-      // Check-in: semua pilihan tersedia
-      return ['wfo', 'wfh', 'dinas'];
-    }
-    
-    // Checkout: batasi berdasarkan status check-in
-    switch (checkInStatus) {
-      case 'wfo':
-        // WFO check-in hanya bisa checkout WFO atau Dinas (tidak mungkin WFH)
-        return ['wfo', 'dinas'];
-      case 'wfh':
-        // WFH check-in hanya bisa checkout WFH
-        return ['wfh'];
-      case 'dinas':
-        // Dinas check-in hanya bisa checkout Dinas
-        return ['dinas'];
-      default:
-        return ['wfo', 'wfh', 'dinas'];
-    }
+    // Semua status tersedia untuk check-in DAN check-out
+    // User bebas memilih status apapun
+    return ['wfo', 'wfh', 'dinas'];
   };
   
   const allowedStatuses = getAllowedStatuses();
@@ -102,15 +86,23 @@ const StatusPresensiDialog: React.FC<StatusPresensiDialogProps> = ({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* Info Status Check-In saat Checkout */}
+          {isCheckout && checkInStatus && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                <span className="font-medium">Status saat Clock-In:</span>{' '}
+                <span className="font-bold uppercase">{checkInStatus}</span>
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                Anda dapat memilih status berbeda untuk Clock-Out
+              </p>
+            </div>
+          )}
+
           {/* Status Selection */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">
               Status Presensi
-              {isCheckout && checkInStatus && (
-                <span className="text-xs text-muted-foreground ml-2">
-                  (Check-in: {checkInStatus.toUpperCase()})
-                </span>
-              )}
             </Label>
             <RadioGroup
               value={status}
