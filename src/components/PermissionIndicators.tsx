@@ -34,18 +34,18 @@ const PermissionIndicators: React.FC<PermissionIndicatorsProps> = ({
       console.error('Location permission denied:', error);
     }
     
-    // Request camera permission with detailed error handling
+    // Request camera permission - similar approach to QR Scanner for better compatibility
     try {
-      // Check permission API first
-      const permissions = await navigator.permissions.query({ 
-        name: 'camera' as PermissionName 
+      // Directly request camera with same constraints as QR Scanner
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'user',
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        } 
       });
       
-      if (permissions.state === 'denied') {
-        throw new Error('PERMISSION_DENIED');
-      }
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      // Success - stop stream and update state
       stream.getTracks().forEach(track => track.stop());
       newPermissions.camera = true;
       
@@ -53,37 +53,30 @@ const PermissionIndicators: React.FC<PermissionIndicatorsProps> = ({
       console.error('Camera permission error:', error);
       
       // Specific error messages based on error type
-      if (error.message === 'PERMISSION_DENIED') {
+      if (error.name === 'NotFoundError') {
         toast({
-          title: "⛔ Akses Kamera Diblokir",
-          description: "Izin kamera telah diblokir di browser. Klik ikon kunci di address bar → Site settings → Camera → Allow",
-          variant: "destructive",
-          duration: 6000
-        });
-      } else if (error.name === 'NotFoundError') {
-        toast({
-          title: "📷 Kamera Tidak Ditemukan",
+          title: "Kamera Tidak Ditemukan",
           description: "Tidak ada kamera terdeteksi. Jika menggunakan PC, silakan hubungkan webcam terlebih dahulu.",
           variant: "destructive",
           duration: 6000
         });
       } else if (error.name === 'NotReadableError') {
         toast({
-          title: "🔒 Kamera Sedang Digunakan",
+          title: "Kamera Sedang Digunakan",
           description: "Kamera tidak dapat diakses karena sedang digunakan aplikasi lain (Zoom, Teams, dll). Silakan tutup aplikasi tersebut.",
           variant: "destructive",
           duration: 6000
         });
-      } else if (error.name === 'NotAllowedError') {
+      } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
         toast({
-          title: "🚫 Izin Kamera Ditolak",
+          title: "Izin Kamera Ditolak",
           description: "Anda menolak akses kamera. Klik ikon kunci di address bar untuk memberikan izin.",
           variant: "destructive",
           duration: 6000
         });
       } else {
         toast({
-          title: "❌ Error Kamera",
+          title: "Error Kamera",
           description: error.message || "Tidak dapat mengakses kamera",
           variant: "destructive",
           duration: 6000
