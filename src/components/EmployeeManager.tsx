@@ -562,10 +562,19 @@ const EmployeeManager = () => {
 
   const resetPassword = async (employee: StaffUser) => {
     try {
+      // Fetch default password from database
+      const { data: settingData } = await supabase
+        .from('app_settings')
+        .select('setting_value')
+        .eq('setting_key', 'default_user_password')
+        .maybeSingle();
+      
+      const defaultPassword = settingData?.setting_value || 'PTG2025';
+
       const { error } = await supabase
         .from('staff_users')
         .update({ 
-          password_hash: 'PTG2025',
+          password_hash: defaultPassword,
           is_first_login: true
         })
         .eq('id', employee.id);
@@ -576,7 +585,7 @@ const EmployeeManager = () => {
 
       toast({
         title: "Berhasil",
-        description: `Password ${employee.name} berhasil direset ke PTG2025`
+        description: `Password ${employee.name} berhasil direset ke default`
       });
     } catch (error) {
       toast({
@@ -1508,7 +1517,7 @@ const EmployeeManager = () => {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Reset Password</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Reset password {employee.name} ke default "PTG2025"? User akan diminta ganti password saat login berikutnya.
+                            Reset password {employee.name} ke default? User akan diminta ganti password saat login berikutnya.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

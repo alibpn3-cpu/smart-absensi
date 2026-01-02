@@ -55,6 +55,19 @@ const UserLogin = () => {
     }
   };
 
+  const getDefaultPassword = async (): Promise<string> => {
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('setting_value')
+        .eq('setting_key', 'default_user_password')
+        .maybeSingle();
+      return data?.setting_value || 'PTG2025';
+    } catch {
+      return 'PTG2025';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -99,8 +112,11 @@ const UserLogin = () => {
         return;
       }
 
+      // Get default password from database
+      const defaultPassword = await getDefaultPassword();
+
       // Verify password (plain text comparison)
-      const storedPassword = staff.password_hash || 'PTG2025';
+      const storedPassword = staff.password_hash || defaultPassword;
       const isPasswordValid = credentials.password === storedPassword;
 
       if (!isPasswordValid) {

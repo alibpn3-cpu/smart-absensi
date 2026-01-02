@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, Sparkles } from 'lucide-react';
+import ChangelogCarousel from './ChangelogCarousel';
 
 interface ForceUpdateModalProps {
   isOpen: boolean;
@@ -16,7 +17,24 @@ const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({
   changelog,
   onUpdate
 }) => {
-  const handleUpdate = async () => {
+  const [showCarousel, setShowCarousel] = useState(false);
+
+  // Parse changelog into pages using ---PAGE--- delimiter
+  const parseChangelogPages = (changelogText: string): string[] => {
+    const pages = changelogText.split('---PAGE---').map(page => page.trim()).filter(Boolean);
+    // If no pages found or no delimiter, return as single page
+    return pages.length > 0 ? pages : [changelogText];
+  };
+
+  const changelogPages = parseChangelogPages(changelog);
+  const hasMultiplePages = changelogPages.length > 1;
+
+  const handleStartUpdate = () => {
+    // Show carousel if there are pages to show
+    setShowCarousel(true);
+  };
+
+  const handleCarouselComplete = async () => {
     try {
       // Preserve kiosk mode and device settings
       const kioskMode = localStorage.getItem('shared_device_mode');
@@ -53,8 +71,19 @@ const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({
     }
   };
 
-  // Parse changelog into lines
-  const changelogLines = changelog.split('\n').filter(line => line.trim());
+  // Show carousel if triggered
+  if (showCarousel) {
+    return (
+      <ChangelogCarousel
+        pages={changelogPages}
+        version={newVersion}
+        onComplete={handleCarouselComplete}
+      />
+    );
+  }
+
+  // Parse changelog for preview (just first few lines)
+  const previewLines = changelogPages[0]?.split('\n').filter(line => line.trim()).slice(0, 4) || [];
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
@@ -84,18 +113,23 @@ const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({
               Yang Baru:
             </h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              {changelogLines.map((line, index) => (
+              {previewLines.map((line, index) => (
                 <li key={index} className="flex items-start gap-2">
                   <span className="text-primary mt-1">•</span>
                   <span>{line.replace(/^[•\-\*]\s*/, '')}</span>
                 </li>
               ))}
+              {hasMultiplePages && (
+                <li className="text-xs text-muted-foreground italic pt-2">
+                  + {changelogPages.length - 1} halaman panduan lainnya...
+                </li>
+              )}
             </ul>
           </div>
         </div>
         
         <Button 
-          onClick={handleUpdate}
+          onClick={handleStartUpdate}
           className="w-full h-12 text-lg font-semibold bg-primary hover:bg-primary/90"
           size="lg"
         >
@@ -104,7 +138,10 @@ const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({
         </Button>
         
         <p className="text-xs text-center text-muted-foreground mt-2">
-          Aplikasi akan dimuat ulang setelah update
+          {hasMultiplePages 
+            ? 'Anda akan melihat panduan update sebelum aplikasi dimuat ulang'
+            : 'Aplikasi akan dimuat ulang setelah update'
+          }
         </p>
       </DialogContent>
     </Dialog>
