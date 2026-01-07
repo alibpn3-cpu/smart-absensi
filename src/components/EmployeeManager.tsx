@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera, CheckSquare, Square, ChevronsUpDown, Check, KeyRound, Shield, ShieldOff, QrCode } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera, CheckSquare, Square, ChevronsUpDown, Check, KeyRound, Shield, ShieldOff, QrCode, Crown } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -28,6 +28,7 @@ interface StaffUser {
   created_at: string;
   photo_url?: string;
   is_admin?: boolean;
+  is_manager?: boolean;
   employee_type?: string;
 }
 
@@ -617,6 +618,32 @@ const EmployeeManager = () => {
       toast({
         title: "Gagal",
         description: "Gagal mengubah status admin",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const toggleManagerStatus = async (employee: StaffUser) => {
+    try {
+      const newManagerStatus = !employee.is_manager;
+      const { error } = await supabase
+        .from('staff_users')
+        .update({ is_manager: newManagerStatus })
+        .eq('id', employee.id);
+
+      if (error) throw error;
+
+      await logActivity(newManagerStatus ? 'grant_manager' : 'revoke_manager', employee.name, { uid: employee.uid });
+
+      toast({
+        title: "Berhasil",
+        description: `${employee.name} ${newManagerStatus ? 'dijadikan manajer' : 'dicabut status manajernya'}`
+      });
+      fetchEmployees();
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: "Gagal mengubah status manajer",
         variant: "destructive"
       });
     }
@@ -1481,6 +1508,12 @@ const EmployeeManager = () => {
                         Admin
                       </Badge>
                     )}
+                    {employee.is_manager && (
+                      <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-300">
+                        <Crown className="h-3 w-3 mr-1" />
+                        Manager
+                      </Badge>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
                     <div>
@@ -1541,6 +1574,16 @@ const EmployeeManager = () => {
                       ) : (
                         <Shield className="h-4 w-4 text-muted-foreground" />
                       )}
+                    </Button>
+                    
+                    {/* Toggle Manager Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleManagerStatus(employee)}
+                      title={employee.is_manager ? "Cabut Manager" : "Jadikan Manager"}
+                    >
+                      <Crown className={`h-4 w-4 ${employee.is_manager ? 'text-purple-600' : 'text-muted-foreground'}`} />
                     </Button>
                     
                     {/* Toggle Active Status */}
