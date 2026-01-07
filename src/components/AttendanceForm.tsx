@@ -139,11 +139,13 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     oscillator.stop(audioContext.currentTime + 0.1);
   };
   
-  // Auto-detect timezone from device
+  // Auto-detect timezone from device (always re-detect unless manual override)
   const getDeviceTimezone = () => {
-    const stored = localStorage.getItem('user_timezone');
-    if (stored) return stored;
+    // Check if user has manually overridden timezone
+    const manualOverride = localStorage.getItem('user_timezone_manual');
+    if (manualOverride) return manualOverride;
 
+    // Always auto-detect based on device UTC offset
     const offset = -new Date().getTimezoneOffset() / 60;
     let detectedTz = 'WIB';
     
@@ -151,11 +153,27 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     else if (offset >= 7.5) detectedTz = 'WITA';
     else detectedTz = 'WIB';
     
-    localStorage.setItem('user_timezone', detectedTz);
+    // Cleanup old localStorage key if exists
+    localStorage.removeItem('user_timezone');
+    
     return detectedTz;
   };
 
-  const [timezone] = useState(getDeviceTimezone());
+  const [timezone, setTimezone] = useState(getDeviceTimezone());
+  const [isManualTimezone, setIsManualTimezone] = useState(() => !!localStorage.getItem('user_timezone_manual'));
+
+  // Handle timezone manual selection
+  const handleTimezoneChange = (value: string) => {
+    if (value === 'auto') {
+      localStorage.removeItem('user_timezone_manual');
+      setIsManualTimezone(false);
+      setTimezone(getDeviceTimezone());
+    } else {
+      localStorage.setItem('user_timezone_manual', value);
+      setIsManualTimezone(true);
+      setTimezone(value);
+    }
+  };
   const [wfoLocationName, setWfoLocationName] = useState<string | null>(null);
   const [sharedDeviceMode, setSharedDeviceMode] = useState(false);
   const [appVersion, setAppVersion] = useState('v2.2.0');
@@ -2152,9 +2170,21 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                     <span className="text-xl sm:text-2xl font-bold text-primary">
                       {formatTimeWithTimezone(currentDateTime, timezone).split(' ')[0]}
                     </span>
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {formatTimeWithTimezone(currentDateTime, timezone).split(' ')[1]}
-                    </span>
+                    {/* Timezone Dropdown */}
+                    <Select 
+                      value={isManualTimezone ? timezone : 'auto'} 
+                      onValueChange={handleTimezoneChange}
+                    >
+                      <SelectTrigger className="h-6 w-[70px] text-xs font-medium border-0 bg-primary/10 hover:bg-primary/20 focus:ring-0 px-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover">
+                        <SelectItem value="auto">Auto</SelectItem>
+                        <SelectItem value="WIB">WIB</SelectItem>
+                        <SelectItem value="WITA">WITA</SelectItem>
+                        <SelectItem value="WIT">WIT</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   {sharedDeviceMode && (
                     <Badge variant="outline" className="bg-amber-500/20 text-amber-700 border-amber-500 text-xs">
