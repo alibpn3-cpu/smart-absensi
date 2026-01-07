@@ -2148,7 +2148,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                     <img 
                       src={selectedStaff.photo_url} 
                       alt={selectedStaff.name}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-contain"
                     />
                   ) : (
                     <div className="h-full w-full bg-primary/10 flex items-center justify-center">
