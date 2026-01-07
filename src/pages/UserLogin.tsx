@@ -214,7 +214,7 @@ const UserLogin = () => {
                   value={credentials.uid}
                   onChange={(e) => setCredentials({ ...credentials, uid: e.target.value.toUpperCase() })}
                   disabled={loading}
-                  className="h-12 text-lg uppercase"
+                  className="h-12 text-lg capitalize"
                   autoComplete="username"
                 />
               </div>
