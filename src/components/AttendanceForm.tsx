@@ -2143,12 +2143,21 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           <Card className="border-0 shadow-md rounded-xl bg-card">
             <CardContent className="p-4">
               <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16 border-2 border-primary/20">
-                  <AvatarImage src={selectedStaff.photo_url} alt={selectedStaff.name} />
-                  <AvatarFallback className="bg-primary/10 text-primary text-lg font-bold">
-                    {selectedStaff.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 border-primary/20">
+                  {selectedStaff.photo_url ? (
+                    <img 
+                      src={selectedStaff.photo_url} 
+                      alt={selectedStaff.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-primary text-lg font-bold">
+                        {selectedStaff.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-lg truncate">{selectedStaff.name}</h3>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
