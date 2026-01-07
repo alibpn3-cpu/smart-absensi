@@ -33,6 +33,7 @@ import { saveScore } from '@/hooks/useScoreCalculation';
 import { format } from 'date-fns';
 import { getEnhancedLocation, getAccuracyLevel, clearLocationCache } from '@/utils/enhancedGeolocation';
 import { isPointInPolygon, PolygonCoordinate } from '@/utils/polygonValidator';
+import { validateGPSPosition, clearPositionHistory } from '@/utils/gpsValidator';
 
 interface StaffUser {
   uid: string;
@@ -493,6 +494,42 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         
         const { latitude: lat, longitude: lng, accuracy } = locationResult;
         console.log(`📍 Enhanced location: ${lat}, ${lng} (accuracy: ${accuracy.toFixed(1)}m from ${locationResult.readingsCount} readings)`);
+        
+        // Validate GPS authenticity - detect fake GPS
+        const gpsValidation = await validateGPSPosition({
+          coords: {
+            latitude: lat,
+            longitude: lng,
+            accuracy: accuracy,
+            altitude: null,
+            altitudeAccuracy: null,
+            heading: null,
+            speed: null
+          },
+          timestamp: Date.now()
+        } as GeolocationPosition);
+        
+        console.log(`🔒 GPS Validation: confidence=${gpsValidation.confidenceScore}%, mocked=${gpsValidation.isMocked}, reason=${gpsValidation.reason || 'none'}`);
+        
+        // Block if fake GPS detected
+        if (gpsValidation.isMocked) {
+          toast({
+            title: "🚫 Fake GPS Terdeteksi",
+            description: `Lokasi tidak valid: ${gpsValidation.reason}. Matikan aplikasi fake GPS dan coba lagi.`,
+            variant: "destructive"
+          });
+          clearPositionHistory();
+          reject(new Error(`Fake GPS detected: ${gpsValidation.reason}`));
+          return;
+        }
+        
+        // Warning for low confidence (but not blocking)
+        if (gpsValidation.confidenceScore < 75) {
+          toast({
+            title: "⚠️ GPS Warning",
+            description: `Kepercayaan GPS: ${gpsValidation.confidenceScore}%. ${gpsValidation.reason || 'Pastikan GPS aktif dan di area terbuka.'}`,
+          });
+        }
         
         // Check accuracy level and warn if poor
         const accuracyLevel = getAccuracyLevel(accuracy);
