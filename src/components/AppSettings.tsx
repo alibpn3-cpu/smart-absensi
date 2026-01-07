@@ -18,6 +18,7 @@ const AppSettings = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -88,6 +89,28 @@ const AppSettings = () => {
     }
   };
 
+  const saveDefaultPassword = async () => {
+    setSavingPassword(true);
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          setting_key: 'default_user_password',
+          setting_value: defaultPassword,
+          description: 'Default password untuk user baru atau reset password'
+        }, { onConflict: 'setting_key' });
+      
+      if (error) throw error;
+      
+      toast({ title: "Berhasil", description: "Default password berhasil disimpan." });
+    } catch (error) {
+      console.error('Error saving default password:', error);
+      toast({ title: "Gagal", description: "Gagal menyimpan default password", variant: "destructive" });
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   const saveSettings = async () => {
     setSaving(true);
     try {
@@ -95,8 +118,7 @@ const AppSettings = () => {
         { setting_key: 'app_logo_url', setting_value: logoUrl, description: 'Logo aplikasi untuk header dan favicon' },
         { setting_key: 'app_title', setting_value: appTitle, description: 'Application title' },
         { setting_key: 'app_current_version', setting_value: appVersion, description: 'Current version' },
-        { setting_key: 'app_version_changelog', setting_value: changelog, description: 'Changelog' },
-        { setting_key: 'default_user_password', setting_value: defaultPassword, description: 'Default password untuk user baru atau reset password' }
+        { setting_key: 'app_version_changelog', setting_value: changelog, description: 'Changelog' }
       ];
 
       if (appTitle) document.title = appTitle;
@@ -162,23 +184,34 @@ const AppSettings = () => {
                 <div className="space-y-2">
                   <Label htmlFor="defaultPassword" className="text-black">Default User Password</Label>
                   <p className="text-xs text-muted-foreground">Password default untuk user baru atau saat reset password</p>
-                  <div className="relative">
-                    <Input 
-                      id="defaultPassword" 
-                      type={showPassword ? "text" : "password"} 
-                      value={defaultPassword} 
-                      onChange={(e) => setDefaultPassword(e.target.value)} 
-                      placeholder="Masukkan password default" 
-                      className="bg-white border-gray-300 text-black pr-10" 
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input 
+                        id="defaultPassword" 
+                        type={showPassword ? "text" : "password"} 
+                        value={defaultPassword} 
+                        onChange={(e) => setDefaultPassword(e.target.value)} 
+                        placeholder="Masukkan password default" 
+                        className="bg-white border-gray-300 text-black pr-10" 
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4 text-gray-500" /> : <Eye className="h-4 w-4 text-gray-500" />}
+                      </Button>
+                    </div>
+                    <Button 
+                      onClick={saveDefaultPassword} 
+                      disabled={savingPassword}
+                      variant="outline"
+                      className="shrink-0"
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4 text-gray-500" /> : <Eye className="h-4 w-4 text-gray-500" />}
+                      <Save className="h-4 w-4 mr-2" />
+                      {savingPassword ? 'Saving...' : 'Save Password'}
                     </Button>
                   </div>
                 </div>
