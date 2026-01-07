@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { Shield, User, LogIn, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -78,12 +79,13 @@ const Index = () => {
     }, 300);
   };
 
-  // Auto-detect timezone from device
+  // Auto-detect timezone from device (always re-detect unless manual override)
   const getDeviceTimezone = () => {
-    const stored = localStorage.getItem('user_timezone');
-    if (stored) return stored;
+    // Check if user has manually overridden timezone
+    const manualOverride = localStorage.getItem('user_timezone_manual');
+    if (manualOverride) return manualOverride;
 
-    // Auto-detect based on device UTC offset
+    // Always auto-detect based on device UTC offset
     const offset = -new Date().getTimezoneOffset() / 60;
     let detectedTz = 'WIB'; // Default
     
@@ -91,11 +93,29 @@ const Index = () => {
     else if (offset >= 7.5) detectedTz = 'WITA'; // UTC+8
     else detectedTz = 'WIB'; // UTC+7
     
-    localStorage.setItem('user_timezone', detectedTz);
+    // Cleanup old localStorage key if exists
+    localStorage.removeItem('user_timezone');
+    
     return detectedTz;
   };
 
   const [timezone, setTimezone] = useState(getDeviceTimezone());
+  const [isManualTimezone, setIsManualTimezone] = useState(() => !!localStorage.getItem('user_timezone_manual'));
+
+  // Handle timezone manual selection
+  const handleTimezoneChange = (value: string) => {
+    if (value === 'auto') {
+      // Remove manual override, use auto-detect
+      localStorage.removeItem('user_timezone_manual');
+      setIsManualTimezone(false);
+      setTimezone(getDeviceTimezone());
+    } else {
+      // Save as manual override
+      localStorage.setItem('user_timezone_manual', value);
+      setIsManualTimezone(true);
+      setTimezone(value);
+    }
+  };
 
   useEffect(() => {
     // Check shared device mode (kiosk)
