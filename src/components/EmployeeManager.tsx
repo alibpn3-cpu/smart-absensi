@@ -563,19 +563,11 @@ const EmployeeManager = () => {
 
   const resetPassword = async (employee: StaffUser) => {
     try {
-      // Fetch default password from database
-      const { data: settingData } = await supabase
-        .from('app_settings')
-        .select('setting_value')
-        .eq('setting_key', 'default_user_password')
-        .maybeSingle();
-      
-      const defaultPassword = settingData?.setting_value || 'PTG2025';
-
+      // Set password_hash to null so it uses default_user_password from app_settings
       const { error } = await supabase
         .from('staff_users')
         .update({ 
-          password_hash: defaultPassword,
+          password_hash: null,
           is_first_login: true
         })
         .eq('id', employee.id);
@@ -592,6 +584,36 @@ const EmployeeManager = () => {
       toast({
         title: "Gagal",
         description: "Gagal mereset password",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const resetAllPasswords = async () => {
+    const confirmed = window.confirm('Reset SEMUA password karyawan ke default? Semua user harus ganti password saat login berikutnya.');
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('staff_users')
+        .update({ 
+          password_hash: null, 
+          is_first_login: true 
+        })
+        .neq('uid', '');
+
+      if (error) throw error;
+
+      await logActivity('reset_all_passwords', 'All Employees', { count: employees.length });
+
+      toast({
+        title: "Berhasil",
+        description: `Semua password (${employees.length} karyawan) berhasil di-reset ke default`
+      });
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: "Gagal mereset semua password",
         variant: "destructive"
       });
     }
@@ -1094,6 +1116,14 @@ const EmployeeManager = () => {
             Employee Management
           </CardTitle>
           <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={resetAllPasswords}
+              className="text-orange-600 border-orange-300 hover:bg-orange-50"
+            >
+              <KeyRound className="h-4 w-4 mr-2" />
+              Reset All Passwords
+            </Button>
             <Button
               variant="outline"
               onClick={downloadBatchQRCodes}

@@ -52,19 +52,30 @@ const Index = () => {
     }
   };
 
-  // Exit browser handler
+  // Exit browser handler with PWA detection
   const handleExit = () => {
-    // Try to close the window first
+    // Check if running as PWA standalone mode
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                  (window.navigator as any).standalone === true;
+    
+    if (isPWA) {
+      // For PWA, try to close
+      window.close();
+    }
+    
+    // Try normal close (works for popup windows)
     window.close();
     
-    // If window.close() doesn't work, show instruction
+    // If still open after 300ms, show instruction
     setTimeout(() => {
       toast({
-        title: "Untuk Keluar",
-        description: "Silakan tutup tab/browser secara manual atau tekan tombol home pada perangkat Anda.",
+        title: "Tidak bisa menutup otomatis",
+        description: isPWA 
+          ? "Silakan swipe up atau tekan tombol home untuk minimize aplikasi." 
+          : "Silakan tutup tab browser secara manual (Ctrl+W atau tekan X).",
         duration: 5000
       });
-    }, 500);
+    }, 300);
   };
 
   // Auto-detect timezone from device
