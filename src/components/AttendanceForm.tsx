@@ -2143,12 +2143,12 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           <Card className="border-0 shadow-md rounded-xl bg-card">
             <CardContent className="p-4">
               <div className="flex items-center gap-4">
-                <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border-2 border-primary/20">
+                <div className="h-24 w-20 shrink-0 overflow-hidden rounded-lg border-2 border-primary/20">
                   {selectedStaff.photo_url ? (
                     <img 
                       src={selectedStaff.photo_url} 
                       alt={selectedStaff.name}
-                      className="h-full w-full object-contain"
+                      className="h-full w-full object-cover"
                     />
                   ) : (
                     <div className="h-full w-full bg-primary/10 flex items-center justify-center">
