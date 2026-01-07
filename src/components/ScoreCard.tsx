@@ -54,7 +54,7 @@ const ScoreCard = ({ staffUid }: ScoreCardProps) => {
 
   if (isLoading) {
     return (
-      <Card className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 border-amber-200 dark:border-amber-800">
+      <Card className="border-0 shadow-md rounded-xl bg-amber-50 dark:bg-amber-950/20">
         <CardContent className="p-4">
           <div className="animate-pulse flex items-center gap-2">
             <div className="h-5 w-5 bg-muted rounded"></div>
@@ -70,7 +70,7 @@ const ScoreCard = ({ staffUid }: ScoreCardProps) => {
   }
 
   return (
-    <Card className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 border-amber-200 dark:border-amber-800">
+    <Card className="border-0 shadow-md rounded-xl bg-amber-50 dark:bg-amber-950/20">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div>

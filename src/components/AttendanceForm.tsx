@@ -26,6 +26,7 @@ import ScoreCard from './ScoreCard';
 import ScorePopup from './ScorePopup';
 import P2HToolboxCard from './P2HToolboxCard';
 import AttendanceStatusCard from './AttendanceStatusCard';
+import ManagerDivisionStatus from './ManagerDivisionStatus';
 import CompanyLogoCard from './CompanyLogoCard';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { saveScore } from '@/hooks/useScoreCalculation';
@@ -160,6 +161,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   
   // Check if user is logged in (non-kiosk mode)
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
+  const [isManager, setIsManager] = useState(false);
   
   // Feature flags
   const featureFlags = useFeatureFlags();
@@ -201,6 +203,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         try {
           const session = JSON.parse(sessionData);
           setIsUserLoggedIn(true);
+          setIsManager(session.is_manager || false);
           setSelectedStaff({
             uid: session.uid,
             name: session.name,
@@ -216,7 +219,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           console.log('🔍 Session loaded:', {
             uid: session.uid,
             name: session.name,
-            employee_type: session.employee_type
+            employee_type: session.employee_type,
+            is_manager: session.is_manager
           });
         } catch (error) {
           console.error('Error parsing session:', error);
@@ -1979,6 +1983,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             status={regularAttendance?.status as 'wfo' | 'wfh' | 'dinas' | null}
             checkinLocationAddress={regularAttendance?.checkin_location_address}
             checkoutLocationAddress={regularAttendance?.checkout_location_address}
+            className="border-0 shadow-md rounded-xl"
           />
         )}
         
@@ -1993,7 +1998,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         )}
         
         {/* ========== CARD 2: Jam Analog + Digital ========== */}
-        <Card className="bg-card border shadow-lg">
+        <Card className="border-0 shadow-md rounded-xl bg-card">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-center gap-4 px-4">
               {/* Analog Clock - Modern Design with Gradient Colors */}
@@ -2135,7 +2140,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         
         {/* ========== USER MODE: CARD 4 - User Detail Card ========== */}
         {isUserLoggedIn && !sharedDeviceMode && selectedStaff && (
-          <Card className="border-0 shadow-xl bg-gradient-to-br from-primary/5 to-primary/10">
+          <Card className="border-0 shadow-md rounded-xl bg-card">
             <CardContent className="p-4">
               <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16 border-2 border-primary/20">
@@ -2165,7 +2170,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         )}
 
         {/* Action Buttons */}
-        <Card className="border-0 shadow-xl">
+        <Card className="border-0 shadow-md rounded-xl bg-card">
           <CardContent className="p-6">
             <div className="flex flex-col gap-3">
               {/* Main In/Out Buttons */}
@@ -2318,7 +2323,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
 
         {/* ========== KIOSK MODE: CARD 6 - Area Tugas ========== */}
         {sharedDeviceMode && (
-          <Card className="border-0 shadow-xl">
+          <Card className="border-0 shadow-md rounded-xl bg-card">
             <CardContent className="p-4">
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
@@ -2384,6 +2389,14 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         {/* ========== USER MODE: Attendance Status List ========== */}
         {isUserLoggedIn && !sharedDeviceMode && (
           <AttendanceStatusList selectedWorkArea={selectedStaff?.work_area || 'all'} />
+        )}
+
+        {/* ========== USER MODE: Manager Division Status (if user is manager) ========== */}
+        {isUserLoggedIn && !sharedDeviceMode && isManager && selectedStaff?.division && (
+          <ManagerDivisionStatus 
+            division={selectedStaff.division} 
+            managerName={selectedStaff.name}
+          />
         )}
 
         {/* ========== FOOTER: Version + Update + Debug ========== */}

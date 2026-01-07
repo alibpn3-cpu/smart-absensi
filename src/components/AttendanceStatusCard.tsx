@@ -99,7 +99,7 @@ const AttendanceStatusCard: React.FC<AttendanceStatusCardProps> = ({
   const shortCheckoutLocation = shortenAddress(checkoutLocationAddress);
 
   return (
-    <Card className={cn('border shadow-lg', config.bgClass, className)}>
+    <Card className={cn('border-0 shadow-md rounded-xl', config.bgClass, className)}>
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
           {/* Status Icon */}
