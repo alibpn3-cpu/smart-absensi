@@ -153,7 +153,8 @@ const EmployeeManager = () => {
   const [batchUpdateData, setBatchUpdateData] = useState({
     position: '',
     work_area: '',
-    division: ''
+    division: '',
+    employee_type: ''
   });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -783,7 +784,7 @@ const EmployeeManager = () => {
   const handleBatchUpdate = async () => {
     if (selectedEmployees.size === 0) return;
 
-    if (!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division) {
+    if (!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division && !batchUpdateData.employee_type) {
       toast({
         title: "Gagal",
         description: "Pilih minimal satu field untuk diupdate",
@@ -797,6 +798,7 @@ const EmployeeManager = () => {
       if (batchUpdateData.position) updatePayload.position = batchUpdateData.position;
       if (batchUpdateData.work_area) updatePayload.work_area = batchUpdateData.work_area;
       if (batchUpdateData.division) updatePayload.division = batchUpdateData.division;
+      if (batchUpdateData.employee_type) updatePayload.employee_type = batchUpdateData.employee_type;
 
       const { error } = await supabase
         .from('staff_users')
@@ -821,7 +823,7 @@ const EmployeeManager = () => {
       });
 
       setIsBatchUpdateDialogOpen(false);
-      setBatchUpdateData({ position: '', work_area: '', division: '' });
+      setBatchUpdateData({ position: '', work_area: '', division: '', employee_type: '' });
       setSelectedEmployees(new Set());
       fetchEmployees();
       fetchDropdownData();
@@ -1874,6 +1876,22 @@ const EmployeeManager = () => {
               />
             </div>
             
+            <div className="space-y-2">
+              <Label htmlFor="batch-employee-type">Employee Type (Optional)</Label>
+              <Select
+                value={batchUpdateData.employee_type}
+                onValueChange={(value) => setBatchUpdateData({...batchUpdateData, employee_type: value})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih tipe karyawan (tidak diubah jika kosong)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="staff">Staff (Reguler)</SelectItem>
+                  <SelectItem value="primary">Primary (Nilai lebih tinggi)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">
                 💡 Field yang tidak dipilih tidak akan diubah. Pilih minimal satu field untuk update.
@@ -1884,7 +1902,7 @@ const EmployeeManager = () => {
               <Button 
                 onClick={handleBatchUpdate}
                 className="flex-1"
-                disabled={!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division}
+                disabled={!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division && !batchUpdateData.employee_type}
               >
                 Update {selectedEmployees.size} Karyawan
               </Button>
@@ -1893,7 +1911,7 @@ const EmployeeManager = () => {
                 variant="outline" 
                 onClick={() => {
                   setIsBatchUpdateDialogOpen(false);
-                  setBatchUpdateData({ position: '', work_area: '', division: '' });
+                  setBatchUpdateData({ position: '', work_area: '', division: '', employee_type: '' });
                 }}
               >
                 Batal
