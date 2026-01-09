@@ -250,8 +250,7 @@ const Index = () => {
                 className="bg-red-500/10 border-red-500/20 text-red-600 hover:bg-red-500/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 px-2 py-1 h-8 text-xs"
                 title="Keluar dari aplikasi"
               >
-                <LogOut className="h-3 w-3 mr-1" />
-                Keluar
+                <LogOut className="h-3 w-3" />
               </Button>
 
               {/* Profile button - only show when logged in (not kiosk) */}
