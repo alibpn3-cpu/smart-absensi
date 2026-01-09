@@ -120,6 +120,9 @@ const EmployeeManager = () => {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<StaffUser | null>(null);
+  const [originalUid, setOriginalUid] = useState('');
+  const [isUidChangeDialogOpen, setIsUidChangeDialogOpen] = useState(false);
+  const [pendingSubmitEvent, setPendingSubmitEvent] = useState<React.FormEvent | null>(null);
   const [positions, setPositions] = useState<string[]>([]);
   const [workAreas, setWorkAreas] = useState<string[]>([]);
   const [divisions, setDivisions] = useState<string[]>([]);
@@ -405,6 +408,7 @@ const EmployeeManager = () => {
   const openDialog = (employee?: StaffUser) => {
     if (employee) {
       setEditingEmployee(employee);
+      setOriginalUid(employee.uid); // Track original UID for change detection
       setFormData({
         uid: employee.uid,
         name: employee.name,
@@ -417,11 +421,12 @@ const EmployeeManager = () => {
       setPhotoPreview(employee.photo_url || '');
     } else {
       resetForm();
+      setOriginalUid('');
     }
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, forceUidChange = false) => {
     e.preventDefault();
     
     if (!formData.uid || !formData.name || !formData.position || !formData.work_area) {
@@ -433,7 +438,44 @@ const EmployeeManager = () => {
       return;
     }
 
+    // Check if UID is being changed (only for edit mode)
+    const isUidChanged = editingEmployee && originalUid && formData.uid !== originalUid;
+    
+    // Show confirmation dialog if UID changed and not forced
+    if (isUidChanged && !forceUidChange) {
+      setPendingSubmitEvent(e);
+      setIsUidChangeDialogOpen(true);
+      return;
+    }
+
     try {
+      // If UID changed, use RPC function to update across all tables
+      if (isUidChanged) {
+        const { error: rpcError } = await supabase.rpc('update_staff_uid', {
+          old_uid: originalUid,
+          new_uid: formData.uid
+        });
+
+        if (rpcError) {
+          toast({
+            title: "Gagal Update UID",
+            description: rpcError.message,
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        await logActivity('update_uid', formData.name, { 
+          old_uid: originalUid, 
+          new_uid: formData.uid 
+        });
+        
+        toast({
+          title: "UID Berhasil Diubah",
+          description: `UID diubah dari ${originalUid} ke ${formData.uid}. Semua data terkait telah diperbarui.`
+        });
+      }
+
       // Upload photo if selected
       let photoUrl = editingEmployee?.photo_url || null;
       if (photoFile) {
@@ -444,7 +486,6 @@ const EmployeeManager = () => {
       }
 
       const employeeData = {
-        uid: formData.uid,
         name: formData.name,
         position: formData.position,
         work_area: formData.work_area,
@@ -454,15 +495,17 @@ const EmployeeManager = () => {
       };
 
       if (editingEmployee) {
-        // Update existing employee
+        // Update existing employee (UID already updated via RPC if changed)
         const { error } = await supabase
           .from('staff_users')
           .update(employeeData)
-          .eq('id', editingEmployee.id);
+          .eq('uid', formData.uid); // Use new UID
 
         if (error) throw error;
         
-        await logActivity('update', formData.name, { uid: formData.uid, position: formData.position });
+        if (!isUidChanged) {
+          await logActivity('update', formData.name, { uid: formData.uid, position: formData.position });
+        }
         
         toast({
           title: "Berhasil",
@@ -485,10 +528,10 @@ const EmployeeManager = () => {
           return;
         }
 
-        // Create new employee
+        // Create new employee (include UID for new)
         const { error } = await supabase
           .from('staff_users')
-          .insert([employeeData]);
+          .insert([{ ...employeeData, uid: formData.uid }]);
 
         if (error) throw error;
         
@@ -510,6 +553,14 @@ const EmployeeManager = () => {
         description: "Gagal menyimpan data karyawan",
         variant: "destructive"
       });
+    }
+  };
+
+  const confirmUidChange = () => {
+    setIsUidChangeDialogOpen(false);
+    if (pendingSubmitEvent) {
+      handleSubmit(pendingSubmitEvent, true);
+      setPendingSubmitEvent(null);
     }
   };
 
@@ -1221,8 +1272,12 @@ const EmployeeManager = () => {
                       value={formData.uid}
                       onChange={(e) => setFormData({...formData, uid: e.target.value})}
                       placeholder="e.g., EMP001"
-                      disabled={!!editingEmployee}
                     />
+                    {editingEmployee && formData.uid !== originalUid && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                        ⚠️ Mengubah UID akan update semua data attendance, score, dan checklist
+                      </p>
+                    )}
                   </div>
                   
                   <div className="space-y-2">
@@ -1345,6 +1400,36 @@ const EmployeeManager = () => {
                 </form>
               </DialogContent>
             </Dialog>
+            
+            {/* UID Change Confirmation Dialog */}
+            <AlertDialog open={isUidChangeDialogOpen} onOpenChange={setIsUidChangeDialogOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>⚠️ Ubah UID Karyawan?</AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-2">
+                    <p>
+                      UID akan diubah dari <strong>"{originalUid}"</strong> menjadi <strong>"{formData.uid}"</strong>.
+                    </p>
+                    <p className="text-sm">Semua data berikut akan ikut terupdate:</p>
+                    <ul className="text-sm list-disc list-inside space-y-1">
+                      <li>Attendance records</li>
+                      <li>Daily scores</li>
+                      <li>P2H/Toolbox checklist</li>
+                      <li>Monthly rankings</li>
+                    </ul>
+                    <p className="text-amber-600 dark:text-amber-400 font-medium mt-2">
+                      Pastikan UID baru sudah benar!
+                    </p>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setPendingSubmitEvent(null)}>Batal</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmUidChange} className="bg-amber-600 hover:bg-amber-700">
+                    Ya, Ubah UID
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </CardHeader>
