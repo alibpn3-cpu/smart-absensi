@@ -33,9 +33,31 @@ const RankingCard = () => {
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
   
-  // Month/Year selection
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  // Month/Year selection - show previous month's ranking on 1st-15th of current month
+  const today = new Date();
+  const dayOfMonth = today.getDate();
+  
+  // If we're in the first 15 days, show PREVIOUS month's ranking
+  // Otherwise show current month's ranking (which may still be in progress)
+  const getDefaultMonth = () => {
+    if (dayOfMonth <= 15) {
+      // Show previous month
+      const prevMonth = today.getMonth() - 1;
+      return prevMonth < 0 ? 11 : prevMonth;
+    }
+    return today.getMonth();
+  };
+  
+  const getDefaultYear = () => {
+    if (dayOfMonth <= 15 && today.getMonth() === 0) {
+      // If January 1-15, show December of previous year
+      return today.getFullYear() - 1;
+    }
+    return today.getFullYear();
+  };
+  
+  const [selectedMonth, setSelectedMonth] = useState(getDefaultMonth());
+  const [selectedYear, setSelectedYear] = useState(getDefaultYear());
 
   const months = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',

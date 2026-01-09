@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plus, Trash2, Edit } from 'lucide-react';
+import { MapPin, Plus, Trash2, Edit, Search, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -17,6 +17,12 @@ interface Geofence {
   is_active: boolean;
 }
 
+interface SearchResult {
+  display_name: string;
+  lat: string;
+  lon: string;
+}
+
 const GeofenceManager = () => {
   const [geofences, setGeofences] = useState<Geofence[]>([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -27,6 +33,11 @@ const GeofenceManager = () => {
     center_lng: '',
     radius: ''
   });
+  
+  // Location search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     fetchGeofences();
@@ -215,6 +226,63 @@ const GeofenceManager = () => {
     setEditingId(null);
   };
 
+  // Location search with Nominatim API
+  const searchLocation = async () => {
+    if (!searchQuery.trim()) {
+      toast({
+        title: "Perhatian",
+        description: "Masukkan nama lokasi untuk mencari",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5`,
+        {
+          headers: {
+            'Accept-Language': 'id'
+          }
+        }
+      );
+      const data = await response.json();
+      setSearchResults(data);
+      
+      if (data.length === 0) {
+        toast({
+          title: "Tidak ditemukan",
+          description: "Lokasi tidak ditemukan, coba kata kunci lain",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Search failed:', error);
+      toast({
+        title: "Gagal",
+        description: "Gagal mencari lokasi",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const selectSearchResult = (result: SearchResult) => {
+    setFormData(prev => ({
+      ...prev,
+      center_lat: result.lat,
+      center_lng: result.lon
+    }));
+    setSearchResults([]);
+    setSearchQuery('');
+    toast({
+      title: "Berhasil",
+      description: "Koordinat lokasi berhasil dipilih"
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Add/Edit Form */}
@@ -270,19 +338,48 @@ const GeofenceManager = () => {
                 />
               </div>
             </div>
+
+            {/* Location Search */}
+            <div className="space-y-2">
+              <Label>Cari Lokasi</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Contoh: Jl. Sudirman Jakarta, Mall Taman Anggrek"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), searchLocation())}
+                />
+                <Button type="button" variant="outline" onClick={searchLocation} disabled={isSearching}>
+                  {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                </Button>
+              </div>
+              {searchResults.length > 0 && (
+                <div className="border rounded-md max-h-40 overflow-y-auto bg-background">
+                  {searchResults.map((result, i) => (
+                    <div 
+                      key={i} 
+                      onClick={() => selectSearchResult(result)} 
+                      className="p-2 hover:bg-muted cursor-pointer text-sm border-b last:border-b-0"
+                    >
+                      {result.display_name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={getCurrentLocation}>
                 <MapPin className="h-4 w-4 mr-2" />
-                Use Current Location
+                Lokasi Saat Ini
               </Button>
               {isEditing && (
                 <Button type="button" variant="outline" onClick={cancelEdit}>
-                  Cancel
+                  Batal
                 </Button>
               )}
               <Button type="submit">
-                {isEditing ? 'Update Area' : 'Add Area'}
+                {isEditing ? 'Update Area' : 'Tambah Area'}
               </Button>
             </div>
           </form>
