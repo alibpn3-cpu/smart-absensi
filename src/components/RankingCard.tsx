@@ -28,29 +28,29 @@ interface MedalTier {
 const MAX_USERS_PER_TIER = 5;
 
 const RankingCard = () => {
+  // Check if we should show ranking card (only on 1st-15th of month)
+  const today = new Date();
+  const dayOfMonth = today.getDate();
+  
+  // Hide card completely on 16th-end of month
+  if (dayOfMonth > 15) {
+    return null;
+  }
+  
   const [rankings, setRankings] = useState<MedalTier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
   
-  // Month/Year selection - show previous month's ranking on 1st-15th of current month
-  const today = new Date();
-  const dayOfMonth = today.getDate();
-  
-  // If we're in the first 15 days, show PREVIOUS month's ranking
-  // Otherwise show current month's ranking (which may still be in progress)
+  // Show previous month's ranking (since we're on 1st-15th)
   const getDefaultMonth = () => {
-    if (dayOfMonth <= 15) {
-      // Show previous month
-      const prevMonth = today.getMonth() - 1;
-      return prevMonth < 0 ? 11 : prevMonth;
-    }
-    return today.getMonth();
+    const prevMonth = today.getMonth() - 1;
+    return prevMonth < 0 ? 11 : prevMonth;
   };
   
   const getDefaultYear = () => {
-    if (dayOfMonth <= 15 && today.getMonth() === 0) {
-      // If January 1-15, show December of previous year
+    if (today.getMonth() === 0) {
+      // If January, show December of previous year
       return today.getFullYear() - 1;
     }
     return today.getFullYear();

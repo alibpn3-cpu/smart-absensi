@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2, ExternalLink, Circle, RefreshCw, ChevronUp } from 'lucide-react';
+import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2, ExternalLink, Circle, RefreshCw, ChevronUp, Search, MapPinned } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { calculatePolygonArea, getPolygonCenter, PolygonCoordinate, sanitizeCoordinates, circleToPolygon } from '@/utils/polygonValidator';
@@ -35,6 +35,12 @@ const PolygonGeofenceManager: React.FC = () => {
   
   // EXPLICIT editor mode state - key fix for toggle bug
   const [editorMode, setEditorMode] = useState<'radius' | 'polygon'>('radius');
+  
+  // Location search states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
   
   const mapRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -832,6 +838,122 @@ const PolygonGeofenceManager: React.FC = () => {
     }
   };
 
+  // Search location using Nominatim API
+  const searchLocation = async () => {
+    if (!searchQuery.trim()) return;
+    setIsSearching(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&countrycodes=id`
+      );
+      const data = await response.json();
+      setSearchResults(data);
+      if (data.length === 0) {
+        toast({
+          title: "Tidak Ditemukan",
+          description: "Lokasi tidak ditemukan. Coba kata kunci lain.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Search failed:', error);
+      toast({
+        title: "Pencarian Gagal",
+        description: "Tidak dapat mencari lokasi. Coba lagi.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Select search result
+  const selectSearchResult = (result: any) => {
+    const lat = parseFloat(result.lat);
+    const lng = parseFloat(result.lon);
+    
+    setEditingGeofence(prev => prev ? { 
+      ...prev, 
+      center_lat: lat, 
+      center_lng: lng 
+    } : null);
+    
+    if (editorMode === 'radius') {
+      drawRadiusCircle(lat, lng, radius);
+    } else {
+      // Polygon mode: add as first point
+      setCurrentPolygon([{ lat, lng }]);
+      clearDrawingLayers();
+      addMarkerWithPopup(lat, lng, 0);
+    }
+    
+    if (leafletMapRef.current) {
+      leafletMapRef.current.setView([lat, lng], 16);
+    }
+    
+    setSearchResults([]);
+    setSearchQuery('');
+    
+    toast({
+      title: "Lokasi Dipilih",
+      description: result.display_name.substring(0, 60) + '...'
+    });
+  };
+
+  // Get current device location
+  const getCurrentLocationForEditor = () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Tidak Didukung",
+        description: "Browser tidak mendukung geolokasi",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        
+        setEditingGeofence(prev => prev ? { 
+          ...prev, 
+          center_lat: lat, 
+          center_lng: lng 
+        } : null);
+        
+        if (editorMode === 'radius') {
+          drawRadiusCircle(lat, lng, radius);
+        } else {
+          // Polygon mode: add as first point
+          setCurrentPolygon([{ lat, lng }]);
+          clearDrawingLayers();
+          addMarkerWithPopup(lat, lng, 0);
+        }
+        
+        if (leafletMapRef.current) {
+          leafletMapRef.current.setView([lat, lng], 16);
+        }
+        
+        toast({
+          title: "Lokasi Ditemukan",
+          description: `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`
+        });
+        setIsGettingLocation(false);
+      },
+      (error) => {
+        toast({
+          title: "Gagal Mendapatkan Lokasi",
+          description: error.message,
+          variant: "destructive"
+        });
+        setIsGettingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Main Geofence List Card */}
@@ -979,6 +1101,65 @@ const PolygonGeofenceManager: React.FC = () => {
                 ? 'Klik pada peta untuk menentukan titik tengah, atau masukkan koordinat manual di bawah.'
                 : 'Klik pada peta untuk menambahkan titik polygon. Drag marker untuk mengubah posisi.'}
             </p>
+            
+            {/* Location Search & Current Location */}
+            <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+              <Label className="text-sm font-medium">Cari Lokasi</Label>
+              
+              {/* Search Input */}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Cari alamat (contoh: Jl. Sudirman Jakarta)"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && searchLocation()}
+                  className="flex-1"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={searchLocation} 
+                  disabled={isSearching || !searchQuery.trim()}
+                >
+                  {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                </Button>
+              </div>
+              
+              {/* Search Results */}
+              {searchResults.length > 0 && (
+                <div className="border rounded-md max-h-40 overflow-y-auto bg-background">
+                  {searchResults.map((result, i) => (
+                    <div 
+                      key={i} 
+                      onClick={() => selectSearchResult(result)} 
+                      className="p-2 hover:bg-muted cursor-pointer text-sm border-b last:border-b-0"
+                    >
+                      <div className="flex items-start gap-2">
+                        <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                        <span className="line-clamp-2">{result.display_name}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Current Location Button */}
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={getCurrentLocationForEditor} 
+                disabled={isGettingLocation}
+                className="w-full"
+              >
+                {isGettingLocation ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <MapPinned className="h-4 w-4 mr-2" />
+                )}
+                Gunakan Lokasi Saat Ini
+              </Button>
+            </div>
             
             {/* Name Input */}
             <div className="space-y-2">
