@@ -2030,17 +2030,6 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     <div className="min-h-screen bg-background p-4 pt-2">
       <div className="max-w-md mx-auto space-y-2 animate-fade-in">
         
-        {/* ========== CARD 1: Status In/Out Personal (USER MODE ONLY) ========== */}
-        {isUserLoggedIn && !sharedDeviceMode && selectedStaff && (
-          <AttendanceStatusCard
-            checkInTime={regularAttendance?.check_in_time || null}
-            checkOutTime={regularAttendance?.check_out_time || null}
-            status={regularAttendance?.status as 'wfo' | 'wfh' | 'dinas' | null}
-            checkinLocationAddress={regularAttendance?.checkin_location_address}
-            checkoutLocationAddress={regularAttendance?.checkout_location_address}
-            className="border-0 shadow-md rounded-xl"
-          />
-        )}
         
         {/* ========== SCORE CARD - Above Clock (USER MODE ONLY) ========== */}
         {featureFlags.scoreEnabled && isUserLoggedIn && !sharedDeviceMode && selectedStaff && (
@@ -2244,6 +2233,18 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             </CardContent>
           </Card>
         )}
+        
+        {/* ========== USER MODE: Status In/Out Card (Above Action Buttons) ========== */}
+        {isUserLoggedIn && !sharedDeviceMode && selectedStaff && (
+          <AttendanceStatusCard
+            checkInTime={regularAttendance?.check_in_time || null}
+            checkOutTime={regularAttendance?.check_out_time || null}
+            status={regularAttendance?.status as 'wfo' | 'wfh' | 'dinas' | null}
+            checkinLocationAddress={regularAttendance?.checkin_location_address}
+            checkoutLocationAddress={regularAttendance?.checkout_location_address}
+            className="border-0 shadow-md rounded-xl"
+          />
+        )}
 
         {/* Action Buttons */}
         <Card className="border-0 shadow-md rounded-xl bg-card">
@@ -2278,6 +2279,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                       : !!regularAttendance?.check_in_time || loading || !selectedStaff) ? 0.5 : 1
                   }}
                 >
+                  <Clock className="h-4 w-4" />
                   In
                 </Button>
                 
@@ -2308,6 +2310,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                       : !!regularAttendance?.check_out_time || loading || !selectedStaff) ? 0.5 : 1
                   }}
                 >
+                  <Clock className="h-4 w-4" />
                   Out
                 </Button>
               </div>
@@ -2358,6 +2361,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                       ) ? 0.5 : 1
                     }}
                   >
+                    <Clock className="h-4 w-4" />
                     In Extend
                   </Button>
                   
@@ -2389,6 +2393,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                         : !overtimeAttendance?.check_in_time || !!overtimeAttendance?.check_out_time || loading) ? 0.5 : 1
                     }}
                   >
+                    <Clock className="h-4 w-4" />
                     Out Extend
                   </Button>
                 </div>

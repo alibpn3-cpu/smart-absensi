@@ -75,11 +75,6 @@ const LocationAccuracyIndicator: React.FC<LocationAccuracyIndicatorProps> = ({
         <div className="flex-1">
           <p className={cn('text-sm font-medium', config.color)}>{config.label}</p>
           <p className="text-xs text-muted-foreground">{config.description}</p>
-          {config.level === 'poor' && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Mohon pindah ke area terbuka atau dekat jendela
-            </p>
-          )}
         </div>
         {config.showRetry && (
           <Button
