@@ -2261,18 +2261,18 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                       : !!regularAttendance?.check_in_time || loading || !selectedStaff  // Login mode
                   }
                   variant="outline"
-                  className="h-12 w-24 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#39ff14]/10"
+                  className="h-12 w-24 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#00cc44]/10"
                   style={{
                     borderColor: (sharedDeviceMode 
                       ? loading || isButtonProcessing
                       : !!regularAttendance?.check_in_time || loading || !selectedStaff) 
                       ? '#9ca3af' 
-                      : '#39ff14',
+                      : '#00cc44',
                     color: (sharedDeviceMode 
                       ? loading || isButtonProcessing
                       : !!regularAttendance?.check_in_time || loading || !selectedStaff)
                       ? '#9ca3af'
-                      : '#39ff14',
+                      : '#00cc44',
                     fontWeight: 'bold',
                     opacity: (sharedDeviceMode 
                       ? loading || isButtonProcessing
@@ -2339,20 +2339,20 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                         : !regularAttendance?.check_out_time || !!overtimeAttendance?.check_in_time || loading || !selectedStaff
                     }
                     variant="outline"
-                    className="h-12 w-28 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#39ff14]/10"
+                    className="h-12 w-28 rounded-full border-2 active:scale-95 transition-all duration-200 hover:bg-[#00cc44]/10"
                     style={{
                       borderColor: (sharedDeviceMode
                         ? loading || isButtonProcessing
                         : !regularAttendance?.check_out_time || !!overtimeAttendance?.check_in_time || loading || !selectedStaff
                       )
                         ? '#9ca3af'
-                        : '#39ff14',
+                        : '#00cc44',
                       color: (sharedDeviceMode
                         ? loading || isButtonProcessing
                         : !regularAttendance?.check_out_time || !!overtimeAttendance?.check_in_time || loading || !selectedStaff
                       )
                         ? '#9ca3af'
-                        : '#39ff14',
+                        : '#00cc44',
                       fontWeight: 'bold',
                       fontSize: '0.85rem',
                       opacity: (sharedDeviceMode
@@ -2482,7 +2482,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
 
         {/* ========== FOOTER: Version + Update + Debug ========== */}
         <div className="text-center text-xs text-muted-foreground mt-2 space-y-2">
-          <div>Versi aplikasi : {appVersion} IT Division 2025</div>
+          <div>Versi aplikasi : {appVersion} IT Division</div>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <Button variant="outline" size="sm" onClick={handleClearCache}>
               Update (Hapus Cache)
