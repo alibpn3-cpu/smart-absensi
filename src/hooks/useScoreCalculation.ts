@@ -20,21 +20,75 @@ interface ScoreResult {
   isLate: boolean;
 }
 
-// Get clock-in deadline based on employee type and work area
-const getClockInDeadline = (employeeType: string, workArea: string): string => {
-  const isHO = workArea.toLowerCase().includes('ho') || 
-               workArea.toLowerCase().includes('head office') ||
-               workArea.toLowerCase().includes('jakarta');
+interface WorkSchedule {
+  clockIn: string;
+  clockOut: string;
+}
+
+// Cache for work schedules
+let scheduleCache: Map<string, WorkSchedule> | null = null;
+let scheduleCacheTime: number = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Fetch schedules from database
+const fetchSchedules = async (): Promise<Map<string, WorkSchedule>> => {
+  const now = Date.now();
+  if (scheduleCache && (now - scheduleCacheTime) < CACHE_DURATION) {
+    return scheduleCache;
+  }
+
+  const { data, error } = await supabase
+    .from('work_area_schedules')
+    .select('work_area, employee_type, clock_in_time, clock_out_time');
+
+  if (error) {
+    console.error('Error fetching work schedules:', error);
+    // Return empty map, will use default fallback
+    return new Map();
+  }
+
+  const map = new Map<string, WorkSchedule>();
+  data?.forEach(s => {
+    const key = `${s.work_area.toUpperCase()}|${s.employee_type}`;
+    map.set(key, { clockIn: s.clock_in_time, clockOut: s.clock_out_time });
+  });
+
+  scheduleCache = map;
+  scheduleCacheTime = now;
+  console.log('📅 Work schedules cached:', map.size, 'entries');
+  return map;
+};
+
+// Get schedule for specific work area + employee type
+const getSchedule = async (workArea: string, employeeType: string): Promise<WorkSchedule> => {
+  const schedules = await fetchSchedules();
+  const normalizedArea = workArea?.toUpperCase() || '';
+  const normalizedType = employeeType || 'staff';
   
-  if (isHO) {
-    return '08:30';
+  // Try exact match first
+  const exactKey = `${normalizedArea}|${normalizedType}`;
+  if (schedules.has(exactKey)) {
+    return schedules.get(exactKey)!;
   }
   
-  if (employeeType === 'primary') {
-    return '07:00';
+  // Try partial match (for areas that might have slightly different names)
+  for (const [key, schedule] of schedules.entries()) {
+    const [area, type] = key.split('|');
+    if (type === normalizedType && normalizedArea.includes(area)) {
+      return schedule;
+    }
   }
   
-  return '08:00';
+  // Fallback to DEFAULT
+  const defaultKey = `DEFAULT|${normalizedType}`;
+  if (schedules.has(defaultKey)) {
+    return schedules.get(defaultKey)!;
+  }
+  
+  // Ultimate fallback (hardcoded)
+  return normalizedType === 'primary' 
+    ? { clockIn: '07:00', clockOut: '16:00' }
+    : { clockIn: '08:00', clockOut: '17:00' };
 };
 
 // Parse time string to minutes since midnight
@@ -48,19 +102,28 @@ const parseTimeToMinutes = (timeStr: string): number => {
   return hours * 60 + minutes;
 };
 
-// Calculate how many minutes late
-const calculateLateMinutes = (checkInTime: string, employeeType: string, workArea: string): number => {
-  const deadline = getClockInDeadline(employeeType, workArea);
-  const deadlineMinutes = parseTimeToMinutes(deadline);
+// Calculate how many minutes late (async version)
+const calculateLateMinutesAsync = async (checkInTime: string, employeeType: string, workArea: string): Promise<number> => {
+  const schedule = await getSchedule(workArea, employeeType);
+  const deadlineMinutes = parseTimeToMinutes(schedule.clockIn);
   const checkInMinutes = parseTimeToMinutes(checkInTime);
   
   const diff = checkInMinutes - deadlineMinutes;
   return diff > 0 ? diff : 0;
 };
 
-// Check if clock-in time is late
-export const isLate = (checkInTime: string, employeeType: string, workArea: string): boolean => {
-  return calculateLateMinutes(checkInTime, employeeType, workArea) > 0;
+// Check if clock-in time is late (async)
+export const isLate = async (checkInTime: string, employeeType: string, workArea: string): Promise<boolean> => {
+  const lateMinutes = await calculateLateMinutesAsync(checkInTime, employeeType, workArea);
+  return lateMinutes > 0;
+};
+
+// Check if clock-in time is late (sync version for non-async contexts - uses default schedule)
+export const isLateSyncFallback = (checkInTime: string, employeeType: string): boolean => {
+  const deadline = employeeType === 'primary' ? '07:00' : '08:00';
+  const deadlineMinutes = parseTimeToMinutes(deadline);
+  const checkInMinutes = parseTimeToMinutes(checkInTime);
+  return checkInMinutes > deadlineMinutes;
 };
 
 // Get clock-in penalty based on late minutes and employee type
@@ -80,34 +143,31 @@ const getClockInPenalty = (lateMinutes: number, employeeType: string): number =>
   }
 };
 
-// Get clock-out penalty based on clock-out time and employee type
-const getClockOutPenalty = (checkOutTime: string | null, employeeType: string): number => {
+// Get clock-out penalty based on clock-out time, employee type, and schedule
+const getClockOutPenaltyWithSchedule = (checkOutTime: string | null, employeeType: string, minClockOutTime: string): number => {
   // No clock out - maximum penalty
   if (!checkOutTime) {
     return employeeType === 'primary' ? -25 : -50;
   }
   
   const checkOutMinutes = parseTimeToMinutes(checkOutTime);
+  const minClockOutMinutes = parseTimeToMinutes(minClockOutTime);
   
   if (employeeType === 'primary') {
-    // Primary: minimum 16:00 (960 minutes)
-    const minClockOut = 16 * 60; // 16:00
-    if (checkOutMinutes >= minClockOut) return 0;
-    if (checkOutMinutes >= 15 * 60) return -10; // 15:00-15:59
-    if (checkOutMinutes >= 14 * 60) return -20; // 14:00-14:59
-    return -25; // < 14:00
+    if (checkOutMinutes >= minClockOutMinutes) return 0;
+    if (checkOutMinutes >= minClockOutMinutes - 60) return -10; // 1 hour early
+    if (checkOutMinutes >= minClockOutMinutes - 120) return -20; // 2 hours early
+    return -25; // > 2 hours early
   } else {
-    // Staff: minimum 17:00 (1020 minutes)
-    const minClockOut = 17 * 60; // 17:00
-    if (checkOutMinutes >= minClockOut) return 0;
-    if (checkOutMinutes >= 16 * 60) return -15; // 16:00-16:59
-    if (checkOutMinutes >= 15 * 60) return -25; // 15:00-15:59
-    return -35; // < 15:00
+    if (checkOutMinutes >= minClockOutMinutes) return 0;
+    if (checkOutMinutes >= minClockOutMinutes - 60) return -15; // 1 hour early
+    if (checkOutMinutes >= minClockOutMinutes - 120) return -25; // 2 hours early
+    return -35; // > 2 hours early
   }
 };
 
-// Calculate score components using subtractive formula (start from 100)
-export const calculateScore = (input: ScoreInput): ScoreResult => {
+// Calculate score components using subtractive formula (start from 100) - ASYNC version
+export const calculateScoreAsync = async (input: ScoreInput): Promise<ScoreResult> => {
   const { 
     checkInTime, 
     checkOutTime, 
@@ -117,13 +177,19 @@ export const calculateScore = (input: ScoreInput): ScoreResult => {
     toolboxChecked = false 
   } = input;
 
-  // Calculate late minutes
-  const lateMinutes = calculateLateMinutes(checkInTime, employeeType, workArea);
+  // Get schedule from database
+  const schedule = await getSchedule(workArea, employeeType);
+  console.log(`📊 Score calculation for ${workArea}/${employeeType}: schedule=${schedule.clockIn}-${schedule.clockOut}`);
+
+  // Calculate late minutes using dynamic schedule
+  const deadlineMinutes = parseTimeToMinutes(schedule.clockIn);
+  const checkInMinutes = parseTimeToMinutes(checkInTime);
+  const lateMinutes = Math.max(0, checkInMinutes - deadlineMinutes);
   const late = lateMinutes > 0;
 
   // Get penalties
   const clockInPenalty = getClockInPenalty(lateMinutes, employeeType);
-  const clockOutPenalty = getClockOutPenalty(checkOutTime, employeeType);
+  const clockOutPenalty = getClockOutPenaltyWithSchedule(checkOutTime, employeeType, schedule.clockOut);
   
   // P2H and Toolbox penalties (only for primary)
   const p2hPenalty = employeeType === 'primary' && !p2hChecked ? -25 : 0;
@@ -152,10 +218,78 @@ export const calculateScore = (input: ScoreInput): ScoreResult => {
   };
 };
 
-// Save score to database
+// Sync version for backward compatibility (uses cached schedule or default)
+export const calculateScore = (input: ScoreInput): ScoreResult => {
+  const { 
+    checkInTime, 
+    checkOutTime, 
+    employeeType, 
+    workArea,
+    p2hChecked = false, 
+    toolboxChecked = false 
+  } = input;
+
+  // Try to get from cache synchronously
+  const normalizedArea = workArea?.toUpperCase() || '';
+  const normalizedType = employeeType || 'staff';
+  
+  let schedule: WorkSchedule = normalizedType === 'primary' 
+    ? { clockIn: '07:00', clockOut: '16:00' }
+    : { clockIn: '08:00', clockOut: '17:00' };
+  
+  if (scheduleCache) {
+    const exactKey = `${normalizedArea}|${normalizedType}`;
+    if (scheduleCache.has(exactKey)) {
+      schedule = scheduleCache.get(exactKey)!;
+    } else {
+      const defaultKey = `DEFAULT|${normalizedType}`;
+      if (scheduleCache.has(defaultKey)) {
+        schedule = scheduleCache.get(defaultKey)!;
+      }
+    }
+  }
+
+  // Calculate late minutes using schedule
+  const deadlineMinutes = parseTimeToMinutes(schedule.clockIn);
+  const checkInMinutes = parseTimeToMinutes(checkInTime);
+  const lateMinutes = Math.max(0, checkInMinutes - deadlineMinutes);
+  const late = lateMinutes > 0;
+
+  // Get penalties
+  const clockInPenalty = getClockInPenalty(lateMinutes, employeeType);
+  const clockOutPenalty = getClockOutPenaltyWithSchedule(checkOutTime, employeeType, schedule.clockOut);
+  
+  // P2H and Toolbox penalties (only for primary)
+  const p2hPenalty = employeeType === 'primary' && !p2hChecked ? -25 : 0;
+  const toolboxPenalty = employeeType === 'primary' && !toolboxChecked ? -25 : 0;
+
+  // Calculate raw score (start from 100, apply penalties)
+  let rawScore = 100 + clockInPenalty + clockOutPenalty;
+  
+  if (employeeType === 'primary') {
+    rawScore += p2hPenalty + toolboxPenalty;
+  }
+  
+  // Ensure raw score is between 0 and 100
+  rawScore = Math.max(0, Math.min(100, rawScore));
+  
+  // Convert to 0-5 star scale
+  const finalScore = Math.round((rawScore / 100) * 5 * 10) / 10;
+
+  return {
+    clockInScore: clockInPenalty,
+    clockOutScore: clockOutPenalty,
+    p2hScore: p2hPenalty,
+    toolboxScore: toolboxPenalty,
+    finalScore,
+    isLate: late
+  };
+};
+
+// Save score to database (uses async version)
 export const saveScore = async (input: ScoreInput): Promise<boolean> => {
   try {
-    const scoreResult = calculateScore(input);
+    const scoreResult = await calculateScoreAsync(input);
     const today = new Date().toISOString().split('T')[0];
 
     const { error } = await supabase
@@ -238,3 +372,6 @@ export const getTodayScore = async (staffUid: string): Promise<number | null> =>
     return null;
   }
 };
+
+// Pre-load schedules on module init
+fetchSchedules().catch(console.error);

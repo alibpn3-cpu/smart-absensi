@@ -40,6 +40,7 @@ import NotCheckedInList from '../components/NotCheckedInList';
 const DashboardAnalytics = React.lazy(() => import('../components/DashboardAnalytics'));
 const ScoreReport = React.lazy(() => import('../components/ScoreReport'));
 const RankingOverrideManager = React.lazy(() => import('../components/RankingOverrideManager'));
+const WorkScheduleManager = React.lazy(() => import('../components/WorkScheduleManager'));
 import { PieChart as RePieChart, Pie, Cell } from 'recharts';
 
 interface AttendanceRecord {
@@ -780,9 +781,14 @@ const Dashboard = () => {
               <ScoreReport />
             </React.Suspense>
             {isSuperAdmin && (
-              <React.Suspense fallback={<div className="text-center py-8">Loading...</div>}>
-                <RankingOverrideManager />
-              </React.Suspense>
+              <>
+                <React.Suspense fallback={<div className="text-center py-8">Loading...</div>}>
+                  <WorkScheduleManager />
+                </React.Suspense>
+                <React.Suspense fallback={<div className="text-center py-8">Loading...</div>}>
+                  <RankingOverrideManager />
+                </React.Suspense>
+              </>
             )}
           </TabsContent>
 
