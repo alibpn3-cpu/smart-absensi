@@ -39,6 +39,7 @@ const getClockInDeadline = (employeeType: string, workArea: string): string => {
 
 // Parse time string to minutes since midnight
 const parseTimeToMinutes = (timeStr: string): number => {
+  if (!timeStr) return 0;
   const match = timeStr.match(/(\d{1,2}):(\d{2})/);
   if (!match) return 0;
   
@@ -47,16 +48,65 @@ const parseTimeToMinutes = (timeStr: string): number => {
   return hours * 60 + minutes;
 };
 
-// Check if clock-in time is late
-export const isLate = (checkInTime: string, employeeType: string, workArea: string): boolean => {
+// Calculate how many minutes late
+const calculateLateMinutes = (checkInTime: string, employeeType: string, workArea: string): number => {
   const deadline = getClockInDeadline(employeeType, workArea);
   const deadlineMinutes = parseTimeToMinutes(deadline);
   const checkInMinutes = parseTimeToMinutes(checkInTime);
   
-  return checkInMinutes > deadlineMinutes;
+  const diff = checkInMinutes - deadlineMinutes;
+  return diff > 0 ? diff : 0;
 };
 
-// Calculate score components
+// Check if clock-in time is late
+export const isLate = (checkInTime: string, employeeType: string, workArea: string): boolean => {
+  return calculateLateMinutes(checkInTime, employeeType, workArea) > 0;
+};
+
+// Get clock-in penalty based on late minutes and employee type
+const getClockInPenalty = (lateMinutes: number, employeeType: string): number => {
+  if (lateMinutes === 0) return 0;
+  
+  if (employeeType === 'primary') {
+    // Primary: max penalty -25 (25% of total)
+    if (lateMinutes <= 30) return -10;
+    if (lateMinutes <= 60) return -20;
+    return -25;
+  } else {
+    // Staff: max penalty -35 (50% weight but graduated)
+    if (lateMinutes <= 30) return -15;
+    if (lateMinutes <= 60) return -25;
+    return -35;
+  }
+};
+
+// Get clock-out penalty based on clock-out time and employee type
+const getClockOutPenalty = (checkOutTime: string | null, employeeType: string): number => {
+  // No clock out - maximum penalty
+  if (!checkOutTime) {
+    return employeeType === 'primary' ? -25 : -50;
+  }
+  
+  const checkOutMinutes = parseTimeToMinutes(checkOutTime);
+  
+  if (employeeType === 'primary') {
+    // Primary: minimum 16:00 (960 minutes)
+    const minClockOut = 16 * 60; // 16:00
+    if (checkOutMinutes >= minClockOut) return 0;
+    if (checkOutMinutes >= 15 * 60) return -10; // 15:00-15:59
+    if (checkOutMinutes >= 14 * 60) return -20; // 14:00-14:59
+    return -25; // < 14:00
+  } else {
+    // Staff: minimum 17:00 (1020 minutes)
+    const minClockOut = 17 * 60; // 17:00
+    if (checkOutMinutes >= minClockOut) return 0;
+    if (checkOutMinutes >= 16 * 60) return -15; // 16:00-16:59
+    if (checkOutMinutes >= 15 * 60) return -25; // 15:00-15:59
+    return -35; // < 15:00
+  }
+};
+
+// Calculate score components using subtractive formula (start from 100)
 export const calculateScore = (input: ScoreInput): ScoreResult => {
   const { 
     checkInTime, 
@@ -67,39 +117,36 @@ export const calculateScore = (input: ScoreInput): ScoreResult => {
     toolboxChecked = false 
   } = input;
 
-  // 1. Clock In Score: 1 star if on time, 0 if late
-  const late = isLate(checkInTime, employeeType, workArea);
-  const clockInScore = late ? 0 : 1;
+  // Calculate late minutes
+  const lateMinutes = calculateLateMinutes(checkInTime, employeeType, workArea);
+  const late = lateMinutes > 0;
 
-  // 2. Clock Out Score: 1 star if clocked out, 0 if not
-  const clockOutScore = checkOutTime ? 1 : 0;
+  // Get penalties
+  const clockInPenalty = getClockInPenalty(lateMinutes, employeeType);
+  const clockOutPenalty = getClockOutPenalty(checkOutTime, employeeType);
+  
+  // P2H and Toolbox penalties (only for primary)
+  const p2hPenalty = employeeType === 'primary' && !p2hChecked ? -25 : 0;
+  const toolboxPenalty = employeeType === 'primary' && !toolboxChecked ? -25 : 0;
 
-  // 3. P2H Score (only for primary): 1 star if checked
-  const p2hScore = employeeType === 'primary' && p2hChecked ? 1 : 0;
-
-  // 4. Toolbox Score (only for primary): 1 star if checked
-  const toolboxScore = employeeType === 'primary' && toolboxChecked ? 1 : 0;
-
-  // Calculate final score based on employee type
-  let finalScore: number;
+  // Calculate raw score (start from 100, apply penalties)
+  let rawScore = 100 + clockInPenalty + clockOutPenalty;
   
   if (employeeType === 'primary') {
-    // Primary: all 4 components, max 4 stars, then scale to 5
-    const rawScore = clockInScore + clockOutScore + p2hScore + toolboxScore;
-    // Scale from 0-4 to 0-5 (multiply by 1.25)
-    finalScore = Math.round((rawScore * 1.25) * 10) / 10;
-  } else {
-    // Staff: only clock in + clock out, max 2 stars, scale to 5
-    const rawScore = clockInScore + clockOutScore;
-    // Scale from 0-2 to 0-5 (multiply by 2.5)
-    finalScore = Math.round((rawScore * 2.5) * 10) / 10;
+    rawScore += p2hPenalty + toolboxPenalty;
   }
+  
+  // Ensure raw score is between 0 and 100
+  rawScore = Math.max(0, Math.min(100, rawScore));
+  
+  // Convert to 0-5 star scale
+  const finalScore = Math.round((rawScore / 100) * 5 * 10) / 10;
 
   return {
-    clockInScore,
-    clockOutScore,
-    p2hScore,
-    toolboxScore,
+    clockInScore: clockInPenalty,
+    clockOutScore: clockOutPenalty,
+    p2hScore: p2hPenalty,
+    toolboxScore: toolboxPenalty,
     finalScore,
     isLate: late
   };
