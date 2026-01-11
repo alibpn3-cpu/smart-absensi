@@ -5,22 +5,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Get clock-in deadline based on employee type and work area
-const getClockInDeadline = (employeeType: string, workArea: string): string => {
-  const isHO = workArea?.toLowerCase().includes('ho') || 
-               workArea?.toLowerCase().includes('head office') ||
-               workArea?.toLowerCase().includes('jakarta');
-  
-  if (isHO) {
-    return '08:30';
-  }
-  
-  if (employeeType === 'primary') {
-    return '07:00';
-  }
-  
-  return '08:00';
-};
+interface WorkSchedule {
+  clockIn: string;
+  clockOut: string;
+}
 
 // Parse time string to minutes since midnight
 const parseTimeToMinutes = (timeStr: string): number => {
@@ -33,19 +21,39 @@ const parseTimeToMinutes = (timeStr: string): number => {
   return hours * 60 + minutes;
 };
 
-// Calculate how many minutes late
-const calculateLateMinutes = (checkInTime: string, employeeType: string, workArea: string): number => {
-  const deadline = getClockInDeadline(employeeType, workArea);
-  const deadlineMinutes = parseTimeToMinutes(deadline);
-  const checkInMinutes = parseTimeToMinutes(checkInTime);
+// Get schedule from map with fallback
+const getScheduleFromMap = (
+  scheduleMap: Map<string, WorkSchedule>,
+  workArea: string,
+  employeeType: string
+): WorkSchedule => {
+  const normalizedArea = workArea?.toUpperCase() || '';
+  const normalizedType = employeeType || 'staff';
   
-  const diff = checkInMinutes - deadlineMinutes;
-  return diff > 0 ? diff : 0;
-};
-
-// Check if clock-in time is late
-const isLate = (checkInTime: string, employeeType: string, workArea: string): boolean => {
-  return calculateLateMinutes(checkInTime, employeeType, workArea) > 0;
+  // Try exact match first
+  const exactKey = `${normalizedArea}|${normalizedType}`;
+  if (scheduleMap.has(exactKey)) {
+    return scheduleMap.get(exactKey)!;
+  }
+  
+  // Try partial match
+  for (const [key, schedule] of scheduleMap.entries()) {
+    const [area, type] = key.split('|');
+    if (type === normalizedType && normalizedArea.includes(area)) {
+      return schedule;
+    }
+  }
+  
+  // Fallback to DEFAULT
+  const defaultKey = `DEFAULT|${normalizedType}`;
+  if (scheduleMap.has(defaultKey)) {
+    return scheduleMap.get(defaultKey)!;
+  }
+  
+  // Ultimate fallback (hardcoded)
+  return normalizedType === 'primary' 
+    ? { clockIn: '07:00', clockOut: '16:00' }
+    : { clockIn: '08:00', clockOut: '17:00' };
 };
 
 // Get clock-in penalty based on late minutes and employee type
@@ -65,29 +73,26 @@ const getClockInPenalty = (lateMinutes: number, employeeType: string): number =>
   }
 };
 
-// Get clock-out penalty based on clock-out time and employee type
-const getClockOutPenalty = (checkOutTime: string | null, employeeType: string): number => {
+// Get clock-out penalty based on clock-out time, employee type, and schedule
+const getClockOutPenalty = (checkOutTime: string | null, employeeType: string, minClockOutTime: string): number => {
   // No clock out - maximum penalty
   if (!checkOutTime) {
     return employeeType === 'primary' ? -25 : -50;
   }
   
   const checkOutMinutes = parseTimeToMinutes(checkOutTime);
+  const minClockOutMinutes = parseTimeToMinutes(minClockOutTime);
   
   if (employeeType === 'primary') {
-    // Primary: minimum 16:00 (960 minutes)
-    const minClockOut = 16 * 60; // 16:00
-    if (checkOutMinutes >= minClockOut) return 0;
-    if (checkOutMinutes >= 15 * 60) return -10; // 15:00-15:59
-    if (checkOutMinutes >= 14 * 60) return -20; // 14:00-14:59
-    return -25; // < 14:00
+    if (checkOutMinutes >= minClockOutMinutes) return 0;
+    if (checkOutMinutes >= minClockOutMinutes - 60) return -10; // 1 hour early
+    if (checkOutMinutes >= minClockOutMinutes - 120) return -20; // 2 hours early
+    return -25; // > 2 hours early
   } else {
-    // Staff: minimum 17:00 (1020 minutes)
-    const minClockOut = 17 * 60; // 17:00
-    if (checkOutMinutes >= minClockOut) return 0;
-    if (checkOutMinutes >= 16 * 60) return -15; // 16:00-16:59
-    if (checkOutMinutes >= 15 * 60) return -25; // 15:00-15:59
-    return -35; // < 15:00
+    if (checkOutMinutes >= minClockOutMinutes) return 0;
+    if (checkOutMinutes >= minClockOutMinutes - 60) return -15; // 1 hour early
+    if (checkOutMinutes >= minClockOutMinutes - 120) return -25; // 2 hours early
+    return -35; // > 2 hours early
   }
 };
 
@@ -96,17 +101,19 @@ const calculateScore = (
   checkInTime: string,
   checkOutTime: string | null,
   employeeType: string,
-  workArea: string,
+  schedule: WorkSchedule,
   p2hChecked: boolean,
   toolboxChecked: boolean
 ) => {
-  // Calculate late minutes
-  const lateMinutes = calculateLateMinutes(checkInTime, employeeType, workArea);
+  // Calculate late minutes using dynamic schedule
+  const deadlineMinutes = parseTimeToMinutes(schedule.clockIn);
+  const checkInMinutes = parseTimeToMinutes(checkInTime);
+  const lateMinutes = Math.max(0, checkInMinutes - deadlineMinutes);
   const late = lateMinutes > 0;
 
   // Get penalties
   const clockInPenalty = getClockInPenalty(lateMinutes, employeeType);
-  const clockOutPenalty = getClockOutPenalty(checkOutTime, employeeType);
+  const clockOutPenalty = getClockOutPenalty(checkOutTime, employeeType, schedule.clockOut);
   
   // P2H and Toolbox penalties (only for primary)
   const p2hPenalty = employeeType === 'primary' && !p2hChecked ? -25 : 0;
@@ -142,7 +149,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('🚀 Starting daily score calculation (Subtractive Formula v2)...');
+    console.log('🚀 Starting daily score calculation (Dynamic Schedule v3)...');
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -164,8 +171,24 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Fetch work area schedules from database
+    const { data: scheduleData, error: scheduleError } = await supabase
+      .from('work_area_schedules')
+      .select('work_area, employee_type, clock_in_time, clock_out_time');
+
+    if (scheduleError) {
+      console.error('❌ Error fetching work schedules:', scheduleError);
+    }
+
+    // Build schedule map
+    const scheduleMap = new Map<string, WorkSchedule>();
+    scheduleData?.forEach(s => {
+      const key = `${s.work_area.toUpperCase()}|${s.employee_type}`;
+      scheduleMap.set(key, { clockIn: s.clock_in_time, clockOut: s.clock_out_time });
+    });
+    console.log(`📅 Loaded ${scheduleMap.size} work schedules from database`);
+
     // Get today's date in WIB (Asia/Jakarta) timezone
-    // This ensures correct date calculation when cron runs at 23:59 WIB
     const wibTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
     const todayStr = wibTime.toISOString().split('T')[0];
     console.log(`📅 Processing scores for date: ${todayStr} (WIB timezone)`);
@@ -214,15 +237,20 @@ Deno.serve(async (req) => {
         const checklist = checklistMap.get(record.staff_uid);
         
         const employeeType = staff?.employee_type || 'staff';
-        const workArea = staff?.work_area || record.staff_name || '';
+        const workArea = staff?.work_area || '';
         const p2hChecked = checklist?.p2h_checked || false;
         const toolboxChecked = checklist?.toolbox_checked || false;
+
+        // Get schedule from map
+        const schedule = getScheduleFromMap(scheduleMap, workArea, employeeType);
+        
+        console.log(`👤 ${record.staff_name} (${workArea}/${employeeType}): schedule=${schedule.clockIn}-${schedule.clockOut}`);
 
         const scoreResult = calculateScore(
           record.check_in_time,
           record.check_out_time,
           employeeType,
-          workArea,
+          schedule,
           p2hChecked,
           toolboxChecked
         );
@@ -286,7 +314,8 @@ Deno.serve(async (req) => {
         processed: processedCount,
         errors: errorCount,
         total: attendanceRecords?.length || 0,
-        formula: 'subtractive_v2'
+        formula: 'dynamic_schedule_v3',
+        schedulesLoaded: scheduleMap.size
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

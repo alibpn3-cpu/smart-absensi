@@ -520,6 +520,36 @@ export type Database = {
         }
         Relationships: []
       }
+      work_area_schedules: {
+        Row: {
+          clock_in_time: string
+          clock_out_time: string
+          created_at: string
+          employee_type: string
+          id: string
+          updated_at: string
+          work_area: string
+        }
+        Insert: {
+          clock_in_time?: string
+          clock_out_time?: string
+          created_at?: string
+          employee_type?: string
+          id?: string
+          updated_at?: string
+          work_area: string
+        }
+        Update: {
+          clock_in_time?: string
+          clock_out_time?: string
+          created_at?: string
+          employee_type?: string
+          id?: string
+          updated_at?: string
+          work_area?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
