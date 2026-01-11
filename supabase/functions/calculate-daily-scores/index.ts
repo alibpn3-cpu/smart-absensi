@@ -33,16 +33,65 @@ const parseTimeToMinutes = (timeStr: string): number => {
   return hours * 60 + minutes;
 };
 
-// Check if clock-in time is late
-const isLate = (checkInTime: string, employeeType: string, workArea: string): boolean => {
+// Calculate how many minutes late
+const calculateLateMinutes = (checkInTime: string, employeeType: string, workArea: string): number => {
   const deadline = getClockInDeadline(employeeType, workArea);
   const deadlineMinutes = parseTimeToMinutes(deadline);
   const checkInMinutes = parseTimeToMinutes(checkInTime);
   
-  return checkInMinutes > deadlineMinutes;
+  const diff = checkInMinutes - deadlineMinutes;
+  return diff > 0 ? diff : 0;
 };
 
-// Calculate score for a user
+// Check if clock-in time is late
+const isLate = (checkInTime: string, employeeType: string, workArea: string): boolean => {
+  return calculateLateMinutes(checkInTime, employeeType, workArea) > 0;
+};
+
+// Get clock-in penalty based on late minutes and employee type
+const getClockInPenalty = (lateMinutes: number, employeeType: string): number => {
+  if (lateMinutes === 0) return 0;
+  
+  if (employeeType === 'primary') {
+    // Primary: max penalty -25 (25% of total)
+    if (lateMinutes <= 30) return -10;
+    if (lateMinutes <= 60) return -20;
+    return -25;
+  } else {
+    // Staff: max penalty -35 (50% weight but graduated)
+    if (lateMinutes <= 30) return -15;
+    if (lateMinutes <= 60) return -25;
+    return -35;
+  }
+};
+
+// Get clock-out penalty based on clock-out time and employee type
+const getClockOutPenalty = (checkOutTime: string | null, employeeType: string): number => {
+  // No clock out - maximum penalty
+  if (!checkOutTime) {
+    return employeeType === 'primary' ? -25 : -50;
+  }
+  
+  const checkOutMinutes = parseTimeToMinutes(checkOutTime);
+  
+  if (employeeType === 'primary') {
+    // Primary: minimum 16:00 (960 minutes)
+    const minClockOut = 16 * 60; // 16:00
+    if (checkOutMinutes >= minClockOut) return 0;
+    if (checkOutMinutes >= 15 * 60) return -10; // 15:00-15:59
+    if (checkOutMinutes >= 14 * 60) return -20; // 14:00-14:59
+    return -25; // < 14:00
+  } else {
+    // Staff: minimum 17:00 (1020 minutes)
+    const minClockOut = 17 * 60; // 17:00
+    if (checkOutMinutes >= minClockOut) return 0;
+    if (checkOutMinutes >= 16 * 60) return -15; // 16:00-16:59
+    if (checkOutMinutes >= 15 * 60) return -25; // 15:00-15:59
+    return -35; // < 15:00
+  }
+};
+
+// Calculate score using subtractive formula (start from 100)
 const calculateScore = (
   checkInTime: string,
   checkOutTime: string | null,
@@ -51,40 +100,37 @@ const calculateScore = (
   p2hChecked: boolean,
   toolboxChecked: boolean
 ) => {
-  // 1. Clock In Score: 1 star if on time, 0 if late
-  const late = isLate(checkInTime, employeeType, workArea);
-  const clockInScore = late ? 0 : 1;
+  // Calculate late minutes
+  const lateMinutes = calculateLateMinutes(checkInTime, employeeType, workArea);
+  const late = lateMinutes > 0;
 
-  // 2. Clock Out Score: 1 star if clocked out, -1 if not (forgot to clock out)
-  const clockOutScore = checkOutTime ? 1 : -1;
+  // Get penalties
+  const clockInPenalty = getClockInPenalty(lateMinutes, employeeType);
+  const clockOutPenalty = getClockOutPenalty(checkOutTime, employeeType);
+  
+  // P2H and Toolbox penalties (only for primary)
+  const p2hPenalty = employeeType === 'primary' && !p2hChecked ? -25 : 0;
+  const toolboxPenalty = employeeType === 'primary' && !toolboxChecked ? -25 : 0;
 
-  // 3. P2H Score (only for primary): 1 star if checked
-  const p2hScore = employeeType === 'primary' && p2hChecked ? 1 : 0;
-
-  // 4. Toolbox Score (only for primary): 1 star if checked
-  const toolboxScore = employeeType === 'primary' && toolboxChecked ? 1 : 0;
-
-  // Calculate final score based on employee type
-  let finalScore: number;
+  // Calculate raw score (start from 100, apply penalties)
+  let rawScore = 100 + clockInPenalty + clockOutPenalty;
   
   if (employeeType === 'primary') {
-    // Primary: all 4 components, max 4 stars (including -1 for no clock out)
-    const rawScore = clockInScore + clockOutScore + p2hScore + toolboxScore;
-    // Scale from -1 to 4 range to 0-5 (shift by 1, then multiply by 1.25)
-    finalScore = Math.max(0, Math.round(((rawScore + 1) * 1) * 10) / 10);
-  } else {
-    // Staff: only clock in + clock out, max 2 stars
-    const rawScore = clockInScore + clockOutScore;
-    // Scale from -1 to 2 range to 0-5
-    finalScore = Math.max(0, Math.round(((rawScore + 1) * 1.67) * 10) / 10);
+    rawScore += p2hPenalty + toolboxPenalty;
   }
+  
+  // Ensure raw score is between 0 and 100
+  rawScore = Math.max(0, Math.min(100, rawScore));
+  
+  // Convert to 0-5 star scale
+  const finalScore = Math.round((rawScore / 100) * 5 * 10) / 10;
 
   return {
-    clockInScore,
-    clockOutScore,
-    p2hScore,
-    toolboxScore,
-    finalScore: Math.min(5, finalScore), // Cap at 5
+    clockInScore: clockInPenalty,
+    clockOutScore: clockOutPenalty,
+    p2hScore: p2hPenalty,
+    toolboxScore: toolboxPenalty,
+    finalScore,
     isLate: late
   };
 };
@@ -96,7 +142,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('🚀 Starting daily score calculation...');
+    console.log('🚀 Starting daily score calculation (Subtractive Formula v2)...');
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -221,7 +267,8 @@ Deno.serve(async (req) => {
           console.error(`❌ Error saving score for ${record.staff_name}:`, upsertError);
           errorCount++;
         } else {
-          console.log(`✅ Score saved for ${record.staff_name}: ${scoreResult.finalScore}/5 (clock_out: ${record.check_out_time ? 'yes' : 'no'})`);
+          const clockOutStatus = record.check_out_time ? record.check_out_time : 'NO CLOCK OUT';
+          console.log(`✅ Score saved for ${record.staff_name}: ${scoreResult.finalScore}/5 (IN: ${scoreResult.clockInScore}, OUT: ${scoreResult.clockOutScore}, clockOut: ${clockOutStatus})`);
           processedCount++;
         }
       } catch (recordError) {
@@ -238,7 +285,8 @@ Deno.serve(async (req) => {
         date: todayStr,
         processed: processedCount,
         errors: errorCount,
-        total: attendanceRecords?.length || 0
+        total: attendanceRecords?.length || 0,
+        formula: 'subtractive_v2'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
