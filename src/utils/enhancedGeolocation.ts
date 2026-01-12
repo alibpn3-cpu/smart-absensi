@@ -20,11 +20,11 @@ export interface EnhancedLocationOptions {
 
 const DEFAULT_OPTIONS: EnhancedLocationOptions = {
   enableHighAccuracy: true,
-  timeout: 15000,
+  timeout: 10000,
   maximumAge: 0,
-  multipleReadings: true,
-  readingsCount: 3,
-  readingInterval: 500,
+  multipleReadings: false, // Default to single reading for faster response
+  readingsCount: 1,
+  readingInterval: 300,
 };
 
 // Cache for debouncing

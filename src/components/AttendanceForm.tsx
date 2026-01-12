@@ -69,6 +69,17 @@ interface AttendanceFormProps {
   companyLogoUrl?: string;
 }
 
+// Geofence cache type
+interface GeofenceArea {
+  id: string;
+  name: string;
+  center_lat: number | null;
+  center_lng: number | null;
+  radius: number | null;
+  coordinates: unknown;
+  is_active: boolean;
+}
+
 const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [filteredStaffUsers, setFilteredStaffUsers] = useState<StaffUser[]>([]);
@@ -100,6 +111,11 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   const [dinasFastCheckoutReason, setDinasFastCheckoutReason] = useState('');
   const [isDinasFastCheckout, setIsDinasFastCheckout] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
+  
+  // Cached geofence areas for faster checks
+  const [cachedGeofences, setCachedGeofences] = useState<GeofenceArea[]>([]);
+  const geofenceCacheRef = useRef<{ data: GeofenceArea[]; timestamp: number } | null>(null);
+  const GEOFENCE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
   
   // GPS status tracking for indicator
   const [gpsStatus, setGpsStatus] = useState<{
@@ -248,11 +264,36 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     }
   }, []);
 
+  // Pre-fetch and cache geofence areas
+  const fetchGeofences = useCallback(async (force = false) => {
+    // Check cache first
+    if (!force && geofenceCacheRef.current && 
+        Date.now() - geofenceCacheRef.current.timestamp < GEOFENCE_CACHE_DURATION) {
+      setCachedGeofences(geofenceCacheRef.current.data);
+      return geofenceCacheRef.current.data;
+    }
+    
+    const { data, error } = await supabase
+      .from('geofence_areas')
+      .select('*')
+      .eq('is_active', true);
+    
+    if (!error && data) {
+      const geofences = data as GeofenceArea[];
+      geofenceCacheRef.current = { data: geofences, timestamp: Date.now() };
+      setCachedGeofences(geofences);
+      console.log('📍 Geofences cached:', geofences.length, 'areas');
+      return geofences;
+    }
+    return cachedGeofences;
+  }, [cachedGeofences]);
+
   useEffect(() => {
     fetchStaffUsers();
     checkStoredPermissions();
     loadSharedDeviceMode();
     fetchAppVersion();
+    fetchGeofences(); // Pre-fetch geofences on mount
     
     // Only load saved staff in kiosk mode
     const localKioskMode = localStorage.getItem('shared_device_mode') === 'true';
@@ -263,6 +304,10 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         setSelectedWorkArea(savedWorkArea);
       }
     }
+    
+    // Refresh geofences every 5 minutes
+    const interval = setInterval(() => fetchGeofences(true), GEOFENCE_CACHE_DURATION);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -491,6 +536,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     }
   };
 
+  // Fast location request - single reading for speed
   const requestLocationPermission = (): Promise<{ lat: number; lng: number; address: string; coordinates: string; accuracy?: number }> => {
     return new Promise(async (resolve, reject) => {
       if (!navigator.geolocation) {
@@ -499,21 +545,19 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       }
 
       try {
-        // Use enhanced geolocation with multiple readings
-        console.log('📍 Using enhanced geolocation...');
+        // Use single GPS reading for faster response (default is now single)
+        console.log('📍 Getting location (single reading for speed)...');
         const locationResult = await getEnhancedLocation({
           enableHighAccuracy: true,
-          timeout: 15000,
+          timeout: 10000,
           maximumAge: 0,
-          multipleReadings: true,
-          readingsCount: 3,
-          readingInterval: 500,
+          multipleReadings: false, // Single reading for speed
         });
         
         const { latitude: lat, longitude: lng, accuracy } = locationResult;
-        console.log(`📍 Enhanced location: ${lat}, ${lng} (accuracy: ${accuracy.toFixed(1)}m from ${locationResult.readingsCount} readings)`);
+        console.log(`📍 Location: ${lat}, ${lng} (accuracy: ${accuracy.toFixed(1)}m)`);
         
-        // Validate GPS authenticity - detect fake GPS
+        // Validate GPS authenticity - detect fake GPS (run in parallel with nothing blocking)
         const gpsValidation = await validateGPSPosition({
           coords: {
             latitude: lat,
@@ -562,25 +606,35 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         // Save permission
         savePermissions({ ...permissions, location: true });
         
-        try {
-          const locationData = await getAddressFromCoords(lat, lng);
-          resolve({ lat, lng, address: locationData.address, coordinates: locationData.coordinates, accuracy });
-        } catch (error) {
-          console.error('❌ Geocoding failed:', error);
-          const locationCode = generateLocationCode(lat, lng);
-          resolve({ 
-            lat, 
-            lng, 
-            address: `${locationCode} - Lokasi tidak dikenal`, 
-            coordinates: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-            accuracy 
-          });
-        }
+        // Quick address for immediate response
+        const quickAddress = generateLocationCode(lat, lng);
+        const coordinates = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        
+        // Resolve immediately with coordinates, geocoding happens in background
+        resolve({ lat, lng, address: quickAddress, coordinates, accuracy });
+        
       } catch (error) {
-        console.error('❌ Enhanced geolocation failed:', error);
+        console.error('❌ Geolocation failed:', error);
         reject(error);
       }
     });
+  };
+  
+  // Background geocoding - updates address after attendance is saved
+  const getAddressInBackground = async (lat: number, lng: number, recordId: string, isCheckOut: boolean) => {
+    try {
+      const locationData = await getAddressFromCoords(lat, lng);
+      const updateField = isCheckOut ? 'checkout_location_address' : 'checkin_location_address';
+      
+      await supabase
+        .from('attendance_records')
+        .update({ [updateField]: locationData.address })
+        .eq('id', recordId);
+      
+      console.log('✅ Address updated in background:', locationData.address);
+    } catch (error) {
+      console.error('❌ Background geocoding failed:', error);
+    }
   };
 
   const generateLocationCode = (lat: number, lng: number): string => {
@@ -598,8 +652,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       
       let detailedAddress = '';
       
-      // Helper function to fetch with timeout
-      const fetchWithTimeout = (url: string, options: RequestInit, timeout = 8000) => {
+      // Helper function to fetch with aggressive timeout (3 seconds for speed)
+      const fetchWithTimeout = (url: string, options: RequestInit, timeout = 3000) => {
         return Promise.race([
           fetch(url, options),
           new Promise<Response>((_, reject) => 
@@ -618,7 +672,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
               'User-Agent': 'AttendanceApp/1.0'
             }
           },
-          8000
+          3000 // Aggressive 3 second timeout
         );
         
         if (nominatimResponse.ok) {
@@ -681,7 +735,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           const bigDataResponse = await fetchWithTimeout(
             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=id`,
             {},
-            8000
+            3000 // Aggressive 3 second timeout
           );
           
           if (bigDataResponse.ok) {
@@ -742,15 +796,18 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     }
   };
 
+  // Check geofence using cached data for speed
   const checkGeofence = async (lat: number, lng: number, accuracy?: number): Promise<{ isInGeofence: boolean; geofenceName?: string }> => {
     if (attendanceStatus !== 'wfo') return { isInGeofence: true };
 
-    const { data: geofences, error } = await supabase
-      .from('geofence_areas')
-      .select('*')
-      .eq('is_active', true);
+    // Use cached geofences for instant check (no DB query)
+    let geofences = cachedGeofences;
+    if (geofences.length === 0) {
+      // Fallback: fetch if cache is empty
+      geofences = await fetchGeofences();
+    }
 
-    if (error || !geofences) return { isInGeofence: true };
+    if (geofences.length === 0) return { isInGeofence: true };
 
     // Tighter geofence tolerance - max 15 meters
     const accuracyTolerance = accuracy ? Math.min(accuracy * 0.3, 15) : 0;
@@ -758,7 +815,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
 
     for (const geofence of geofences) {
       // Check polygon geofence first (if coordinates exist)
-      if (geofence.coordinates && Array.isArray(geofence.coordinates) && geofence.coordinates.length >= 3) {
+      if (geofence.coordinates && Array.isArray(geofence.coordinates) && (geofence.coordinates as unknown[]).length >= 3) {
         try {
           const polygonCoords = geofence.coordinates as unknown as PolygonCoordinate[];
           const isInside = isPointInPolygon(lat, lng, accuracy || 0, polygonCoords);
@@ -791,18 +848,19 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     return { isInGeofence: false };
   };
 
-  // Check ANY geofence (for Dinas status to display geofence name instead of address)
+  // Check ANY geofence using cached data (for Dinas status to display geofence name instead of address)
   const checkAnyGeofence = async (lat: number, lng: number): Promise<string | null> => {
-    const { data: geofences, error } = await supabase
-      .from('geofence_areas')
-      .select('*')
-      .eq('is_active', true);
+    // Use cached geofences for instant check
+    let geofences = cachedGeofences;
+    if (geofences.length === 0) {
+      geofences = await fetchGeofences();
+    }
 
-    if (error || !geofences) return null;
+    if (geofences.length === 0) return null;
 
     for (const geofence of geofences) {
       // Check polygon geofence first
-      if (geofence.coordinates && Array.isArray(geofence.coordinates) && geofence.coordinates.length >= 3) {
+      if (geofence.coordinates && Array.isArray(geofence.coordinates) && (geofence.coordinates as unknown[]).length >= 3) {
         try {
           const polygonCoords = geofence.coordinates as unknown as PolygonCoordinate[];
           const isInside = isPointInPolygon(lat, lng, 50, polygonCoords); // 50m tolerance for Dinas
@@ -1371,6 +1429,11 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           throw error;
         }
         console.log('✅ Check-out recorded successfully');
+        
+        // Background geocoding for detailed address (non-blocking)
+        if (locationAddress.startsWith('GPS:')) {
+          getAddressInBackground(usedLocation.lat, usedLocation.lng, todayAttendance.id, true);
+        }
       } else if (!todayAttendance) {
         // Create new record for check-in
         console.log('📝 Creating new check-in record');
@@ -1384,6 +1447,11 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           throw error;
         }
         console.log('✅ Check-in recorded successfully:', data);
+        
+        // Background geocoding for detailed address (non-blocking)
+        if (data && data[0] && locationAddress.startsWith('GPS:')) {
+          getAddressInBackground(usedLocation.lat, usedLocation.lng, data[0].id, false);
+        }
         
         // Save attendance status to localStorage for checkout
         localStorage.setItem('attendance_status', attendanceStatus);
