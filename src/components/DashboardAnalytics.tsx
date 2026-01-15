@@ -5,15 +5,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
 import { 
-  TrendingUp, Calendar, Users, Clock, Building2, BarChart3, RefreshCw, Filter
+  TrendingUp, Calendar, Users, Clock, Building2, BarChart3, RefreshCw, Filter, Check, ChevronsUpDown
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface DailyStats {
   date: string;
@@ -58,6 +61,7 @@ const DashboardAnalytics = () => {
   const [filterWorkArea, setFilterWorkArea] = useState('all');
   const [filterDivision, setFilterDivision] = useState('all');
   const [filterEmployee, setFilterEmployee] = useState('all');
+  const [employeeSearchOpen, setEmployeeSearchOpen] = useState(false);
   
   // Filter options
   const [workAreas, setWorkAreas] = useState<string[]>([]);
@@ -415,17 +419,56 @@ const DashboardAnalytics = () => {
               
               <div className="space-y-2">
                 <Label className="text-xs">Karyawan</Label>
-                <Select value={filterEmployee} onValueChange={setFilterEmployee}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Semua Karyawan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Karyawan</SelectItem>
-                    {employees.map(emp => (
-                      <SelectItem key={emp.uid} value={emp.uid}>{emp.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={employeeSearchOpen} onOpenChange={setEmployeeSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={employeeSearchOpen}
+                      className="w-[220px] justify-between font-normal"
+                    >
+                      <span className="truncate">
+                        {filterEmployee === 'all' 
+                          ? 'Semua Karyawan' 
+                          : employees.find(e => e.uid === filterEmployee)?.name || 'Pilih Karyawan'}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[250px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Cari nama karyawan..." />
+                      <CommandList>
+                        <CommandEmpty>Tidak ditemukan</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="semua-karyawan"
+                            onSelect={() => {
+                              setFilterEmployee('all');
+                              setEmployeeSearchOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", filterEmployee === 'all' ? "opacity-100" : "opacity-0")} />
+                            Semua Karyawan
+                          </CommandItem>
+                          {employees.map(emp => (
+                            <CommandItem
+                              key={emp.uid}
+                              value={emp.name}
+                              onSelect={() => {
+                                setFilterEmployee(emp.uid);
+                                setEmployeeSearchOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", filterEmployee === emp.uid ? "opacity-100" : "opacity-0")} />
+                              {emp.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {hasActiveFilters && (
