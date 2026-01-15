@@ -9,6 +9,7 @@ import { Download, FileSpreadsheet, Calendar, Filter, FileText, FileJson } from 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -560,84 +561,6 @@ const AttendanceExporter = () => {
         return null;
       };
 
-      const excelData = attendanceData.map((record: any, index: number) => {
-        const checkinGeofenceName = record.checkin_location_lat && record.checkin_location_lng
-          ? findGeofenceName(Number(record.checkin_location_lat), Number(record.checkin_location_lng))
-          : null;
-        
-        const checkoutGeofenceName = record.checkout_location_lat && record.checkout_location_lng
-          ? findGeofenceName(Number(record.checkout_location_lat), Number(record.checkout_location_lng))
-          : null;
-        
-        const checkoutLat = record.checkout_location_lat ?? (record.check_out_time ? record.checkin_location_lat : null);
-        const checkoutLng = record.checkout_location_lng ?? (record.check_out_time ? record.checkin_location_lng : null);
-        const checkoutAddress = checkoutGeofenceName || record.checkout_location_address || (record.check_out_time ? record.checkin_location_address : null);
-          
-        const emp = allEmployees.find((s: any) => s.uid === record.staff_uid);
-        
-        // Get P2H/Toolbox checklist for this record
-        const checklist = checklistMap.get(`${record.staff_uid}_${record.date}`);
-        
-        // Get schedule times
-        const onDuty = getOnDuty(emp?.work_area, emp?.employee_type);
-        const offDuty = getOffDuty(emp?.work_area, emp?.employee_type);
-        
-        return {
-          'No': index + 1,
-          'UID Karyawan': record.staff_uid,
-          'Nama Karyawan': record.staff_name,
-          'Jabatan': emp?.position || '-',
-          'Area Kerja': emp?.work_area || '-',
-          'Divisi': emp?.division || '-',
-          'Hari': getDayName(record.date),
-          'Tanggal': new Date(record.date).toLocaleDateString('id-ID'),
-          'Status Clock-In': record.status?.toUpperCase() || '-',
-          'Status Clock-Out': record.checkout_status?.toUpperCase() || record.status?.toUpperCase() || '-',
-          'Jenis Absensi': record.attendance_type === 'overtime' ? 'LEMBUR' : 'REGULAR',
-          'On Duty': onDuty,
-          'Off Duty': offDuty,
-          'Waktu Clock In': formatTimeHMS(record.check_in_time, emp?.work_area),
-          'Waktu Clock Out': formatTimeHMS(record.check_out_time, emp?.work_area),
-          'Late Clock In': calculateLateClockIn(record.check_in_time, onDuty, emp?.work_area),
-          'Early Clock Out': calculateEarlyClockOut(record.check_out_time, offDuty, emp?.work_area),
-          'Total Jam Kerja': formatHoursHMS(record.hours_worked, record.check_in_time, record.check_out_time),
-          'Geofence Clock-In': checkinGeofenceName || '-',
-          'Alamat Clock-In': record.checkin_location_address || '-',
-          'Koordinat Clock-In': record.checkin_location_lat && record.checkin_location_lng 
-            ? `${record.checkin_location_lat}, ${record.checkin_location_lng}` 
-            : '-',
-          'Geofence Clock-Out': checkoutGeofenceName || '-',
-          'Alamat Clock-Out': checkoutAddress || '-',
-          'Koordinat Clock-Out': checkoutLat && checkoutLng 
-            ? `${checkoutLat}, ${checkoutLng}` 
-            : '-',
-          'Foto Clock-In': record.selfie_checkin_url || record.selfie_photo_url ? 'Lihat Foto' : '-',
-          'Foto Clock-Out': record.selfie_checkout_url ? 'Lihat Foto' : '-',
-          'P2H': checklist?.p2h_checked ? 'Ya' : 'Tidak',
-          'Foto P2H': checklist?.p2h_photo_url ? 'Lihat Foto' : '-',
-          'Toolbox': checklist?.toolbox_checked ? 'Ya' : 'Tidak',
-          'Foto Toolbox': checklist?.toolbox_photo_url ? 'Lihat Foto' : '-',
-          'Alasan Clock In': record.checkin_reason || record.reason || '-',
-          'Alasan Clock Out': record.checkout_reason || '-',
-          'Alasan Extend In': record.extend_reason || '-',
-          'Alasan Extend Out': record.extend_reason || '-'
-        };
-      });
-
-      // Create workbook
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(excelData);
-
-      // Bold headers - xlsx-js-style not available, so we use a workaround
-      // Headers are in row 1
-      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
-        if (!ws[cellAddress]) continue;
-        // Note: Basic xlsx doesn't support styling. Headers will be bolded in PDF/HTML exports.
-        // For Excel, the data is still properly structured with clear header names.
-      }
-
       // Generate signed URLs for all photos
       const signedPhotoUrls = await Promise.all(
         attendanceData.map(async (record: any) => {
@@ -700,121 +623,183 @@ const AttendanceExporter = () => {
         })
       );
 
-      // Add hyperlinks after creating the sheet - adjusted column positions for new columns
+      // Create ExcelJS workbook
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Laporan Absensi');
+
+      // Define columns
+      worksheet.columns = [
+        { header: 'No', key: 'no', width: 5 },
+        { header: 'UID Karyawan', key: 'uid', width: 12 },
+        { header: 'Nama Karyawan', key: 'nama', width: 20 },
+        { header: 'Jabatan', key: 'jabatan', width: 15 },
+        { header: 'Area Kerja', key: 'area', width: 15 },
+        { header: 'Divisi', key: 'divisi', width: 12 },
+        { header: 'Hari', key: 'hari', width: 10 },
+        { header: 'Tanggal', key: 'tanggal', width: 12 },
+        { header: 'Status Clock-In', key: 'statusIn', width: 12 },
+        { header: 'Status Clock-Out', key: 'statusOut', width: 12 },
+        { header: 'Jenis Absensi', key: 'jenisAbsensi', width: 12 },
+        { header: 'On Duty', key: 'onDuty', width: 10 },
+        { header: 'Off Duty', key: 'offDuty', width: 10 },
+        { header: 'Waktu Clock In', key: 'clockIn', width: 10 },
+        { header: 'Waktu Clock Out', key: 'clockOut', width: 10 },
+        { header: 'Late Clock In', key: 'lateIn', width: 12 },
+        { header: 'Early Clock Out', key: 'earlyOut', width: 12 },
+        { header: 'Total Jam Kerja', key: 'totalJam', width: 12 },
+        { header: 'Geofence Clock-In', key: 'geofenceIn', width: 20 },
+        { header: 'Alamat Clock-In', key: 'alamatIn', width: 35 },
+        { header: 'Koordinat Clock-In', key: 'koordinatIn', width: 20 },
+        { header: 'Geofence Clock-Out', key: 'geofenceOut', width: 20 },
+        { header: 'Alamat Clock-Out', key: 'alamatOut', width: 35 },
+        { header: 'Koordinat Clock-Out', key: 'koordinatOut', width: 20 },
+        { header: 'Foto Clock-In', key: 'fotoIn', width: 12 },
+        { header: 'Foto Clock-Out', key: 'fotoOut', width: 12 },
+        { header: 'P2H', key: 'p2h', width: 8 },
+        { header: 'Foto P2H', key: 'fotoP2h', width: 12 },
+        { header: 'Toolbox', key: 'toolbox', width: 8 },
+        { header: 'Foto Toolbox', key: 'fotoToolbox', width: 12 },
+        { header: 'Alasan Clock In', key: 'alasanIn', width: 25 },
+        { header: 'Alasan Clock Out', key: 'alasanOut', width: 25 },
+        { header: 'Alasan Extend In', key: 'alasanExtendIn', width: 25 },
+        { header: 'Alasan Extend Out', key: 'alasanExtendOut', width: 25 }
+      ];
+
+      // Add data rows
       attendanceData.forEach((record: any, index: number) => {
-        const rowIndex = index + 2;
+        const checkinGeofenceName = record.checkin_location_lat && record.checkin_location_lng
+          ? findGeofenceName(Number(record.checkin_location_lat), Number(record.checkin_location_lng))
+          : null;
         
-        // Koordinat Clock-In hyperlink (Column U - adjusted for new columns)
-        if (record.checkin_location_lat && record.checkin_location_lng) {
-          const coordCell = `U${rowIndex}`;
-          const mapsUrl = `https://www.google.com/maps?q=${record.checkin_location_lat},${record.checkin_location_lng}`;
-          ws[coordCell] = {
-            t: 's',
-            v: `${record.checkin_location_lat}, ${record.checkin_location_lng}`,
-            l: { Target: mapsUrl, Tooltip: 'Buka lokasi clock-in di Google Maps' }
-          };
-        }
+        const checkoutGeofenceName = record.checkout_location_lat && record.checkout_location_lng
+          ? findGeofenceName(Number(record.checkout_location_lat), Number(record.checkout_location_lng))
+          : null;
         
-        // Koordinat Clock-Out hyperlink (Column X - adjusted)
-        const cLat = record.checkout_location_lat ?? (record.check_out_time ? record.checkin_location_lat : null);
-        const cLng = record.checkout_location_lng ?? (record.check_out_time ? record.checkin_location_lng : null);
-        if (cLat && cLng) {
-          const coordCell = `X${rowIndex}`;
-          const mapsUrl = `https://www.google.com/maps?q=${cLat},${cLng}`;
-          ws[coordCell] = {
-            t: 's',
-            v: `${cLat}, ${cLng}`,
-            l: { Target: mapsUrl, Tooltip: 'Buka lokasi clock-out di Google Maps' }
-          };
-        }
-        
+        const checkoutLat = record.checkout_location_lat ?? (record.check_out_time ? record.checkin_location_lat : null);
+        const checkoutLng = record.checkout_location_lng ?? (record.check_out_time ? record.checkin_location_lng : null);
+        const checkoutAddress = checkoutGeofenceName || record.checkout_location_address || (record.check_out_time ? record.checkin_location_address : null);
+          
+        const emp = allEmployees.find((s: any) => s.uid === record.staff_uid);
+        const checklist = checklistMap.get(`${record.staff_uid}_${record.date}`);
         const photoUrls = signedPhotoUrls[index];
         
-        // Foto Clock-In (Column Y - adjusted)
+        const onDuty = getOnDuty(emp?.work_area, emp?.employee_type);
+        const offDuty = getOffDuty(emp?.work_area, emp?.employee_type);
+        
+        const row = worksheet.addRow({
+          no: index + 1,
+          uid: record.staff_uid,
+          nama: record.staff_name,
+          jabatan: emp?.position || '-',
+          area: emp?.work_area || '-',
+          divisi: emp?.division || '-',
+          hari: getDayName(record.date),
+          tanggal: new Date(record.date).toLocaleDateString('id-ID'),
+          statusIn: record.status?.toUpperCase() || '-',
+          statusOut: record.checkout_status?.toUpperCase() || record.status?.toUpperCase() || '-',
+          jenisAbsensi: record.attendance_type === 'overtime' ? 'LEMBUR' : 'REGULAR',
+          onDuty: onDuty,
+          offDuty: offDuty,
+          clockIn: formatTimeHMS(record.check_in_time, emp?.work_area),
+          clockOut: formatTimeHMS(record.check_out_time, emp?.work_area),
+          lateIn: calculateLateClockIn(record.check_in_time, onDuty, emp?.work_area),
+          earlyOut: calculateEarlyClockOut(record.check_out_time, offDuty, emp?.work_area),
+          totalJam: formatHoursHMS(record.hours_worked, record.check_in_time, record.check_out_time),
+          geofenceIn: checkinGeofenceName || '-',
+          alamatIn: record.checkin_location_address || '-',
+          koordinatIn: record.checkin_location_lat && record.checkin_location_lng 
+            ? `${record.checkin_location_lat}, ${record.checkin_location_lng}` 
+            : '-',
+          geofenceOut: checkoutGeofenceName || '-',
+          alamatOut: checkoutAddress || '-',
+          koordinatOut: checkoutLat && checkoutLng 
+            ? `${checkoutLat}, ${checkoutLng}` 
+            : '-',
+          fotoIn: photoUrls?.checkin ? 'Lihat Foto' : '-',
+          fotoOut: photoUrls?.checkout ? 'Lihat Foto' : '-',
+          p2h: checklist?.p2h_checked ? 'Ya' : 'Tidak',
+          fotoP2h: photoUrls?.p2h ? 'Lihat Foto' : '-',
+          toolbox: checklist?.toolbox_checked ? 'Ya' : 'Tidak',
+          fotoToolbox: photoUrls?.toolbox ? 'Lihat Foto' : '-',
+          alasanIn: record.checkin_reason || record.reason || '-',
+          alasanOut: record.checkout_reason || '-',
+          alasanExtendIn: record.extend_reason || '-',
+          alasanExtendOut: record.extend_reason || '-'
+        });
+
+        // Add hyperlinks for coordinates
+        if (record.checkin_location_lat && record.checkin_location_lng) {
+          const cell = row.getCell('koordinatIn');
+          const mapsUrl = `https://www.google.com/maps?q=${record.checkin_location_lat},${record.checkin_location_lng}`;
+          cell.value = { 
+            text: `${record.checkin_location_lat}, ${record.checkin_location_lng}`, 
+            hyperlink: mapsUrl 
+          };
+          cell.font = { color: { argb: 'FF0000FF' }, underline: true };
+        }
+
+        if (checkoutLat && checkoutLng) {
+          const cell = row.getCell('koordinatOut');
+          const mapsUrl = `https://www.google.com/maps?q=${checkoutLat},${checkoutLng}`;
+          cell.value = { text: `${checkoutLat}, ${checkoutLng}`, hyperlink: mapsUrl };
+          cell.font = { color: { argb: 'FF0000FF' }, underline: true };
+        }
+
+        // Add hyperlinks for photos
         if (photoUrls?.checkin) {
-          ws[`Y${rowIndex}`] = {
-            t: 's',
-            v: 'Lihat Foto',
-            l: { Target: photoUrls.checkin, Tooltip: 'Buka foto clock-in' }
-          };
+          const cell = row.getCell('fotoIn');
+          cell.value = { text: 'Lihat Foto', hyperlink: photoUrls.checkin };
+          cell.font = { color: { argb: 'FF0000FF' }, underline: true };
         }
-        
-        // Foto Clock-Out (Column Z - adjusted)
         if (photoUrls?.checkout) {
-          ws[`Z${rowIndex}`] = {
-            t: 's',
-            v: 'Lihat Foto',
-            l: { Target: photoUrls.checkout, Tooltip: 'Buka foto clock-out' }
-          };
+          const cell = row.getCell('fotoOut');
+          cell.value = { text: 'Lihat Foto', hyperlink: photoUrls.checkout };
+          cell.font = { color: { argb: 'FF0000FF' }, underline: true };
         }
-        
-        // Foto P2H (Column AB - adjusted)
         if (photoUrls?.p2h) {
-          ws[`AB${rowIndex}`] = {
-            t: 's',
-            v: 'Lihat Foto',
-            l: { Target: photoUrls.p2h, Tooltip: 'Buka foto P2H' }
-          };
+          const cell = row.getCell('fotoP2h');
+          cell.value = { text: 'Lihat Foto', hyperlink: photoUrls.p2h };
+          cell.font = { color: { argb: 'FF0000FF' }, underline: true };
         }
-        
-        // Foto Toolbox (Column AD - adjusted)
         if (photoUrls?.toolbox) {
-          ws[`AD${rowIndex}`] = {
-            t: 's',
-            v: 'Lihat Foto',
-            l: { Target: photoUrls.toolbox, Tooltip: 'Buka foto Toolbox' }
-          };
+          const cell = row.getCell('fotoToolbox');
+          cell.value = { text: 'Lihat Foto', hyperlink: photoUrls.toolbox };
+          cell.font = { color: { argb: 'FF0000FF' }, underline: true };
         }
       });
 
-      // Set column widths - updated for new columns
-      const colWidths = [
-        { wch: 5 },   // No
-        { wch: 12 },  // UID
-        { wch: 20 },  // Nama
-        { wch: 15 },  // Jabatan
-        { wch: 15 },  // Area Kerja
-        { wch: 12 },  // Divisi
-        { wch: 10 },  // Hari (NEW)
-        { wch: 12 },  // Tanggal
-        { wch: 12 },  // Status Clock-In
-        { wch: 12 },  // Status Clock-Out
-        { wch: 12 },  // Jenis Absensi
-        { wch: 10 },  // On Duty (NEW)
-        { wch: 10 },  // Off Duty (NEW)
-        { wch: 10 },  // Clock In
-        { wch: 10 },  // Clock Out
-        { wch: 12 },  // Late Clock In (NEW)
-        { wch: 12 },  // Early Clock Out (NEW)
-        { wch: 12 },  // Total Jam
-        { wch: 20 },  // Geofence Clock-In
-        { wch: 35 },  // Alamat Clock-In
-        { wch: 20 },  // Koordinat Clock-In
-        { wch: 20 },  // Geofence Clock-Out
-        { wch: 35 },  // Alamat Clock-Out
-        { wch: 20 },  // Koordinat Clock-Out
-        { wch: 12 },  // Foto Clock-In
-        { wch: 12 },  // Foto Clock-Out
-        { wch: 8 },   // P2H
-        { wch: 12 },  // Foto P2H
-        { wch: 8 },   // Toolbox
-        { wch: 12 },  // Foto Toolbox
-        { wch: 25 },  // Alasan Clock In
-        { wch: 25 },  // Alasan Clock Out
-        { wch: 25 },  // Alasan Extend In
-        { wch: 25 }   // Alasan Extend Out
-      ];
-      ws['!cols'] = colWidths;
-
-      // Set page orientation to landscape
-      ws['!printProps'] = {
-        orientation: 'landscape',
-        fitToWidth: 1,
-        fitToHeight: 0
+      // Style header row - BOLD + BLUE BACKGROUND + WHITE TEXT
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF3B82F6' }
       };
+      headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+      headerRow.height = 25;
 
-      // Add worksheet to workbook
-      XLSX.utils.book_append_sheet(wb, ws, 'Laporan Absensi');
+      // Add borders to all cells
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+        });
+      });
+
+      // Freeze header row
+      worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+      // Add auto filter
+      const lastColumn = String.fromCharCode(65 + worksheet.columns.length - 1);
+      worksheet.autoFilter = {
+        from: 'A1',
+        to: `${lastColumn}${attendanceData.length + 1}`
+      };
 
       // Generate filename
       const startDate = new Date(filters.startDate).toLocaleDateString('id-ID').replace(/\//g, '-');
@@ -825,11 +810,9 @@ const AttendanceExporter = () => {
       
       const filename = `Laporan-Absensi_${startDate}_${endDate}_${statusText}_${workAreaText}_${employeeText}.xlsx`;
 
-      // Generate Excel file
-      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
-      
       // Save file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       saveAs(blob, filename);
 
       toast({
