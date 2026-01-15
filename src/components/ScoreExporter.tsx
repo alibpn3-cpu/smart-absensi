@@ -166,29 +166,11 @@ const ScoreExporter = () => {
 
   const exportToExcel = async (data: any[]) => {
     try {
-      // Generate photo URLs for P2H/Toolbox
-      const photoUrls = await Promise.all(
-        data.map(async (record) => {
-          let p2hUrl = null;
-          let toolboxUrl = null;
-          
-          if (record.checklist?.p2h_photo_url) {
-            const { data: urlData } = supabase.storage
-              .from('p2h-photos')
-              .getPublicUrl(record.checklist.p2h_photo_url);
-            p2hUrl = urlData?.publicUrl || null;
-          }
-          
-          if (record.checklist?.toolbox_photo_url) {
-            const { data: urlData } = supabase.storage
-              .from('p2h-photos')
-              .getPublicUrl(record.checklist.toolbox_photo_url);
-            toolboxUrl = urlData?.publicUrl || null;
-          }
-          
-          return { p2h: p2hUrl, toolbox: toolboxUrl };
-        })
-      );
+      // URL foto sudah lengkap dari database, tidak perlu generate lagi
+      const photoUrls = data.map((record) => ({
+        p2h: record.checklist?.p2h_photo_url || null,
+        toolbox: record.checklist?.toolbox_photo_url || null
+      }));
 
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Laporan Score');
