@@ -615,7 +615,8 @@ const PolygonGeofenceManager: React.FC = () => {
         };
       }
       
-      if (editingGeofence) {
+      // Use isNewMode to decide insert vs update (not editingGeofence which is always set)
+      if (!isNewMode && editingGeofence?.id) {
         const { error } = await supabase
           .from('geofence_areas')
           .update(geofenceData)
