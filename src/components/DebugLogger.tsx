@@ -14,6 +14,14 @@ interface DebugLoggerProps {
   permissions?: { location: boolean; camera: boolean };
 }
 
+interface CameraErrorData {
+  name: string;
+  message: string;
+  stack?: string;
+  timestamp?: string;
+  constraint?: string;
+}
+
 const DebugLogger: React.FC<DebugLoggerProps> = ({ staffUid, staffName, workAreas, permissions }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [userNotes, setUserNotes] = useState('');
@@ -73,6 +81,80 @@ const DebugLogger: React.FC<DebugLoggerProps> = ({ staffUid, staffName, workArea
     });
   };
 
+  // Enhanced camera data collection
+  const getCameraData = async (): Promise<{
+    permissionState?: string;
+    cameras?: { label: string; id: string }[];
+    accessResult: 'success' | 'failed' | 'unknown';
+    error?: CameraErrorData;
+  }> => {
+    try {
+      // Check permission state via Permissions API
+      let permissionState = 'unknown';
+      try {
+        const permResult = await navigator.permissions.query({ name: 'camera' as PermissionName });
+        permissionState = permResult.state;
+      } catch {
+        // Some browsers don't support camera permission query
+      }
+
+      // Enumerate available devices
+      let cameras: { label: string; id: string }[] = [];
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        cameras = devices
+          .filter(d => d.kind === 'videoinput')
+          .map(c => ({ label: c.label || 'Unknown Camera', id: c.deviceId }));
+      } catch {
+        // Device enumeration failed
+      }
+
+      // Try to access camera to get detailed error
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'user' } 
+        });
+        // Successfully got stream, clean up
+        stream.getTracks().forEach(t => t.stop());
+        return {
+          permissionState,
+          cameras,
+          accessResult: 'success'
+        };
+      } catch (cameraError: any) {
+        return {
+          permissionState,
+          cameras,
+          accessResult: 'failed',
+          error: {
+            name: cameraError.name || 'UnknownError',
+            message: cameraError.message || 'Camera access failed',
+            stack: cameraError.stack,
+            constraint: cameraError.constraint
+          }
+        };
+      }
+    } catch (e: any) {
+      return { 
+        accessResult: 'unknown',
+        error: { name: 'Error', message: e.message || 'Failed to check camera' }
+      };
+    }
+  };
+
+  // Get recent camera error from localStorage (set by CameraCapture)
+  const getRecentCameraError = (): CameraErrorData | null => {
+    try {
+      const stored = localStorage.getItem('last_camera_error');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch { 
+      // Ignore parse errors
+    }
+    return null;
+  };
+
   const collectAndSendLogs = async () => {
     setLoading(true);
 
@@ -87,20 +169,40 @@ const DebugLogger: React.FC<DebugLoggerProps> = ({ staffUid, staffName, workArea
       // Get location data (with potential error)
       const locationData = await getLocationData();
 
-      // Determine issue type based on location result
+      // Get camera data with detailed error info
+      const cameraData = await getCameraData();
+      const recentCameraError = getRecentCameraError();
+
+      // Determine issue type based on results
       let issueType = 'general';
       let errorMessage = '';
+      let errorStack = '';
       
+      // Check for location error
       if ('error' in locationData) {
         issueType = 'location';
         errorMessage = locationData.error;
       }
 
-      // Check permissions state
+      // Check for camera error (prioritize camera issues if both exist)
+      if (cameraData.accessResult === 'failed' || recentCameraError) {
+        issueType = 'camera';
+        const camError = cameraData.error || recentCameraError;
+        if (camError) {
+          errorMessage = `${camError.name}: ${camError.message}`;
+          errorStack = camError.stack || '';
+        }
+      }
+
+      // Build permissions state with camera details
       const permissionsState = {
-        ...permissions,
+        camera: cameraData.accessResult === 'success',
+        location: !('error' in locationData),
         geolocationAvailable: 'geolocation' in navigator,
-        mediaDevicesAvailable: 'mediaDevices' in navigator
+        mediaDevicesAvailable: 'mediaDevices' in navigator,
+        cameraPermissionState: cameraData.permissionState,
+        availableCameras: cameraData.cameras,
+        cameraError: cameraData.error || recentCameraError || undefined
       };
 
       // Collect console logs from localStorage if any
@@ -109,7 +211,7 @@ const DebugLogger: React.FC<DebugLoggerProps> = ({ staffUid, staffName, workArea
       // Insert to database
       const { error } = await supabase
         .from('debug_logs')
-        .insert({
+        .insert([{
           device_id: deviceId,
           user_agent: userAgent,
           screen_width: screenWidth,
@@ -119,14 +221,18 @@ const DebugLogger: React.FC<DebugLoggerProps> = ({ staffUid, staffName, workArea
           staff_name: staffName || null,
           issue_type: issueType,
           error_message: errorMessage || null,
-          permissions_state: permissionsState,
+          error_stack: errorStack || null,
+          permissions_state: permissionsState as any,
           work_areas_data: workAreas ? { areas: workAreas, count: workAreas.length } : null,
-          location_data: locationData,
+          location_data: locationData as any,
           console_logs: consoleLogs.length > 0 ? consoleLogs : null,
           user_notes: userNotes || null
-        });
+        }]);
 
       if (error) throw error;
+
+      // Clear recent camera error after successful send
+      localStorage.removeItem('last_camera_error');
 
       toast({
         title: "✅ Log Debug Terkirim",
@@ -178,6 +284,7 @@ const DebugLogger: React.FC<DebugLoggerProps> = ({ staffUid, staffName, workArea
               <ul className="text-xs text-muted-foreground space-y-1">
                 <li>• Info device (browser, layar, platform)</li>
                 <li>• Status permission (lokasi, kamera)</li>
+                <li>• Detail error kamera (jika ada masalah)</li>
                 <li>• Data lokasi saat ini (jika tersedia)</li>
                 <li>• Daftar area tugas yang tersedia</li>
               </ul>

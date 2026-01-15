@@ -20,7 +20,8 @@ import {
   FileSpreadsheet,
   Cake,
   ImageIcon,
-  History
+  History,
+  Bug
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -41,6 +42,7 @@ const DashboardAnalytics = React.lazy(() => import('../components/DashboardAnaly
 const ScoreReport = React.lazy(() => import('../components/ScoreReport'));
 const RankingOverrideManager = React.lazy(() => import('../components/RankingOverrideManager'));
 const WorkScheduleManager = React.lazy(() => import('../components/WorkScheduleManager'));
+const DebugLogViewer = React.lazy(() => import('../components/DebugLogViewer'));
 import { PieChart as RePieChart, Pie, Cell } from 'recharts';
 
 interface AttendanceRecord {
@@ -382,7 +384,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
-          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSuperAdmin ? 'grid-cols-3 sm:grid-cols-13' : 'grid-cols-3 sm:grid-cols-10'}`}>
+          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSuperAdmin ? 'grid-cols-3 sm:grid-cols-14' : 'grid-cols-3 sm:grid-cols-10'}`}>
             <TabsTrigger value="attendance" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Attendance</span>
               <span className="sm:hidden">Absen</span>
@@ -419,6 +421,11 @@ const Dashboard = () => {
                   <History className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Activity Logs</span>
                   <span className="sm:hidden">Log</span>
+                </TabsTrigger>
+                <TabsTrigger value="debuglogs" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <Bug className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Debug Logs</span>
+                  <span className="sm:hidden">Debug</span>
                 </TabsTrigger>
               </>
             )}
@@ -817,6 +824,14 @@ const Dashboard = () => {
           <TabsContent value="settings">
             <AppSettings />
           </TabsContent>
+
+          {isSuperAdmin && (
+            <TabsContent value="debuglogs">
+              <React.Suspense fallback={<div className="text-center py-8">Loading Debug Logs...</div>}>
+                <DebugLogViewer />
+              </React.Suspense>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>
