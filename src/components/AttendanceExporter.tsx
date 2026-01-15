@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,14 @@ interface StaffUser {
   work_area?: string;
   position?: string;
   division?: string;
+  employee_type?: string;
+}
+
+interface WorkAreaSchedule {
+  work_area: string;
+  employee_type: string;
+  clock_in_time: string;
+  clock_out_time: string;
 }
 
 const AttendanceExporter = () => {
@@ -44,9 +52,11 @@ const AttendanceExporter = () => {
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [exportFormat, setExportFormat] = useState<'excel' | 'pdf' | 'csv' | 'html'>('excel');
   const [skipBlankDates, setSkipBlankDates] = useState(false);
+  const [schedules, setSchedules] = useState<WorkAreaSchedule[]>([]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetchEmployees();
+    fetchSchedules();
     
     // Set default dates (current month)
     const now = new Date();
@@ -64,7 +74,7 @@ const AttendanceExporter = () => {
     setLoadingEmployees(true);
     const { data, error } = await supabase
       .from('staff_users')
-      .select('uid, name, work_area, position, division')
+      .select('uid, name, work_area, position, division, employee_type')
       .eq('is_active', true)
       .order('name');
 
@@ -84,6 +94,212 @@ const AttendanceExporter = () => {
       setWorkAreas(areas);
     }
     setLoadingEmployees(false);
+  };
+
+  const fetchSchedules = async () => {
+    const { data } = await supabase
+      .from('work_area_schedules')
+      .select('*');
+    setSchedules(data || []);
+  };
+
+  // Get timezone for work area (WIB = Asia/Jakarta, WITA = Asia/Makassar)
+  const getTimezone = (workArea: string | undefined): string => {
+    if (!workArea) return 'Asia/Jakarta';
+    const upperArea = workArea.toUpperCase();
+    // WIB (GMT+7) for Head Office Jakarta/Cikarang
+    if (upperArea.includes('HEAD OFFICE') || upperArea.includes('CIKARANG') || upperArea.includes('JAKARTA')) {
+      return 'Asia/Jakarta';
+    }
+    // WITA (GMT+8) for Kalimantan areas
+    return 'Asia/Makassar';
+  };
+
+  // Get On Duty time based on work area and employee type
+  const getOnDuty = (workArea: string | undefined, employeeType: string | undefined): string => {
+    const upperArea = (workArea || '').toUpperCase();
+    const empType = (employeeType || 'staff').toLowerCase();
+    
+    // Check if schedule exists in database first
+    const schedule = schedules.find(s => 
+      s.work_area.toUpperCase() === upperArea && 
+      s.employee_type.toLowerCase() === empType
+    );
+    if (schedule) {
+      return formatScheduleTime(schedule.clock_in_time);
+    }
+    
+    // Fallback defaults
+    if (upperArea.includes('HEAD OFFICE') || upperArea.includes('CIKARANG') || upperArea.includes('JAKARTA')) {
+      return '08:30:00'; // WIB
+    }
+    if (upperArea.includes('BRANCH OFFICE') || upperArea.includes('BALIKPAPAN')) {
+      return '08:00:00'; // WITA
+    }
+    if (upperArea.includes('HANDIL') || upperArea.includes('MUARA BADAK') || upperArea.includes('SITE')) {
+      return empType === 'primary' ? '07:00:00' : '08:00:00'; // WITA
+    }
+    return '08:00:00';
+  };
+
+  // Get Off Duty time based on work area and employee type
+  const getOffDuty = (workArea: string | undefined, employeeType: string | undefined): string => {
+    const upperArea = (workArea || '').toUpperCase();
+    const empType = (employeeType || 'staff').toLowerCase();
+    
+    // Check if schedule exists in database first
+    const schedule = schedules.find(s => 
+      s.work_area.toUpperCase() === upperArea && 
+      s.employee_type.toLowerCase() === empType
+    );
+    if (schedule) {
+      return formatScheduleTime(schedule.clock_out_time);
+    }
+    
+    // Fallback defaults
+    if (upperArea.includes('HEAD OFFICE') || upperArea.includes('CIKARANG') || upperArea.includes('JAKARTA')) {
+      return '17:30:00'; // WIB
+    }
+    if (upperArea.includes('BRANCH OFFICE') || upperArea.includes('BALIKPAPAN')) {
+      return '17:00:00'; // WITA
+    }
+    if (upperArea.includes('HANDIL') || upperArea.includes('MUARA BADAK') || upperArea.includes('SITE')) {
+      return empType === 'primary' ? '18:00:00' : '16:00:00'; // WITA
+    }
+    return '17:00:00';
+  };
+
+  // Format schedule time to HH:mm:ss
+  const formatScheduleTime = (time: string): string => {
+    if (!time) return '-';
+    // If already in HH:mm:ss format, return as is
+    if (/^\d{2}:\d{2}:\d{2}$/.test(time)) return time;
+    // If in HH:mm format, add :00
+    if (/^\d{2}:\d{2}$/.test(time)) return `${time}:00`;
+    return time;
+  };
+
+  // Get day name in Indonesian
+  const getDayName = (dateStr: string): string => {
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const date = new Date(dateStr);
+    return days[date.getDay()];
+  };
+
+  // Format time to HH:mm:ss only (no milliseconds, timezone-aware)
+  const formatTimeHMS = (timeStr: string | null, workArea?: string): string => {
+    if (!timeStr) return '-';
+    try {
+      // Parse the stored time string (format: "YYYY-MM-DD HH:mm:ss.sss+HH:mm")
+      const normalized = timeStr.replace(' ', 'T');
+      const date = new Date(normalized);
+      
+      if (isNaN(date.getTime())) {
+        // Fallback: extract time portion directly
+        const match = timeStr.match(/(\d{2}:\d{2}:\d{2})/);
+        return match ? match[1] : '-';
+      }
+      
+      const timezone = getTimezone(workArea);
+      return date.toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZone: timezone
+      });
+    } catch {
+      const match = timeStr.match(/(\d{2}:\d{2}:\d{2})/);
+      return match ? match[1] : '-';
+    }
+  };
+
+  // Calculate late clock in (returns HH:mm:ss or '-')
+  const calculateLateClockIn = (checkInTime: string | null, scheduledTime: string, workArea?: string): string => {
+    if (!checkInTime || !scheduledTime || scheduledTime === '-') return '-';
+    
+    try {
+      const checkInHMS = formatTimeHMS(checkInTime, workArea);
+      if (checkInHMS === '-') return '-';
+      
+      const [ciH, ciM, ciS] = checkInHMS.split(':').map(Number);
+      const [schH, schM, schS] = scheduledTime.split(':').map(Number);
+      
+      const checkInMinutes = ciH * 60 + ciM + ciS / 60;
+      const scheduledMinutes = schH * 60 + schM + (schS || 0) / 60;
+      
+      const lateMinutes = checkInMinutes - scheduledMinutes;
+      
+      if (lateMinutes <= 0) return '-'; // Not late
+      
+      const hours = Math.floor(lateMinutes / 60);
+      const minutes = Math.floor(lateMinutes % 60);
+      const seconds = Math.round((lateMinutes % 1) * 60);
+      
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    } catch {
+      return '-';
+    }
+  };
+
+  // Calculate early clock out (returns HH:mm:ss or '-')
+  const calculateEarlyClockOut = (checkOutTime: string | null, scheduledTime: string, workArea?: string): string => {
+    if (!checkOutTime || !scheduledTime || scheduledTime === '-') return '-';
+    
+    try {
+      const checkOutHMS = formatTimeHMS(checkOutTime, workArea);
+      if (checkOutHMS === '-') return '-';
+      
+      const [coH, coM, coS] = checkOutHMS.split(':').map(Number);
+      const [schH, schM, schS] = scheduledTime.split(':').map(Number);
+      
+      const checkOutMinutes = coH * 60 + coM + coS / 60;
+      const scheduledMinutes = schH * 60 + schM + (schS || 0) / 60;
+      
+      const earlyMinutes = scheduledMinutes - checkOutMinutes;
+      
+      if (earlyMinutes <= 0) return '-'; // Not early
+      
+      const hours = Math.floor(earlyMinutes / 60);
+      const minutes = Math.floor(earlyMinutes % 60);
+      const seconds = Math.round((earlyMinutes % 1) * 60);
+      
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    } catch {
+      return '-';
+    }
+  };
+
+  // Format hours worked to HH:mm:ss
+  const formatHoursHMS = (hoursWorked: number | null, checkIn: string | null, checkOut: string | null): string => {
+    if (hoursWorked && typeof hoursWorked === 'number') {
+      const hours = Math.floor(hoursWorked);
+      const minutes = Math.floor((hoursWorked - hours) * 60);
+      const seconds = Math.round(((hoursWorked - hours) * 60 - minutes) * 60);
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+    
+    if (!checkIn || !checkOut) return '-';
+    
+    try {
+      const start = new Date(checkIn.replace(' ', 'T'));
+      const end = new Date(checkOut.replace(' ', 'T'));
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return '-';
+      
+      const diffMs = end.getTime() - start.getTime();
+      const totalSeconds = Math.floor(diffMs / 1000);
+      
+      if (totalSeconds < 0) return '-';
+      
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    } catch {
+      return '-';
+    }
   };
 
   // Generate all dates in a range
@@ -231,52 +447,6 @@ const AttendanceExporter = () => {
     return result;
   };
 
-  const formatTimeForExport = (timeString: string | null) => {
-    if (!timeString) return '-';
-    try {
-      // Parse the stored time string (format: "YYYY-MM-DD HH:mm:ss.sss+HH:mm")
-      // Extract just the time portion for display
-      const parts = timeString.split(' ');
-      if (parts.length >= 2) {
-        const timePart = parts[1].split('+')[0]; // Remove timezone offset
-        return timePart;
-      }
-      return timeString;
-    } catch {
-      return timeString;
-    }
-  };
-
-  const calculateWorkHours = (checkIn: string | null, checkOut: string | null) => {
-    if (!checkIn || !checkOut) return '-';
-    
-    try {
-      // Parse the stored time strings (format: "YYYY-MM-DD HH:mm:ss.sss+HH:mm")
-      const start = new Date(checkIn.replace(' ', 'T'));
-      const end = new Date(checkOut.replace(' ', 'T'));
-      
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) return '-';
-      
-      const diffMs = end.getTime() - start.getTime();
-      
-      // Convert to hours, minutes, seconds
-      const totalSeconds = Math.floor(diffMs / 1000);
-      const hours = Math.floor(totalSeconds / 3600);
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      const seconds = totalSeconds % 60;
-      
-      // Format output
-      const parts = [];
-      if (hours > 0) parts.push(`${hours} jam`);
-      if (minutes > 0) parts.push(`${minutes} menit`);
-      if (seconds > 0 && hours === 0) parts.push(`${seconds} detik`); // Show seconds only if less than 1 hour
-      
-      return parts.length > 0 ? parts.join(' ') : '0 detik';
-    } catch {
-      return '-';
-    }
-  };
-
   const exportToExcel = async () => {
     setLoading(true);
     
@@ -360,6 +530,10 @@ const AttendanceExporter = () => {
         // Get P2H/Toolbox checklist for this record
         const checklist = checklistMap.get(`${record.staff_uid}_${record.date}`);
         
+        // Get schedule times
+        const onDuty = getOnDuty(emp?.work_area, emp?.employee_type);
+        const offDuty = getOffDuty(emp?.work_area, emp?.employee_type);
+        
         return {
           'No': index + 1,
           'UID Karyawan': record.staff_uid,
@@ -367,13 +541,18 @@ const AttendanceExporter = () => {
           'Jabatan': emp?.position || '-',
           'Area Kerja': emp?.work_area || '-',
           'Divisi': emp?.division || '-',
+          'Hari': getDayName(record.date),
           'Tanggal': new Date(record.date).toLocaleDateString('id-ID'),
           'Status Clock-In': record.status?.toUpperCase() || '-',
           'Status Clock-Out': record.checkout_status?.toUpperCase() || record.status?.toUpperCase() || '-',
           'Jenis Absensi': record.attendance_type === 'overtime' ? 'LEMBUR' : 'REGULAR',
-          'Waktu Clock In': formatTimeForExport(record.check_in_time),
-          'Waktu Clock Out': formatTimeForExport(record.check_out_time),
-          'Total Jam Kerja': record.hours_worked || calculateWorkHours(record.check_in_time, record.check_out_time),
+          'On Duty': onDuty,
+          'Off Duty': offDuty,
+          'Waktu Clock In': formatTimeHMS(record.check_in_time, emp?.work_area),
+          'Waktu Clock Out': formatTimeHMS(record.check_out_time, emp?.work_area),
+          'Late Clock In': calculateLateClockIn(record.check_in_time, onDuty, emp?.work_area),
+          'Early Clock Out': calculateEarlyClockOut(record.check_out_time, offDuty, emp?.work_area),
+          'Total Jam Kerja': formatHoursHMS(record.hours_worked, record.check_in_time, record.check_out_time),
           'Geofence Clock-In': checkinGeofenceName || '-',
           'Alamat Clock-In': record.checkin_location_address || '-',
           'Koordinat Clock-In': record.checkin_location_lat && record.checkin_location_lng 
@@ -397,6 +576,16 @@ const AttendanceExporter = () => {
       // Create workbook
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(excelData);
+
+      // Bold headers - xlsx-js-style not available, so we use a workaround
+      // Headers are in row 1
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (!ws[cellAddress]) continue;
+        // Note: Basic xlsx doesn't support styling. Headers will be bolded in PDF/HTML exports.
+        // For Excel, the data is still properly structured with clear header names.
+      }
 
       // Generate signed URLs for all photos
       const signedPhotoUrls = await Promise.all(
@@ -460,13 +649,13 @@ const AttendanceExporter = () => {
         })
       );
 
-      // Add hyperlinks after creating the sheet
+      // Add hyperlinks after creating the sheet - adjusted column positions for new columns
       attendanceData.forEach((record: any, index: number) => {
         const rowIndex = index + 2;
         
-        // Koordinat Clock-In hyperlink (Column P)
+        // Koordinat Clock-In hyperlink (Column U - adjusted for new columns)
         if (record.checkin_location_lat && record.checkin_location_lng) {
-          const coordCell = `P${rowIndex}`;
+          const coordCell = `U${rowIndex}`;
           const mapsUrl = `https://www.google.com/maps?q=${record.checkin_location_lat},${record.checkin_location_lng}`;
           ws[coordCell] = {
             t: 's',
@@ -475,11 +664,11 @@ const AttendanceExporter = () => {
           };
         }
         
-        // Koordinat Clock-Out hyperlink (Column S)
+        // Koordinat Clock-Out hyperlink (Column X - adjusted)
         const cLat = record.checkout_location_lat ?? (record.check_out_time ? record.checkin_location_lat : null);
         const cLng = record.checkout_location_lng ?? (record.check_out_time ? record.checkin_location_lng : null);
         if (cLat && cLng) {
-          const coordCell = `S${rowIndex}`;
+          const coordCell = `X${rowIndex}`;
           const mapsUrl = `https://www.google.com/maps?q=${cLat},${cLng}`;
           ws[coordCell] = {
             t: 's',
@@ -490,36 +679,36 @@ const AttendanceExporter = () => {
         
         const photoUrls = signedPhotoUrls[index];
         
-        // Foto Clock-In (Column T)
+        // Foto Clock-In (Column Y - adjusted)
         if (photoUrls?.checkin) {
-          ws[`T${rowIndex}`] = {
+          ws[`Y${rowIndex}`] = {
             t: 's',
             v: 'Lihat Foto',
             l: { Target: photoUrls.checkin, Tooltip: 'Buka foto clock-in' }
           };
         }
         
-        // Foto Clock-Out (Column U)
+        // Foto Clock-Out (Column Z - adjusted)
         if (photoUrls?.checkout) {
-          ws[`U${rowIndex}`] = {
+          ws[`Z${rowIndex}`] = {
             t: 's',
             v: 'Lihat Foto',
             l: { Target: photoUrls.checkout, Tooltip: 'Buka foto clock-out' }
           };
         }
         
-        // Foto P2H (Column W)
+        // Foto P2H (Column AB - adjusted)
         if (photoUrls?.p2h) {
-          ws[`W${rowIndex}`] = {
+          ws[`AB${rowIndex}`] = {
             t: 's',
             v: 'Lihat Foto',
             l: { Target: photoUrls.p2h, Tooltip: 'Buka foto P2H' }
           };
         }
         
-        // Foto Toolbox (Column Y)
+        // Foto Toolbox (Column AD - adjusted)
         if (photoUrls?.toolbox) {
-          ws[`Y${rowIndex}`] = {
+          ws[`AD${rowIndex}`] = {
             t: 's',
             v: 'Lihat Foto',
             l: { Target: photoUrls.toolbox, Tooltip: 'Buka foto Toolbox' }
@@ -527,7 +716,7 @@ const AttendanceExporter = () => {
         }
       });
 
-      // Set column widths
+      // Set column widths - updated for new columns
       const colWidths = [
         { wch: 5 },   // No
         { wch: 12 },  // UID
@@ -535,12 +724,17 @@ const AttendanceExporter = () => {
         { wch: 15 },  // Jabatan
         { wch: 15 },  // Area Kerja
         { wch: 12 },  // Divisi
+        { wch: 10 },  // Hari (NEW)
         { wch: 12 },  // Tanggal
         { wch: 12 },  // Status Clock-In
         { wch: 12 },  // Status Clock-Out
         { wch: 12 },  // Jenis Absensi
-        { wch: 18 },  // Clock In
-        { wch: 18 },  // Clock Out
+        { wch: 10 },  // On Duty (NEW)
+        { wch: 10 },  // Off Duty (NEW)
+        { wch: 10 },  // Clock In
+        { wch: 10 },  // Clock Out
+        { wch: 12 },  // Late Clock In (NEW)
+        { wch: 12 },  // Early Clock Out (NEW)
         { wch: 12 },  // Total Jam
         { wch: 20 },  // Geofence Clock-In
         { wch: 35 },  // Alamat Clock-In
@@ -631,6 +825,10 @@ const AttendanceExporter = () => {
       const emp = allEmployees.find((s: any) => s.uid === record.staff_uid);
       const checklist = checklistMap.get(`${record.staff_uid}_${record.date}`);
       const isEmpty = record._isEmpty === true;
+      
+      const onDuty = getOnDuty(emp?.work_area, emp?.employee_type);
+      const offDuty = getOffDuty(emp?.work_area, emp?.employee_type);
+      
       return {
         no: index + 1,
         uid: record.staff_uid,
@@ -638,13 +836,18 @@ const AttendanceExporter = () => {
         position: emp?.position || '-',
         workArea: emp?.work_area || '-',
         division: emp?.division || '-',
+        day: getDayName(record.date),
         date: new Date(record.date).toLocaleDateString('id-ID'),
         statusIn: isEmpty ? '-' : (record.status?.toUpperCase() || '-'),
         statusOut: isEmpty ? '-' : (record.checkout_status?.toUpperCase() || record.status?.toUpperCase() || '-'),
         attendanceType: isEmpty ? '-' : (record.attendance_type === 'overtime' ? 'LEMBUR' : 'REGULAR'),
-        checkIn: isEmpty ? '-' : formatTimeForExport(record.check_in_time),
-        checkOut: isEmpty ? '-' : formatTimeForExport(record.check_out_time),
-        hoursWorked: isEmpty ? '-' : (record.hours_worked || calculateWorkHours(record.check_in_time, record.check_out_time)),
+        onDuty: onDuty,
+        offDuty: offDuty,
+        checkIn: isEmpty ? '-' : formatTimeHMS(record.check_in_time, emp?.work_area),
+        checkOut: isEmpty ? '-' : formatTimeHMS(record.check_out_time, emp?.work_area),
+        lateClockIn: isEmpty ? '-' : calculateLateClockIn(record.check_in_time, onDuty, emp?.work_area),
+        earlyClockOut: isEmpty ? '-' : calculateEarlyClockOut(record.check_out_time, offDuty, emp?.work_area),
+        hoursWorked: isEmpty ? '-' : formatHoursHMS(record.hours_worked, record.check_in_time, record.check_out_time),
         checkinAddress: isEmpty ? '-' : (record.checkin_location_address || '-'),
         checkoutAddress: isEmpty ? '-' : (record.checkout_location_address || '-'),
         p2h: checklist?.p2h_checked ? 'Ya' : 'Tidak',
@@ -662,26 +865,28 @@ const AttendanceExporter = () => {
 
       const doc = new jsPDF('landscape', 'mm', 'a4');
       
-      // Header
+      // Header - Bold
       doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
       doc.setTextColor(59, 130, 246);
       doc.text('Laporan Absensi Karyawan', 14, 15);
       
       // Info periode
       doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
       doc.setTextColor(100);
       doc.text(`Periode: ${filters.startDate} s/d ${filters.endDate}`, 14, 22);
       doc.text(`Total Records: ${data.length}`, 14, 27);
       
-      // Table
+      // Table with new columns
       autoTable(doc, {
-        head: [['No', 'Nama', 'Tanggal', 'Status In', 'Status Out', 'Jenis', 'Clock In', 'Clock Out', 'Jam Kerja', 'Lokasi']],
+        head: [['No', 'Nama', 'Hari', 'Tanggal', 'Status In', 'Jenis', 'On Duty', 'Clock In', 'Late', 'Off Duty', 'Clock Out', 'Early', 'Jam Kerja']],
         body: data.map((r) => [
-          r.no, r.name, r.date, r.statusIn, r.statusOut, r.attendanceType, r.checkIn, r.checkOut, r.hoursWorked, r.checkinAddress
+          r.no, r.name, r.day, r.date, r.statusIn, r.attendanceType, r.onDuty, r.checkIn, r.lateClockIn, r.offDuty, r.checkOut, r.earlyClockOut, r.hoursWorked
         ]),
         startY: 32,
-        styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [59, 130, 246], textColor: 255 },
+        styles: { fontSize: 7, cellPadding: 1.5 },
+        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 247, 250] }
       });
       
@@ -713,9 +918,9 @@ const AttendanceExporter = () => {
       if (!data) { setLoading(false); return; }
 
       const BOM = '\uFEFF';
-      const headers = ['No', 'UID', 'Nama', 'Jabatan', 'Area Kerja', 'Divisi', 'Tanggal', 'Status In', 'Status Out', 'Jenis Absensi', 'Clock In', 'Clock Out', 'Jam Kerja', 'Lokasi Clock In', 'Lokasi Clock Out', 'P2H', 'Toolbox', 'Alasan'];
+      const headers = ['No', 'UID', 'Nama', 'Jabatan', 'Area Kerja', 'Divisi', 'Hari', 'Tanggal', 'Status In', 'Status Out', 'Jenis Absensi', 'On Duty', 'Off Duty', 'Clock In', 'Clock Out', 'Late Clock In', 'Early Clock Out', 'Jam Kerja', 'Lokasi Clock In', 'Lokasi Clock Out', 'P2H', 'Toolbox', 'Alasan'];
       const rows = data.map((r) => [
-        r.no, r.uid, r.name, r.position, r.workArea, r.division, r.date, r.statusIn, r.statusOut, r.attendanceType, r.checkIn, r.checkOut, r.hoursWorked, r.checkinAddress, r.checkoutAddress, r.p2h, r.toolbox, r.reason
+        r.no, r.uid, r.name, r.position, r.workArea, r.division, r.day, r.date, r.statusIn, r.statusOut, r.attendanceType, r.onDuty, r.offDuty, r.checkIn, r.checkOut, r.lateClockIn, r.earlyClockOut, r.hoursWorked, r.checkinAddress, r.checkoutAddress, r.p2h, r.toolbox, r.reason
       ]);
       
       const csvContent = BOM + [
@@ -745,11 +950,16 @@ const AttendanceExporter = () => {
         <tr>
           <td>${r.no}</td>
           <td>${r.name}</td>
+          <td>${r.day}</td>
           <td>${r.date}</td>
           <td><span class="badge ${r.statusIn.toLowerCase()}">${r.statusIn}</span></td>
           <td>${r.attendanceType}</td>
+          <td>${r.onDuty}</td>
           <td>${r.checkIn}</td>
+          <td class="${r.lateClockIn !== '-' ? 'late' : ''}">${r.lateClockIn}</td>
+          <td>${r.offDuty}</td>
           <td>${r.checkOut}</td>
+          <td class="${r.earlyClockOut !== '-' ? 'early' : ''}">${r.earlyClockOut}</td>
           <td>${r.hoursWorked}</td>
           <td>${r.checkinAddress}</td>
         </tr>
@@ -764,12 +974,12 @@ const AttendanceExporter = () => {
   <style>
     * { box-sizing: border-box; }
     body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f7fa; color: #1a202c; }
-    .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    h1 { color: #3B82F6; margin-bottom: 10px; font-size: 24px; }
+    .container { max-width: 1400px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    h1 { color: #3B82F6; margin-bottom: 10px; font-size: 24px; font-weight: bold; }
     .summary { background: linear-gradient(135deg, #3B82F6, #2563EB); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
     .summary p { margin: 5px 0; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
-    th { background: #3B82F6; color: white; padding: 12px 8px; text-align: left; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+    th { background: #3B82F6; color: white; padding: 12px 8px; text-align: left; font-weight: bold; }
     td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; }
     tr:nth-child(even) { background: #f8fafc; }
     tr:hover { background: #e0f2fe; }
@@ -777,6 +987,8 @@ const AttendanceExporter = () => {
     .badge.wfo { background: #dbeafe; color: #1d4ed8; }
     .badge.wfh { background: #dcfce7; color: #16a34a; }
     .badge.dinas { background: #fed7aa; color: #c2410c; }
+    .late { color: #dc2626; font-weight: 500; }
+    .early { color: #f59e0b; font-weight: 500; }
     footer { margin-top: 30px; text-align: center; color: #64748b; font-size: 12px; }
     @media print { body { background: white; } .container { box-shadow: none; } }
   </style>
@@ -792,7 +1004,7 @@ const AttendanceExporter = () => {
     <table>
       <thead>
         <tr>
-          <th>No</th><th>Nama</th><th>Tanggal</th><th>Status</th><th>Jenis</th><th>Clock In</th><th>Clock Out</th><th>Jam Kerja</th><th>Lokasi</th>
+          <th>No</th><th>Nama</th><th>Hari</th><th>Tanggal</th><th>Status</th><th>Jenis</th><th>On Duty</th><th>Clock In</th><th>Late</th><th>Off Duty</th><th>Clock Out</th><th>Early</th><th>Jam Kerja</th><th>Lokasi</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
@@ -1006,7 +1218,7 @@ const AttendanceExporter = () => {
           {/* Export Info */}
           <div className="text-center text-sm text-muted-foreground">
             <p>📊 Excel: Format lengkap dengan hyperlink foto dan koordinat</p>
-            <p>📄 PDF: Format cetak dengan tabel rapi dan header</p>
+            <p>📄 PDF: Format cetak dengan tabel rapi dan header bold</p>
             <p>📋 CSV: Format teks untuk import ke aplikasi lain</p>
             <p>🌐 HTML: Format web dengan styling modern</p>
           </div>

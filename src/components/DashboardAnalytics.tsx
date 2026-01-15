@@ -10,7 +10,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
 import { 
-  TrendingUp, Calendar, Users, Clock, Building2, BarChart3, RefreshCw
+  TrendingUp, Calendar, Users, Clock, Building2, BarChart3, RefreshCw, Filter
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -34,6 +34,13 @@ interface CheckInTimeStats {
   count: number;
 }
 
+interface StaffUser {
+  uid: string;
+  name: string;
+  work_area: string;
+  division: string | null;
+}
+
 // Status colors - distinct and visible
 const STATUS_COLORS: Record<string, string> = {
   WFO: '#3B82F6',   // Blue
@@ -47,6 +54,17 @@ const DashboardAnalytics = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   
+  // Filter states
+  const [filterWorkArea, setFilterWorkArea] = useState('all');
+  const [filterDivision, setFilterDivision] = useState('all');
+  const [filterEmployee, setFilterEmployee] = useState('all');
+  
+  // Filter options
+  const [workAreas, setWorkAreas] = useState<string[]>([]);
+  const [divisions, setDivisions] = useState<string[]>([]);
+  const [employees, setEmployees] = useState<StaffUser[]>([]);
+  const [allStaff, setAllStaff] = useState<StaffUser[]>([]);
+  
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [workAreaStats, setWorkAreaStats] = useState<WorkAreaStats[]>([]);
   const [statusDistribution, setStatusDistribution] = useState<{name: string; value: number}[]>([]);
@@ -58,6 +76,10 @@ const DashboardAnalytics = () => {
     topWorkArea: '',
     attendanceRate: 0
   });
+
+  useEffect(() => {
+    fetchStaffData();
+  }, []);
 
   useEffect(() => {
     const now = new Date();
@@ -78,38 +100,104 @@ const DashboardAnalytics = () => {
     if (startDate && endDate) {
       fetchAnalytics();
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, filterWorkArea, filterDivision, filterEmployee]);
+
+  // Update employee filter options when work area or division changes
+  useEffect(() => {
+    let filtered = allStaff;
+    
+    if (filterWorkArea !== 'all') {
+      filtered = filtered.filter(s => s.work_area === filterWorkArea);
+    }
+    if (filterDivision !== 'all') {
+      filtered = filtered.filter(s => s.division === filterDivision);
+    }
+    
+    setEmployees(filtered);
+    
+    // Reset employee filter if current selection is no longer valid
+    if (filterEmployee !== 'all' && !filtered.find(s => s.uid === filterEmployee)) {
+      setFilterEmployee('all');
+    }
+  }, [filterWorkArea, filterDivision, allStaff]);
+
+  const fetchStaffData = async () => {
+    const { data: staff } = await supabase
+      .from('staff_users')
+      .select('uid, name, work_area, division')
+      .eq('is_active', true)
+      .order('name');
+    
+    if (staff) {
+      setAllStaff(staff);
+      setEmployees(staff);
+      
+      // Extract unique work areas and divisions
+      const areas = [...new Set(staff.map(s => s.work_area).filter(Boolean))].sort();
+      const divs = [...new Set(staff.map(s => s.division).filter(Boolean))].sort() as string[];
+      
+      setWorkAreas(areas);
+      setDivisions(divs);
+    }
+  };
 
   const fetchAnalytics = async () => {
     if (!startDate || !endDate) return;
     
     setLoading(true);
     try {
-      // Fetch attendance records
-      const { data: records, error } = await supabase
+      // Build target UIDs based on filters
+      let targetUids: string[] | null = null;
+      
+      if (filterEmployee !== 'all') {
+        targetUids = [filterEmployee];
+      } else if (filterWorkArea !== 'all' || filterDivision !== 'all') {
+        let filtered = allStaff;
+        if (filterWorkArea !== 'all') {
+          filtered = filtered.filter(s => s.work_area === filterWorkArea);
+        }
+        if (filterDivision !== 'all') {
+          filtered = filtered.filter(s => s.division === filterDivision);
+        }
+        targetUids = filtered.map(s => s.uid);
+      }
+
+      // Fetch attendance records with filters
+      let query = supabase
         .from('attendance_records')
         .select('*')
         .gte('date', startDate)
         .lte('date', endDate)
         .order('date', { ascending: true });
 
+      if (targetUids && targetUids.length > 0) {
+        query = query.in('staff_uid', targetUids);
+      } else if (targetUids && targetUids.length === 0) {
+        // No matching staff for filters
+        setDailyStats([]);
+        setWorkAreaStats([]);
+        setStatusDistribution([]);
+        setCheckInTimeStats([]);
+        setSummary({
+          totalRecords: 0,
+          avgDailyAttendance: 0,
+          avgCheckInTime: '-',
+          topWorkArea: '-',
+          attendanceRate: 0
+        });
+        setLoading(false);
+        return;
+      }
+
+      const { data: records, error } = await query;
+
       if (error) throw error;
 
       // Fetch staff for work area info
-      const { data: staff } = await supabase
-        .from('staff_users')
-        .select('uid, work_area')
-        .eq('is_active', true);
+      const staffWorkArea = new Map(allStaff.map(s => [s.uid, s.work_area]));
 
-      const staffWorkArea = new Map(staff?.map(s => [s.uid, s.work_area]) || []);
-
-      // Fetch total staff count
-      const { data: allStaff } = await supabase
-        .from('staff_users')
-        .select('id')
-        .eq('is_active', true);
-      
-      const totalStaff = allStaff?.length || 0;
+      // Fetch total staff count (based on filters)
+      const totalStaff = targetUids ? targetUids.length : allStaff.length;
 
       // Process daily stats
       const dailyMap = new Map<string, DailyStats>();
@@ -140,7 +228,7 @@ const DashboardAnalytics = () => {
         .map(([name, count]) => ({
           name,
           count,
-          percentage: Math.round((count / totalRecords) * 100)
+          percentage: totalRecords > 0 ? Math.round((count / totalRecords) * 100) : 0
         }))
         .sort((a, b) => b.count - a.count);
       setWorkAreaStats(workAreaData);
@@ -208,7 +296,7 @@ const DashboardAnalytics = () => {
       setSummary({
         totalRecords,
         avgDailyAttendance: avgDaily,
-        avgCheckInTime: `${avgHour}:${avgMin}`,
+        avgCheckInTime: validTimes > 0 ? `${avgHour}:${avgMin}` : '-',
         topWorkArea: topArea,
         attendanceRate
       });
@@ -225,9 +313,17 @@ const DashboardAnalytics = () => {
     }
   };
 
+  const clearFilters = () => {
+    setFilterWorkArea('all');
+    setFilterDivision('all');
+    setFilterEmployee('all');
+  };
+
+  const hasActiveFilters = filterWorkArea !== 'all' || filterDivision !== 'all' || filterEmployee !== 'all';
+
   return (
     <div className="space-y-6">
-      {/* Date Range Selector */}
+      {/* Date Range & Filters */}
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-title-primary">
@@ -236,46 +332,125 @@ const DashboardAnalytics = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-2">
-              <Label>Periode</Label>
-              <Select value={dateRange} onValueChange={(v) => setDateRange(v as any)}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7d">7 Hari Terakhir</SelectItem>
-                  <SelectItem value="30d">30 Hari Terakhir</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
-                </SelectContent>
-              </Select>
+          <div className="space-y-4">
+            {/* Date Range Row */}
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="space-y-2">
+                <Label>Periode</Label>
+                <Select value={dateRange} onValueChange={(v) => setDateRange(v as any)}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7d">7 Hari Terakhir</SelectItem>
+                    <SelectItem value="30d">30 Hari Terakhir</SelectItem>
+                    <SelectItem value="custom">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {dateRange === 'custom' && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Mulai</Label>
+                    <Input 
+                      type="date" 
+                      value={startDate} 
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Sampai</Label>
+                    <Input 
+                      type="date" 
+                      value={endDate} 
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+              
+              <Button onClick={fetchAnalytics} disabled={loading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
-            
-            {dateRange === 'custom' && (
-              <>
-                <div className="space-y-2">
-                  <Label>Mulai</Label>
-                  <Input 
-                    type="date" 
-                    value={startDate} 
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Sampai</Label>
-                  <Input 
-                    type="date" 
-                    value={endDate} 
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
-                </div>
-              </>
+
+            {/* Filter Row */}
+            <div className="flex flex-wrap items-end gap-4 pt-4 border-t border-border">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Filter className="h-4 w-4" />
+                <span className="font-medium">Filter:</span>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-xs">Area Kerja</Label>
+                <Select value={filterWorkArea} onValueChange={setFilterWorkArea}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Semua Area" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Area</SelectItem>
+                    {workAreas.map(area => (
+                      <SelectItem key={area} value={area}>{area}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-xs">Divisi</Label>
+                <Select value={filterDivision} onValueChange={setFilterDivision}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Semua Divisi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Divisi</SelectItem>
+                    {divisions.map(div => (
+                      <SelectItem key={div} value={div}>{div}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-xs">Karyawan</Label>
+                <Select value={filterEmployee} onValueChange={setFilterEmployee}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Semua Karyawan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Karyawan</SelectItem>
+                    {employees.map(emp => (
+                      <SelectItem key={emp.uid} value={emp.uid}>{emp.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {hasActiveFilters && (
+                <Button variant="outline" size="sm" onClick={clearFilters}>
+                  Hapus Filter
+                </Button>
+              )}
+            </div>
+
+            {/* Active Filters Display */}
+            {hasActiveFilters && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                {filterWorkArea !== 'all' && (
+                  <Badge variant="secondary">Area: {filterWorkArea}</Badge>
+                )}
+                {filterDivision !== 'all' && (
+                  <Badge variant="secondary">Divisi: {filterDivision}</Badge>
+                )}
+                {filterEmployee !== 'all' && (
+                  <Badge variant="secondary">
+                    Karyawan: {employees.find(e => e.uid === filterEmployee)?.name || filterEmployee}
+                  </Badge>
+                )}
+              </div>
             )}
-            
-            <Button onClick={fetchAnalytics} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
           </div>
         </CardContent>
       </Card>
