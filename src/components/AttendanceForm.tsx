@@ -1286,7 +1286,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             checkout_location_lat: usedLocation.lat,
             checkout_location_lng: usedLocation.lng,
             selfie_checkout_url: photoPath,
-            reason: dinasFastCheckoutReason,
+            checkout_reason: dinasFastCheckoutReason,
             hours_worked: hoursWorked
           });
         
@@ -1368,7 +1368,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const localDateStr = `${y}-${M}-${d}`;
       
       // Use the checkout reason if it was set (for WFO checkout outside geofence)
-      const finalReason = checkoutReason || reason || null;
+      const finalCheckinReason = reason || null;
+      const finalCheckoutReason = checkoutReason || null;
       
       const attendanceData = {
         staff_uid: selectedStaff.uid,
@@ -1377,7 +1378,6 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         selfie_photo_url: photoPath,
         status: attendanceStatus,
         attendance_type: currentAttendanceType,
-        reason: finalReason,
         ...(isCheckOut 
           ? { 
               check_out_time: formattedTime,
@@ -1385,6 +1385,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
               checkout_location_lng: usedLocation.lng,
               checkout_location_address: locationAddress,
               selfie_checkout_url: photoPath,
+              checkout_reason: finalCheckoutReason,
               hours_worked: currentAttendanceType === 'overtime' ? calculateHoursWorked(currentRecord!.check_in_time!, formattedTime) : undefined
             }
           : { 
@@ -1392,7 +1393,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
               checkin_location_lat: usedLocation.lat,
               checkin_location_lng: usedLocation.lng,
               checkin_location_address: locationAddress,
-              selfie_checkin_url: photoPath
+              selfie_checkin_url: photoPath,
+              checkin_reason: finalCheckinReason
             }
         )
       };
@@ -1416,7 +1418,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         
         // Update checkout reason if provided (for WFO outside geofence)
         if (checkoutReason) {
-          updateData.reason = checkoutReason;
+          updateData.checkout_reason = checkoutReason;
         }
         
         const { error } = await supabase

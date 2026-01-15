@@ -617,7 +617,10 @@ const AttendanceExporter = () => {
           'Foto P2H': checklist?.p2h_photo_url ? 'Lihat Foto' : '-',
           'Toolbox': checklist?.toolbox_checked ? 'Ya' : 'Tidak',
           'Foto Toolbox': checklist?.toolbox_photo_url ? 'Lihat Foto' : '-',
-          'Alasan': record.reason || '-'
+          'Alasan Clock In': record.checkin_reason || record.reason || '-',
+          'Alasan Clock Out': record.checkout_reason || '-',
+          'Alasan Extend In': record.extend_reason || '-',
+          'Alasan Extend Out': record.extend_reason || '-'
         };
       });
 
@@ -796,7 +799,10 @@ const AttendanceExporter = () => {
         { wch: 12 },  // Foto P2H
         { wch: 8 },   // Toolbox
         { wch: 12 },  // Foto Toolbox
-        { wch: 20 }   // Alasan
+        { wch: 25 },  // Alasan Clock In
+        { wch: 25 },  // Alasan Clock Out
+        { wch: 25 },  // Alasan Extend In
+        { wch: 25 }   // Alasan Extend Out
       ];
       ws['!cols'] = colWidths;
 
@@ -900,7 +906,10 @@ const AttendanceExporter = () => {
         checkoutAddress: isEmpty ? '-' : (record.checkout_location_address || '-'),
         p2h: checklist?.p2h_checked ? 'Ya' : 'Tidak',
         toolbox: checklist?.toolbox_checked ? 'Ya' : 'Tidak',
-        reason: isEmpty ? '-' : (record.reason || '-')
+        checkinReason: isEmpty ? '-' : (record.checkin_reason || record.reason || '-'),
+        checkoutReason: isEmpty ? '-' : (record.checkout_reason || '-'),
+        extendInReason: isEmpty ? '-' : (record.extend_reason || '-'),
+        extendOutReason: isEmpty ? '-' : (record.extend_reason || '-')
       };
     });
   };
@@ -966,9 +975,9 @@ const AttendanceExporter = () => {
       if (!data) { setLoading(false); return; }
 
       const BOM = '\uFEFF';
-      const headers = ['No', 'UID', 'Nama', 'Jabatan', 'Area Kerja', 'Divisi', 'Hari', 'Tanggal', 'Status In', 'Status Out', 'Jenis Absensi', 'On Duty', 'Off Duty', 'Clock In', 'Clock Out', 'Late Clock In', 'Early Clock Out', 'Jam Kerja', 'Lokasi Clock In', 'Lokasi Clock Out', 'P2H', 'Toolbox', 'Alasan'];
+      const headers = ['No', 'UID', 'Nama', 'Jabatan', 'Area Kerja', 'Divisi', 'Hari', 'Tanggal', 'Status In', 'Status Out', 'Jenis Absensi', 'On Duty', 'Off Duty', 'Clock In', 'Clock Out', 'Late Clock In', 'Early Clock Out', 'Jam Kerja', 'Lokasi Clock In', 'Lokasi Clock Out', 'P2H', 'Toolbox', 'Alasan Clock In', 'Alasan Clock Out', 'Alasan Extend In', 'Alasan Extend Out'];
       const rows = data.map((r) => [
-        r.no, r.uid, r.name, r.position, r.workArea, r.division, r.day, r.date, r.statusIn, r.statusOut, r.attendanceType, r.onDuty, r.offDuty, r.checkIn, r.checkOut, r.lateClockIn, r.earlyClockOut, r.hoursWorked, r.checkinAddress, r.checkoutAddress, r.p2h, r.toolbox, r.reason
+        r.no, r.uid, r.name, r.position, r.workArea, r.division, r.day, r.date, r.statusIn, r.statusOut, r.attendanceType, r.onDuty, r.offDuty, r.checkIn, r.checkOut, r.lateClockIn, r.earlyClockOut, r.hoursWorked, r.checkinAddress, r.checkoutAddress, r.p2h, r.toolbox, r.checkinReason, r.checkoutReason, r.extendInReason, r.extendOutReason
       ]);
       
       const csvContent = BOM + [
