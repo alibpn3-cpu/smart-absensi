@@ -12,24 +12,53 @@ export interface ValidationResult {
   areaName?: string;
 }
 
-// Validate if a coordinate object is valid
-const isValidCoordinate = (coord: unknown): coord is PolygonCoordinate => {
-  if (!coord || typeof coord !== 'object') return false;
-  const c = coord as Record<string, unknown>;
-  return (
-    typeof c.lat === 'number' &&
-    typeof c.lng === 'number' &&
-    !isNaN(c.lat) &&
-    !isNaN(c.lng) &&
-    isFinite(c.lat) &&
-    isFinite(c.lng)
-  );
+// Parse a value to number (handles string or number)
+const parseCoordValue = (value: unknown): number | null => {
+  if (typeof value === 'number' && isFinite(value) && !isNaN(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    if (isFinite(parsed) && !isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
 };
 
-// Sanitize coordinates array - filter out invalid ones
+// Validate if a coordinate object is valid (supports both number and string lat/lng)
+const isValidCoordinate = (coord: unknown): boolean => {
+  if (!coord || typeof coord !== 'object') return false;
+  const c = coord as Record<string, unknown>;
+  const lat = parseCoordValue(c.lat);
+  const lng = parseCoordValue(c.lng);
+  return lat !== null && lng !== null;
+};
+
+// Convert raw coordinate to PolygonCoordinate (handles string values)
+const toPolygonCoordinate = (coord: unknown): PolygonCoordinate | null => {
+  if (!coord || typeof coord !== 'object') return null;
+  const c = coord as Record<string, unknown>;
+  const lat = parseCoordValue(c.lat);
+  const lng = parseCoordValue(c.lng);
+  if (lat !== null && lng !== null) {
+    return { lat, lng };
+  }
+  return null;
+};
+
+// Sanitize coordinates array - filter out invalid ones and convert to proper format
 export const sanitizeCoordinates = (coords: unknown[]): PolygonCoordinate[] => {
   if (!Array.isArray(coords)) return [];
-  return coords.filter(isValidCoordinate);
+  const result: PolygonCoordinate[] = [];
+  for (const coord of coords) {
+    const parsed = toPolygonCoordinate(coord);
+    if (parsed) {
+      result.push(parsed);
+    }
+  }
+  console.log(`🔍 sanitizeCoordinates: input ${coords.length} points → output ${result.length} valid points`);
+  return result;
 };
 
 // Convert polygon coordinates to Turf format [lng, lat][]
@@ -50,45 +79,61 @@ const toTurfCoordinates = (coords: PolygonCoordinate[]): [number, number][] => {
   return turfCoords;
 };
 
-// Check if a point is inside a polygon with accuracy buffer
+// Check if a point is inside a polygon with GPS accuracy tolerance
+// Uses "inclusive tolerance" approach instead of shrinking polygon
 export const isPointInPolygon = (
   userLat: number,
   userLng: number,
   accuracy: number,
   polygonCoords: PolygonCoordinate[]
 ): boolean => {
-  if (polygonCoords.length < 3) return false;
+  console.log(`🔍 isPointInPolygon called: user(${userLat.toFixed(6)}, ${userLng.toFixed(6)}), accuracy: ${accuracy}m, coords: ${polygonCoords.length} points`);
+  
+  if (polygonCoords.length < 3) {
+    console.log(`❌ Polygon invalid: less than 3 coordinates`);
+    return false;
+  }
   
   try {
     const userPoint = turf.point([userLng, userLat]);
     const turfCoords = toTurfCoordinates(polygonCoords);
-    const polygon = turf.polygon([turfCoords]);
     
-    // Calculate polygon area to determine if buffer should be applied
-    const polygonArea = turf.area(polygon); // in square meters
-    const polygonSize = Math.sqrt(polygonArea); // approximate "size" in meters
-    
-    console.log(`📏 Polygon size: ~${polygonSize.toFixed(0)}m, GPS accuracy: ${accuracy}m`);
-    
-    // Only apply negative buffer if:
-    // 1. Accuracy > 10m
-    // 2. Polygon is large enough (size > 100m)
-    // 3. Buffer is capped at max 25m to avoid over-shrinking small polygons
-    let checkPolygon: ReturnType<typeof turf.polygon> = polygon;
-    if (accuracy > 10 && polygonSize > 100) {
-      const bufferAmount = Math.min(accuracy * 0.5, 25); // Use 50% of accuracy, max 25m
-      const buffered = turf.buffer(polygon, -(bufferAmount / 1000), { units: 'kilometers' });
-      if (buffered && turf.area(buffered) > 0) {
-        checkPolygon = buffered as ReturnType<typeof turf.polygon>;
-        console.log(`📏 Applied buffer: -${bufferAmount.toFixed(0)}m (polygon still valid)`);
-      } else {
-        console.log(`📏 Buffer skipped: would invalidate polygon`);
-      }
-    } else {
-      console.log(`📏 Buffer skipped: accuracy ≤ 10m or polygon too small`);
+    if (turfCoords.length < 4) {
+      console.log(`❌ Polygon invalid after sanitization: ${turfCoords.length} points (need at least 4 including closing)`);
+      return false;
     }
     
-    return turf.booleanPointInPolygon(userPoint, checkPolygon);
+    const polygon = turf.polygon([turfCoords]);
+    
+    // Calculate polygon metrics for logging
+    const polygonArea = turf.area(polygon);
+    const polygonSize = Math.sqrt(polygonArea);
+    console.log(`📏 Polygon size: ~${polygonSize.toFixed(0)}m (area: ${polygonArea.toFixed(0)}m²)`);
+    
+    // Step 1: Check if point is directly inside polygon (raw check)
+    const isInsideRaw = turf.booleanPointInPolygon(userPoint, polygon);
+    console.log(`📍 Raw point-in-polygon check: ${isInsideRaw ? 'INSIDE ✅' : 'OUTSIDE'}`);
+    
+    if (isInsideRaw) {
+      return true;
+    }
+    
+    // Step 2: If outside, check distance to edge with GPS tolerance
+    // This handles cases where GPS inaccuracy puts user just outside boundary
+    const distanceToEdge = getDistanceToPolygonEdge(userLat, userLng, polygonCoords);
+    
+    // Tolerance: 30% of accuracy, capped at 20m max
+    const toleranceMeters = Math.min(accuracy * 0.3, 20);
+    
+    console.log(`📏 Distance to edge: ${distanceToEdge.toFixed(1)}m, tolerance: ${toleranceMeters.toFixed(1)}m`);
+    
+    if (distanceToEdge <= toleranceMeters) {
+      console.log(`✅ Within tolerance - considering INSIDE`);
+      return true;
+    }
+    
+    console.log(`❌ Outside polygon and beyond tolerance`);
+    return false;
   } catch (error) {
     console.error('Error checking point in polygon:', error);
     return false;
