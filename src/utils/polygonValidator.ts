@@ -81,13 +81,15 @@ const toTurfCoordinates = (coords: PolygonCoordinate[]): [number, number][] => {
 
 // Check if a point is inside a polygon with GPS accuracy tolerance
 // Uses "inclusive tolerance" approach instead of shrinking polygon
+// maxTolerance: Maximum tolerance in meters (default 20m, can be set per geofence)
 export const isPointInPolygon = (
   userLat: number,
   userLng: number,
   accuracy: number,
-  polygonCoords: PolygonCoordinate[]
+  polygonCoords: PolygonCoordinate[],
+  maxTolerance: number = 20
 ): boolean => {
-  console.log(`🔍 isPointInPolygon called: user(${userLat.toFixed(6)}, ${userLng.toFixed(6)}), accuracy: ${accuracy}m, coords: ${polygonCoords.length} points`);
+  console.log(`🔍 isPointInPolygon called: user(${userLat.toFixed(6)}, ${userLng.toFixed(6)}), accuracy: ${accuracy}m, coords: ${polygonCoords.length} points, maxTolerance: ${maxTolerance}m`);
   
   if (polygonCoords.length < 3) {
     console.log(`❌ Polygon invalid: less than 3 coordinates`);
@@ -122,10 +124,10 @@ export const isPointInPolygon = (
     // This handles cases where GPS inaccuracy puts user just outside boundary
     const distanceToEdge = getDistanceToPolygonEdge(userLat, userLng, polygonCoords);
     
-    // Tolerance: 30% of accuracy, capped at 20m max
-    const toleranceMeters = Math.min(accuracy * 0.3, 20);
+    // Dynamic tolerance: 50% of accuracy, capped at maxTolerance (configurable per geofence)
+    const toleranceMeters = Math.min(accuracy * 0.5, maxTolerance);
     
-    console.log(`📏 Distance to edge: ${distanceToEdge.toFixed(1)}m, tolerance: ${toleranceMeters.toFixed(1)}m`);
+    console.log(`📏 Distance to edge: ${distanceToEdge.toFixed(1)}m, tolerance: ${toleranceMeters.toFixed(1)}m (max: ${maxTolerance}m)`);
     
     if (distanceToEdge <= toleranceMeters) {
       console.log(`✅ Within tolerance - considering INSIDE`);

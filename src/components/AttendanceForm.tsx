@@ -78,6 +78,7 @@ interface GeofenceArea {
   radius: number | null;
   coordinates: unknown;
   is_active: boolean;
+  tolerance_meters?: number; // Dynamic GPS tolerance per geofence (default 20m)
 }
 
 const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
@@ -275,7 +276,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     
     const { data, error } = await supabase
       .from('geofence_areas')
-      .select('*')
+      .select('id, name, center_lat, center_lng, radius, coordinates, is_active, tolerance_meters')
       .eq('is_active', true);
     
     if (!error && data) {
@@ -809,22 +810,22 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
 
     if (geofences.length === 0) return { isInGeofence: true };
 
-    // Tighter geofence tolerance - max 15 meters
-    const accuracyTolerance = accuracy ? Math.min(accuracy * 0.3, 15) : 0;
-    console.log(`📏 Accuracy: ${accuracy}m, adding tolerance: ${accuracyTolerance}m (max 15m)`);
+    // Dynamic tolerance per geofence (default 20m if not set)
+    console.log(`📏 Checking geofences with dynamic tolerance...`);
 
     for (const geofence of geofences) {
       let isInsideThisGeofence = false;
+      const maxTolerance = geofence.tolerance_meters || 20;
       
       // 1. Try polygon check first (if coordinates exist)
       if (geofence.coordinates && Array.isArray(geofence.coordinates) && (geofence.coordinates as unknown[]).length >= 3) {
         try {
           const rawCoords = geofence.coordinates as unknown[];
-          console.log(`🔍 Checking polygon "${geofence.name}": ${rawCoords.length} raw coordinates`);
+          console.log(`🔍 Checking polygon "${geofence.name}": ${rawCoords.length} raw coordinates, tolerance: ${maxTolerance}m`);
           console.log(`   Sample coordinate: ${JSON.stringify(rawCoords[0])}`);
           
           const polygonCoords = rawCoords as unknown as PolygonCoordinate[];
-          isInsideThisGeofence = isPointInPolygon(lat, lng, accuracy || 0, polygonCoords);
+          isInsideThisGeofence = isPointInPolygon(lat, lng, accuracy || 0, polygonCoords, maxTolerance);
           console.log(`📍 Polygon check for ${geofence.name}: ${isInsideThisGeofence ? 'INSIDE ✅' : 'OUTSIDE ❌'}`);
         } catch (error) {
           console.error('Error checking polygon geofence:', error);
@@ -841,8 +842,11 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           parseFloat(geofence.center_lng.toString())
         );
         
+        // Dynamic tolerance for radius mode: 50% of accuracy, capped at geofence tolerance
+        const maxTolerance = geofence.tolerance_meters || 20;
+        const accuracyTolerance = accuracy ? Math.min(accuracy * 0.5, maxTolerance) : 0;
         const effectiveRadius = geofence.radius + accuracyTolerance;
-        console.log(`📍 Radius fallback for ${geofence.name}: ${distance.toFixed(2)}m (radius: ${effectiveRadius.toFixed(0)}m)`);
+        console.log(`📍 Radius fallback for ${geofence.name}: ${distance.toFixed(2)}m (radius: ${geofence.radius}m + tolerance: ${accuracyTolerance.toFixed(0)}m = ${effectiveRadius.toFixed(0)}m)`);
         
         if (distance <= effectiveRadius) {
           isInsideThisGeofence = true;
