@@ -596,28 +596,9 @@ const AttendanceExporter = () => {
             }
           }
           
-          // P2H/Toolbox photos from p2h-photos bucket (public bucket - use getPublicUrl)
-          if (checklist?.p2h_photo_url) {
-            try {
-              const { data } = supabase.storage
-                .from('p2h-photos')
-                .getPublicUrl(checklist.p2h_photo_url);
-              p2hSigned = data?.publicUrl || null;
-            } catch (e) {
-              console.error('Error getting P2H photo URL:', e);
-            }
-          }
-          
-          if (checklist?.toolbox_photo_url) {
-            try {
-              const { data } = supabase.storage
-                .from('p2h-photos')
-                .getPublicUrl(checklist.toolbox_photo_url);
-              toolboxSigned = data?.publicUrl || null;
-            } catch (e) {
-              console.error('Error getting Toolbox photo URL:', e);
-            }
-          }
+          // URL foto P2H/Toolbox sudah lengkap dari database, tidak perlu generate lagi
+          p2hSigned = checklist?.p2h_photo_url || null;
+          toolboxSigned = checklist?.toolbox_photo_url || null;
           
           return { checkin: checkinSigned, checkout: checkoutSigned, p2h: p2hSigned, toolbox: toolboxSigned };
         })
