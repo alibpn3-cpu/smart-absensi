@@ -69,9 +69,25 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose, loadi
       localStorage.setItem('camera_permission_granted', 'true');
       
     } catch (error: any) {
-      // Notify parent about camera error
+      // Create structured error data for debugging
+      const errorData = {
+        name: error.name || 'UnknownError',
+        message: error.message || 'Camera access failed',
+        stack: error.stack,
+        timestamp: new Date().toISOString(),
+        constraint: error.constraint || null
+      };
+
+      // Save to localStorage for debug button to pick up
+      try {
+        localStorage.setItem('last_camera_error', JSON.stringify(errorData));
+      } catch {
+        // Ignore storage errors
+      }
+
+      // Notify parent about camera error with structured data
       if (onCameraError) {
-        onCameraError(error);
+        onCameraError(errorData);
       }
       
       console.error('Error accessing camera:', error);
