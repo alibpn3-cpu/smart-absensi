@@ -124,8 +124,12 @@ export const isPointInPolygon = (
     // This handles cases where GPS inaccuracy puts user just outside boundary
     const distanceToEdge = getDistanceToPolygonEdge(userLat, userLng, polygonCoords);
     
-    // Dynamic tolerance: 50% of accuracy, capped at maxTolerance (configurable per geofence)
-    const toleranceMeters = Math.min(accuracy * 0.5, maxTolerance);
+    // FIXED: Dynamic tolerance logic
+    // If admin set tolerance > 20m, use it directly (admin intentionally wants lenient area)
+    // Otherwise use GPS-based calculation capped at maxTolerance
+    const toleranceMeters = maxTolerance > 20 
+      ? maxTolerance  // Admin deliberately set high tolerance, use it
+      : Math.min(Math.max(accuracy * 0.5, 10), maxTolerance);  // GPS-based, min 10m, max default
     
     console.log(`📏 Distance to edge: ${distanceToEdge.toFixed(1)}m, tolerance: ${toleranceMeters.toFixed(1)}m (max: ${maxTolerance}m)`);
     
