@@ -196,22 +196,25 @@ const AttendanceExporter = () => {
       const date = new Date(normalized);
       
       if (isNaN(date.getTime())) {
-        // Fallback: extract time portion directly
-        const match = timeStr.match(/(\d{2}:\d{2}:\d{2})/);
-        return match ? match[1] : '-';
+        // Fallback: extract time portion directly (handle both : and . separators)
+        const match = timeStr.match(/(\d{2})[:.]\d{2})[:.]\d{2})/);
+        return match ? match[1].replace(/\./g, ':') : '-';
       }
       
       const timezone = getTimezone(workArea);
-      return date.toLocaleTimeString('id-ID', {
+      const formatted = date.toLocaleTimeString('id-ID', {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
         hour12: false,
         timeZone: timezone
       });
+      
+      // Indonesian locale uses dots (.) as separator, convert to colons (:)
+      return formatted.replace(/\./g, ':');
     } catch {
-      const match = timeStr.match(/(\d{2}:\d{2}:\d{2})/);
-      return match ? match[1] : '-';
+      const match = timeStr.match(/(\d{2})[:.]\d{2})[:.]\d{2})/);
+      return match ? match[1].replace(/\./g, ':') : '-';
     }
   };
 
@@ -226,7 +229,10 @@ const AttendanceExporter = () => {
       const [ciH, ciM, ciS] = checkInHMS.split(':').map(Number);
       const [schH, schM, schS] = scheduledTime.split(':').map(Number);
       
-      const checkInMinutes = ciH * 60 + ciM + ciS / 60;
+      // Validate parsed numbers
+      if (isNaN(ciH) || isNaN(ciM) || isNaN(schH) || isNaN(schM)) return '-';
+      
+      const checkInMinutes = ciH * 60 + ciM + (ciS || 0) / 60;
       const scheduledMinutes = schH * 60 + schM + (schS || 0) / 60;
       
       const lateMinutes = checkInMinutes - scheduledMinutes;
@@ -254,7 +260,10 @@ const AttendanceExporter = () => {
       const [coH, coM, coS] = checkOutHMS.split(':').map(Number);
       const [schH, schM, schS] = scheduledTime.split(':').map(Number);
       
-      const checkOutMinutes = coH * 60 + coM + coS / 60;
+      // Validate parsed numbers
+      if (isNaN(coH) || isNaN(coM) || isNaN(schH) || isNaN(schM)) return '-';
+      
+      const checkOutMinutes = coH * 60 + coM + (coS || 0) / 60;
       const scheduledMinutes = schH * 60 + schM + (schS || 0) / 60;
       
       const earlyMinutes = scheduledMinutes - checkOutMinutes;
