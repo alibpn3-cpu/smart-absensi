@@ -53,6 +53,7 @@ const AttendanceExporter = () => {
   const [exportFormat, setExportFormat] = useState<'excel' | 'pdf' | 'csv' | 'html'>('excel');
   const [skipBlankDates, setSkipBlankDates] = useState(false);
   const [schedules, setSchedules] = useState<WorkAreaSchedule[]>([]);
+  const [fetchProgress, setFetchProgress] = useState('');
 
   useEffect(() => {
     fetchEmployees();
@@ -325,47 +326,85 @@ const AttendanceExporter = () => {
       return null;
     }
 
-    let query = supabase
-      .from('attendance_records')
-      .select('*')
-      .gte('date', filters.startDate)
-      .lte('date', filters.endDate)
-      .order('date', { ascending: false })
-      .order('check_in_time', { ascending: false });
+    const BATCH_SIZE = 1000;
+    let allData: any[] = [];
+    let from = 0;
+    let hasMore = true;
 
-    // Apply status filter
-    if (filters.status !== 'all') {
-      query = query.eq('status', filters.status);
-    }
-
-    // Apply employee filter
-    if (filters.employeeUid !== 'all') {
-      query = query.eq('staff_uid', filters.employeeUid);
-    }
-
-    // Apply work area filter
+    // Get work area UIDs once if filtering by work area
+    let workAreaUids: string[] = [];
     if (filters.workArea !== 'all') {
-      const uids = allEmployees
+      workAreaUids = allEmployees
         .filter((s) => s.work_area === filters.workArea)
         .map((s) => s.uid);
-      if (uids.length === 0) {
+      if (workAreaUids.length === 0) {
+        setFetchProgress('');
         return [];
       }
-      query = query.in('staff_uid', uids);
     }
 
-    const { data, error } = await query;
+    setFetchProgress('Mengambil data...');
 
-    if (error) {
-      toast({
-        title: "Gagal",
-        description: "Gagal memuat data absensi",
-        variant: "destructive"
-      });
-      return null;
+    while (hasMore) {
+      let query = supabase
+        .from('attendance_records')
+        .select('*')
+        .gte('date', filters.startDate)
+        .lte('date', filters.endDate)
+        .order('date', { ascending: true })
+        .order('check_in_time', { ascending: true })
+        .range(from, from + BATCH_SIZE - 1);
+
+      // Apply status filter
+      if (filters.status !== 'all') {
+        query = query.eq('status', filters.status);
+      }
+
+      // Apply employee filter
+      if (filters.employeeUid !== 'all') {
+        query = query.eq('staff_uid', filters.employeeUid);
+      }
+
+      // Apply work area filter
+      if (filters.workArea !== 'all' && workAreaUids.length > 0) {
+        query = query.in('staff_uid', workAreaUids);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        toast({
+          title: "Gagal",
+          description: "Gagal memuat data absensi",
+          variant: "destructive"
+        });
+        setFetchProgress('');
+        return null;
+      }
+
+      if (data && data.length > 0) {
+        allData = [...allData, ...data];
+        from += BATCH_SIZE;
+        setFetchProgress(`Mengambil data... (${allData.length} records)`);
+        
+        // If data count is less than batch size, we've reached the end
+        if (data.length < BATCH_SIZE) {
+          hasMore = false;
+        }
+      } else {
+        hasMore = false;
+      }
     }
 
-    return data;
+    // Sort results descending (newest first) for display
+    allData.sort((a, b) => {
+      const dateCompare = b.date.localeCompare(a.date);
+      if (dateCompare !== 0) return dateCompare;
+      return (b.check_in_time || '').localeCompare(a.check_in_time || '');
+    });
+
+    setFetchProgress(`Total: ${allData.length} records`);
+    return allData;
   };
 
   // Fetch attendance data with date range filling (for exports that show all dates)
@@ -1213,6 +1252,9 @@ const AttendanceExporter = () => {
                 </>
               )}
             </Button>
+            {fetchProgress && (
+              <span className="text-sm text-muted-foreground">{fetchProgress}</span>
+            )}
           </div>
 
           {/* Export Info */}
