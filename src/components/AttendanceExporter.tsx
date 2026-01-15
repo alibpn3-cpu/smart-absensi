@@ -197,7 +197,7 @@ const AttendanceExporter = () => {
       
       if (isNaN(date.getTime())) {
         // Fallback: extract time portion directly (handle both : and . separators)
-        const match = timeStr.match(/(\d{2})[:.]\d{2})[:.]\d{2})/);
+        const match = timeStr.match(/(\d{2}[:.]\d{2}[:.]\d{2})/);
         return match ? match[1].replace(/\./g, ':') : '-';
       }
       
@@ -213,7 +213,7 @@ const AttendanceExporter = () => {
       // Indonesian locale uses dots (.) as separator, convert to colons (:)
       return formatted.replace(/\./g, ':');
     } catch {
-      const match = timeStr.match(/(\d{2})[:.]\d{2})[:.]\d{2})/);
+      const match = timeStr.match(/(\d{2}[:.]\d{2}[:.]\d{2})/);
       return match ? match[1].replace(/\./g, ':') : '-';
     }
   };
