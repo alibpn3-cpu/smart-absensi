@@ -5,10 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2, ExternalLink, Circle, RefreshCw, ChevronUp, Search, MapPinned } from 'lucide-react';
+import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2, ExternalLink, Circle, RefreshCw, ChevronUp, Search, MapPinned, TestTube, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { calculatePolygonArea, getPolygonCenter, PolygonCoordinate, sanitizeCoordinates, circleToPolygon } from '@/utils/polygonValidator';
+import { calculatePolygonArea, getPolygonCenter, PolygonCoordinate, sanitizeCoordinates, circleToPolygon, isPointInPolygon, getDistanceToPolygonEdge } from '@/utils/polygonValidator';
 import * as turf from '@turf/turf';
 
 interface GeofenceArea {
@@ -19,6 +19,16 @@ interface GeofenceArea {
   radius: number | null;
   coordinates: PolygonCoordinate[] | null;
   is_active: boolean;
+  tolerance_meters: number;
+}
+
+interface TestResult {
+  geofenceName: string;
+  geofenceId: string;
+  isInside: boolean;
+  distanceToEdge: number;
+  tolerance: number;
+  mode: 'polygon' | 'radius';
 }
 
 const PolygonGeofenceManager: React.FC = () => {
@@ -41,6 +51,19 @@ const PolygonGeofenceManager: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  
+  // Tolerance state
+  const [tolerance, setTolerance] = useState<number>(20);
+  
+  // Geofence test state
+  const [isTestingLocation, setIsTestingLocation] = useState(false);
+  const [testResults, setTestResults] = useState<{
+    userLat: number;
+    userLng: number;
+    accuracy: number;
+    results: TestResult[];
+  } | null>(null);
+  const testMarkerRef = useRef<any>(null);
   
   const mapRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -277,7 +300,8 @@ const PolygonGeofenceManager: React.FC = () => {
       center_lng: lng,
       radius: r,
       coordinates: null,
-      is_active: true
+      is_active: true,
+      tolerance_meters: 20
     });
   };
 
@@ -453,8 +477,9 @@ const PolygonGeofenceManager: React.FC = () => {
         }
         return {
           ...g,
-          coordinates: coords
-        };
+          coordinates: coords,
+          tolerance_meters: g.tolerance_meters || 20
+        } as GeofenceArea;
       });
       
       setGeofences(parsed);
@@ -506,8 +531,10 @@ const PolygonGeofenceManager: React.FC = () => {
       center_lng: null,
       radius: 100,
       coordinates: null,
-      is_active: true
+      is_active: true,
+      tolerance_meters: 20
     });
+    setTolerance(20);
     setIsNewMode(true);
     setName('');
     setCurrentPolygon([]);
@@ -525,6 +552,7 @@ const PolygonGeofenceManager: React.FC = () => {
     setIsNewMode(false);
     setName(geofence.name);
     setRadius(geofence.radius || 100);
+    setTolerance(geofence.tolerance_meters || 20);
     setCurrentPolygon([]);
     
     // Set mode based on existing geofence data
@@ -595,6 +623,7 @@ const PolygonGeofenceManager: React.FC = () => {
           radius: radius,
           coordinates: null,
           is_active: editingGeofence.is_active,
+          tolerance_meters: tolerance,
         };
       } else {
         // Polygon mode - also save radius as backup for fallback
@@ -612,6 +641,7 @@ const PolygonGeofenceManager: React.FC = () => {
           center_lng: center?.lng || null,
           radius: estimatedRadius || radius || 100, // Keep radius as backup
           is_active: editingGeofence?.is_active ?? true,
+          tolerance_meters: tolerance,
         };
       }
       
@@ -955,19 +985,178 @@ const PolygonGeofenceManager: React.FC = () => {
     );
   };
 
+  // Test current location against all active geofences
+  const testCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Tidak Didukung",
+        description: "Browser tidak mendukung geolokasi",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsTestingLocation(true);
+    setTestResults(null);
+    
+    // Remove previous test marker
+    if (testMarkerRef.current && leafletMapRef.current) {
+      testMarkerRef.current.remove();
+      testMarkerRef.current = null;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const userLat = position.coords.latitude;
+        const userLng = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
+        
+        console.log(`🧪 Testing location: ${userLat}, ${userLng} (accuracy: ${accuracy}m)`);
+        
+        // Fetch fresh geofence data for testing
+        const { data: freshGeofences } = await supabase
+          .from('geofence_areas')
+          .select('*')
+          .eq('is_active', true);
+        
+        if (!freshGeofences || freshGeofences.length === 0) {
+          toast({
+            title: "Tidak Ada Geofence Aktif",
+            description: "Tambahkan area geofence aktif terlebih dahulu",
+            variant: "destructive"
+          });
+          setIsTestingLocation(false);
+          return;
+        }
+        
+        const results: TestResult[] = [];
+        
+        for (const geofence of freshGeofences) {
+          const maxTolerance = geofence.tolerance_meters || 20;
+          let isInside = false;
+          let distanceToEdge = Infinity;
+          let mode: 'polygon' | 'radius' = 'radius';
+          
+          // Check polygon first
+          if (geofence.coordinates && Array.isArray(geofence.coordinates) && (geofence.coordinates as unknown[]).length >= 3) {
+            mode = 'polygon';
+            const polygonCoords = sanitizeCoordinates(geofence.coordinates as unknown[]);
+            if (polygonCoords.length >= 3) {
+              isInside = isPointInPolygon(userLat, userLng, accuracy, polygonCoords, maxTolerance);
+              distanceToEdge = getDistanceToPolygonEdge(userLat, userLng, polygonCoords);
+            }
+          }
+          
+          // Fallback to radius
+          if (!isInside && geofence.center_lat && geofence.center_lng && geofence.radius) {
+            mode = 'radius';
+            const R = 6371000; // Earth radius in meters
+            const dLat = (userLat - geofence.center_lat) * Math.PI / 180;
+            const dLng = (userLng - geofence.center_lng) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                     Math.cos(geofence.center_lat * Math.PI / 180) * Math.cos(userLat * Math.PI / 180) *
+                     Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const distance = R * c;
+            
+            distanceToEdge = Math.max(0, distance - geofence.radius);
+            const toleranceForRadius = Math.min(accuracy * 0.5, maxTolerance);
+            isInside = distance <= (geofence.radius + toleranceForRadius);
+          }
+          
+          results.push({
+            geofenceName: geofence.name,
+            geofenceId: geofence.id,
+            isInside,
+            distanceToEdge,
+            tolerance: maxTolerance,
+            mode
+          });
+        }
+        
+        setTestResults({
+          userLat,
+          userLng,
+          accuracy,
+          results
+        });
+        
+        // Add test marker to map (red marker)
+        if (leafletMapRef.current && LRef.current) {
+          const L = LRef.current;
+          const redIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+          });
+          
+          testMarkerRef.current = L.marker([userLat, userLng], { icon: redIcon })
+            .addTo(leafletMapRef.current)
+            .bindPopup(`<strong>Lokasi Tes</strong><br>Akurasi: ${accuracy.toFixed(1)}m`)
+            .openPopup();
+          
+          leafletMapRef.current.setView([userLat, userLng], 16);
+        }
+        
+        const insideCount = results.filter(r => r.isInside).length;
+        toast({
+          title: "Tes Selesai",
+          description: `Lokasi terdeteksi di ${insideCount} dari ${results.length} area geofence`
+        });
+        
+        setIsTestingLocation(false);
+      },
+      (error) => {
+        toast({
+          title: "Gagal Mendapatkan Lokasi",
+          description: error.message,
+          variant: "destructive"
+        });
+        setIsTestingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  };
+
+  // Clear test results
+  const clearTestResults = () => {
+    setTestResults(null);
+    if (testMarkerRef.current && leafletMapRef.current) {
+      testMarkerRef.current.remove();
+      testMarkerRef.current = null;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Main Geofence List Card */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
           <CardTitle className="flex items-center gap-2">
             <Map className="h-5 w-5" />
             Semua Area Geofence
           </CardTitle>
-          <Button onClick={openNewEditor} disabled={!leafletLoaded || isEditorOpen}>
-            <Plus className="h-4 w-4 mr-2" />
-            Tambah Area Baru
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={testCurrentLocation} 
+              disabled={!leafletLoaded || isTestingLocation || geofences.length === 0}
+            >
+              {isTestingLocation ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <TestTube className="h-4 w-4 mr-2" />
+              )}
+              Tes Lokasi Saya
+            </Button>
+            <Button onClick={openNewEditor} disabled={!leafletLoaded || isEditorOpen}>
+              <Plus className="h-4 w-4 mr-2" />
+              Tambah Area Baru
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {geofences.length === 0 ? (
@@ -1013,10 +1202,10 @@ const PolygonGeofenceManager: React.FC = () => {
                       <p className="text-sm text-muted-foreground">
                         {geofence.coordinates ? (
                           <>
-                            {geofence.coordinates.length} titik • Luas: {calculatePolygonArea(geofence.coordinates).toLocaleString('id-ID', { maximumFractionDigits: 0 })} m²
+                            {geofence.coordinates.length} titik • Luas: {calculatePolygonArea(geofence.coordinates).toLocaleString('id-ID', { maximumFractionDigits: 0 })} m² • Toleransi: {geofence.tolerance_meters}m
                           </>
                         ) : (
-                          <>Radius: {geofence.radius}m</>
+                          <>Radius: {geofence.radius}m • Toleransi: {geofence.tolerance_meters}m</>
                         )}
                       </p>
                     </div>
@@ -1060,6 +1249,70 @@ const PolygonGeofenceManager: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Test Results Panel */}
+      {testResults && (
+        <Card className="border-green-500 dark:border-green-700">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TestTube className="h-5 w-5" />
+              Hasil Tes Lokasi
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={clearTestResults}>
+              <X className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-sm font-medium mb-1">📍 Lokasi Saat Ini:</p>
+              <p className="text-sm text-muted-foreground">
+                Lat: {testResults.userLat.toFixed(6)} | Lng: {testResults.userLng.toFixed(6)}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Akurasi GPS: {testResults.accuracy.toFixed(1)}m
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              {testResults.results.map((result) => (
+                <div 
+                  key={result.geofenceId} 
+                  className={`p-3 rounded-lg border ${
+                    result.isInside 
+                      ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800' 
+                      : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {result.isInside ? (
+                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium">{result.geofenceName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Status: <span className={result.isInside ? 'text-green-600' : 'text-red-600'}>
+                          {result.isInside ? 'INSIDE ✅' : 'OUTSIDE ❌'}
+                        </span>
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Jarak ke tepi: {result.distanceToEdge.toFixed(1)}m | Toleransi: {result.tolerance}m | Mode: {result.mode}
+                      </p>
+                      {!result.isInside && result.distanceToEdge < 150 && (
+                        <p className="text-sm text-amber-600 flex items-center gap-1 mt-1">
+                          <AlertTriangle className="h-4 w-4" />
+                          Naikkan toleransi ke {Math.ceil(result.distanceToEdge + 10)}m atau perbesar polygon
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Inline Editor Panel (instead of Dialog for better Leaflet compatibility) */}
       {isEditorOpen && (
@@ -1246,6 +1499,25 @@ const PolygonGeofenceManager: React.FC = () => {
                 </p>
               </div>
             )}
+            
+            {/* Tolerance Slider (shown for both modes) */}
+            <div className="space-y-3 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="geofence-tolerance">Toleransi GPS</Label>
+                <span className="text-sm font-medium text-amber-700 dark:text-amber-400">{tolerance} meter</span>
+              </div>
+              <Slider
+                value={[tolerance]}
+                onValueChange={([value]) => setTolerance(value)}
+                min={10}
+                max={150}
+                step={5}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Jarak maksimum dari tepi geofence yang masih dianggap INSIDE. Naikkan jika GPS sering meleset.
+              </p>
+            </div>
             
             {/* Polygon Mode Controls */}
             {editorMode === 'polygon' && (

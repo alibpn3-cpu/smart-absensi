@@ -368,6 +368,7 @@ export type Database = {
           is_active: boolean
           name: string
           radius: number | null
+          tolerance_meters: number
           updated_at: string
         }
         Insert: {
@@ -379,6 +380,7 @@ export type Database = {
           is_active?: boolean
           name: string
           radius?: number | null
+          tolerance_meters?: number
           updated_at?: string
         }
         Update: {
@@ -390,6 +392,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           radius?: number | null
+          tolerance_meters?: number
           updated_at?: string
         }
         Relationships: []
