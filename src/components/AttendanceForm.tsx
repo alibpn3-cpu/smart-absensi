@@ -842,11 +842,13 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           parseFloat(geofence.center_lng.toString())
         );
         
-        // Dynamic tolerance for radius mode: 50% of accuracy, capped at geofence tolerance
-        const maxTolerance = geofence.tolerance_meters || 20;
-        const accuracyTolerance = accuracy ? Math.min(accuracy * 0.5, maxTolerance) : 0;
-        const effectiveRadius = geofence.radius + accuracyTolerance;
-        console.log(`📍 Radius fallback for ${geofence.name}: ${distance.toFixed(2)}m (radius: ${geofence.radius}m + tolerance: ${accuracyTolerance.toFixed(0)}m = ${effectiveRadius.toFixed(0)}m)`);
+        // FIXED: Same tolerance logic as polygon validator
+        // If admin set tolerance > 20m, use it directly; otherwise GPS-based calculation
+        const radiusTolerance = maxTolerance > 20 
+          ? maxTolerance 
+          : (accuracy ? Math.min(Math.max(accuracy * 0.5, 10), maxTolerance) : 10);
+        const effectiveRadius = geofence.radius + radiusTolerance;
+        console.log(`📍 Radius fallback for ${geofence.name}: ${distance.toFixed(2)}m (radius: ${geofence.radius}m + tolerance: ${radiusTolerance.toFixed(0)}m = ${effectiveRadius.toFixed(0)}m)`);
         
         if (distance <= effectiveRadius) {
           isInsideThisGeofence = true;

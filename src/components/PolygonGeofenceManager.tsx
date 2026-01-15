@@ -1035,11 +1035,17 @@ const PolygonGeofenceManager: React.FC = () => {
           const maxTolerance = geofence.tolerance_meters || 20;
           let isInside = false;
           let distanceToEdge = Infinity;
-          let mode: 'polygon' | 'radius' = 'radius';
           
-          // Check polygon first
-          if (geofence.coordinates && Array.isArray(geofence.coordinates) && (geofence.coordinates as unknown[]).length >= 3) {
-            mode = 'polygon';
+          // FIXED: Determine mode ONCE based on available data, not based on result
+          const hasValidPolygon = geofence.coordinates && 
+            Array.isArray(geofence.coordinates) && 
+            (geofence.coordinates as unknown[]).length >= 3;
+          
+          // Mode is determined by geofence DATA, not by check result
+          const mode: 'polygon' | 'radius' = hasValidPolygon ? 'polygon' : 'radius';
+          
+          // Check polygon first if available
+          if (hasValidPolygon) {
             const polygonCoords = sanitizeCoordinates(geofence.coordinates as unknown[]);
             if (polygonCoords.length >= 3) {
               isInside = isPointInPolygon(userLat, userLng, accuracy, polygonCoords, maxTolerance);
@@ -1047,9 +1053,9 @@ const PolygonGeofenceManager: React.FC = () => {
             }
           }
           
-          // Fallback to radius
+          // Fallback to radius if polygon check failed AND radius data exists
+          // Note: mode stays as 'polygon' if hasValidPolygon was true
           if (!isInside && geofence.center_lat && geofence.center_lng && geofence.radius) {
-            mode = 'radius';
             const R = 6371000; // Earth radius in meters
             const dLat = (userLat - geofence.center_lat) * Math.PI / 180;
             const dLng = (userLng - geofence.center_lng) * Math.PI / 180;
@@ -1059,18 +1065,30 @@ const PolygonGeofenceManager: React.FC = () => {
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             const distance = R * c;
             
-            distanceToEdge = Math.max(0, distance - geofence.radius);
-            const toleranceForRadius = Math.min(accuracy * 0.5, maxTolerance);
+            // If no polygon distance, calculate radius distance
+            if (distanceToEdge === Infinity) {
+              distanceToEdge = Math.max(0, distance - geofence.radius);
+            }
+            
+            // FIXED: Apply same tolerance logic as polygon validator
+            const toleranceForRadius = maxTolerance > 20 
+              ? maxTolerance 
+              : Math.min(Math.max(accuracy * 0.5, 10), maxTolerance);
             isInside = distance <= (geofence.radius + toleranceForRadius);
           }
+          
+          // Calculate actual tolerance used for display
+          const actualTolerance = maxTolerance > 20 
+            ? maxTolerance 
+            : Math.min(Math.max(accuracy * 0.5, 10), maxTolerance);
           
           results.push({
             geofenceName: geofence.name,
             geofenceId: geofence.id,
             isInside,
             distanceToEdge,
-            tolerance: maxTolerance,
-            mode
+            tolerance: actualTolerance,  // Show actual tolerance used, not maxTolerance
+            mode  // Mode stays as 'polygon' if geofence HAS polygon data
           });
         }
         
