@@ -814,22 +814,21 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     console.log(`📏 Accuracy: ${accuracy}m, adding tolerance: ${accuracyTolerance}m (max 15m)`);
 
     for (const geofence of geofences) {
-      // Check polygon geofence first (if coordinates exist)
+      let isInsideThisGeofence = false;
+      
+      // 1. Try polygon check first (if coordinates exist)
       if (geofence.coordinates && Array.isArray(geofence.coordinates) && (geofence.coordinates as unknown[]).length >= 3) {
         try {
           const polygonCoords = geofence.coordinates as unknown as PolygonCoordinate[];
-          const isInside = isPointInPolygon(lat, lng, accuracy || 0, polygonCoords);
-          console.log(`📍 Polygon check for ${geofence.name}: ${isInside ? 'INSIDE' : 'OUTSIDE'}`);
-          
-          if (isInside) {
-            return { isInGeofence: true, geofenceName: geofence.name };
-          }
+          isInsideThisGeofence = isPointInPolygon(lat, lng, accuracy || 0, polygonCoords);
+          console.log(`📍 Polygon check for ${geofence.name}: ${isInsideThisGeofence ? 'INSIDE ✅' : 'OUTSIDE ❌'}`);
         } catch (error) {
           console.error('Error checking polygon geofence:', error);
         }
       }
-      // Fallback to radius-based geofence
-      else if (geofence.center_lat && geofence.center_lng && geofence.radius) {
+      
+      // 2. If polygon check failed OR no polygon, try radius check as fallback
+      if (!isInsideThisGeofence && geofence.center_lat && geofence.center_lng && geofence.radius) {
         const distance = calculateDistance(
           lat, lng, 
           parseFloat(geofence.center_lat.toString()), 
@@ -837,11 +836,16 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         );
         
         const effectiveRadius = geofence.radius + accuracyTolerance;
-        console.log(`📍 Distance to ${geofence.name}: ${distance.toFixed(2)}m (radius: ${geofence.radius}m + tolerance: ${accuracyTolerance.toFixed(0)}m = ${effectiveRadius.toFixed(0)}m)`);
+        console.log(`📍 Radius fallback for ${geofence.name}: ${distance.toFixed(2)}m (radius: ${effectiveRadius.toFixed(0)}m)`);
         
         if (distance <= effectiveRadius) {
-          return { isInGeofence: true, geofenceName: geofence.name };
+          isInsideThisGeofence = true;
         }
+      }
+      
+      // 3. If inside this geofence (polygon OR radius), return success
+      if (isInsideThisGeofence) {
+        return { isInGeofence: true, geofenceName: geofence.name };
       }
     }
 
@@ -2734,9 +2738,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         }}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Checkout WFO di Luar Area Kantor</DialogTitle>
+              <DialogTitle>Clock Out WFO di Luar Area Kantor</DialogTitle>
               <DialogDescription>
-                Anda berada di luar area geofence kantor. Silakan masukkan alasan checkout WFO di luar kantor.
+                Anda berada di luar area geofence kantor. Silakan masukkan alasan Clock Out WFO di luar kantor.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2 py-4">

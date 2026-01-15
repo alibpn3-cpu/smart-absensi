@@ -64,14 +64,28 @@ export const isPointInPolygon = (
     const turfCoords = toTurfCoordinates(polygonCoords);
     const polygon = turf.polygon([turfCoords]);
     
-    // Shrink polygon by accuracy for safety margin (negative buffer)
-    // Only apply buffer if accuracy > 10m to avoid over-shrinking
+    // Calculate polygon area to determine if buffer should be applied
+    const polygonArea = turf.area(polygon); // in square meters
+    const polygonSize = Math.sqrt(polygonArea); // approximate "size" in meters
+    
+    console.log(`📏 Polygon size: ~${polygonSize.toFixed(0)}m, GPS accuracy: ${accuracy}m`);
+    
+    // Only apply negative buffer if:
+    // 1. Accuracy > 10m
+    // 2. Polygon is large enough (size > 100m)
+    // 3. Buffer is capped at max 25m to avoid over-shrinking small polygons
     let checkPolygon: ReturnType<typeof turf.polygon> = polygon;
-    if (accuracy > 10) {
-      const buffered = turf.buffer(polygon, -(accuracy / 1000), { units: 'kilometers' });
-      if (buffered) {
+    if (accuracy > 10 && polygonSize > 100) {
+      const bufferAmount = Math.min(accuracy * 0.5, 25); // Use 50% of accuracy, max 25m
+      const buffered = turf.buffer(polygon, -(bufferAmount / 1000), { units: 'kilometers' });
+      if (buffered && turf.area(buffered) > 0) {
         checkPolygon = buffered as ReturnType<typeof turf.polygon>;
+        console.log(`📏 Applied buffer: -${bufferAmount.toFixed(0)}m (polygon still valid)`);
+      } else {
+        console.log(`📏 Buffer skipped: would invalidate polygon`);
       }
+    } else {
+      console.log(`📏 Buffer skipped: accuracy ≤ 10m or polygon too small`);
     }
     
     return turf.booleanPointInPolygon(userPoint, checkPolygon);
