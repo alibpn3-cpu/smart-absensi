@@ -127,12 +127,15 @@ export type Database = {
           checkin_location_address: string | null
           checkin_location_lat: number | null
           checkin_location_lng: number | null
+          checkin_reason: string | null
           checkout_location_address: string | null
           checkout_location_lat: number | null
           checkout_location_lng: number | null
+          checkout_reason: string | null
           checkout_status: string | null
           created_at: string
           date: string
+          extend_reason: string | null
           hours_worked: number | null
           id: string
           reason: string | null
@@ -151,12 +154,15 @@ export type Database = {
           checkin_location_address?: string | null
           checkin_location_lat?: number | null
           checkin_location_lng?: number | null
+          checkin_reason?: string | null
           checkout_location_address?: string | null
           checkout_location_lat?: number | null
           checkout_location_lng?: number | null
+          checkout_reason?: string | null
           checkout_status?: string | null
           created_at?: string
           date?: string
+          extend_reason?: string | null
           hours_worked?: number | null
           id?: string
           reason?: string | null
@@ -175,12 +181,15 @@ export type Database = {
           checkin_location_address?: string | null
           checkin_location_lat?: number | null
           checkin_location_lng?: number | null
+          checkin_reason?: string | null
           checkout_location_address?: string | null
           checkout_location_lat?: number | null
           checkout_location_lng?: number | null
+          checkout_reason?: string | null
           checkout_status?: string | null
           created_at?: string
           date?: string
+          extend_reason?: string | null
           hours_worked?: number | null
           id?: string
           reason?: string | null
