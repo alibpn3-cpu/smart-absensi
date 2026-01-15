@@ -25,7 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
 interface DebugLog {
@@ -159,7 +159,7 @@ const DebugLogViewer: React.FC = () => {
     return <Monitor className="h-4 w-4" />;
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     if (logs.length === 0) {
       toast({
         title: "Tidak ada data",
@@ -169,33 +169,95 @@ const DebugLogViewer: React.FC = () => {
       return;
     }
 
-    const exportData = logs.map(log => ({
-      Waktu: log.created_at ? format(new Date(log.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: id }) : '-',
-      Nama: log.staff_name || '-',
-      UID: log.staff_uid || '-',
-      Platform: log.platform || '-',
-      'Issue Type': log.issue_type || 'general',
-      Error: log.error_message || '-',
-      'Camera Permission': log.permissions_state?.camera ? 'Granted' : 'Denied',
-      'Location Permission': log.permissions_state?.location ? 'Granted' : 'Denied',
-      'User Notes': log.user_notes || '-',
-      'User Agent': log.user_agent || '-',
-      'Screen': `${log.screen_width || 0}x${log.screen_height || 0}`,
-      'Device ID': log.device_id || '-'
-    }));
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Debug Logs');
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Debug Logs');
-    
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(data, `debug-logs-${dateFrom}-${dateTo}.xlsx`);
+      // Define columns with headers
+      worksheet.columns = [
+        { header: 'Waktu', key: 'waktu', width: 20 },
+        { header: 'Nama', key: 'nama', width: 25 },
+        { header: 'UID', key: 'uid', width: 15 },
+        { header: 'Platform', key: 'platform', width: 12 },
+        { header: 'Issue Type', key: 'issue', width: 12 },
+        { header: 'Error', key: 'error', width: 35 },
+        { header: 'Camera Permission', key: 'camera', width: 18 },
+        { header: 'Location Permission', key: 'location', width: 18 },
+        { header: 'User Notes', key: 'notes', width: 30 },
+        { header: 'User Agent', key: 'userAgent', width: 45 },
+        { header: 'Screen', key: 'screen', width: 12 },
+        { header: 'Device ID', key: 'deviceId', width: 20 },
+      ];
 
-    toast({
-      title: "Export Berhasil",
-      description: `${logs.length} log berhasil diekspor ke Excel`
-    });
+      // Add data rows
+      logs.forEach(log => {
+        worksheet.addRow({
+          waktu: log.created_at ? format(new Date(log.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: id }) : '-',
+          nama: log.staff_name || '-',
+          uid: log.staff_uid || '-',
+          platform: log.platform || '-',
+          issue: log.issue_type || 'general',
+          error: log.error_message || '-',
+          camera: log.permissions_state?.camera ? 'Granted' : 'Denied',
+          location: log.permissions_state?.location ? 'Granted' : 'Denied',
+          notes: log.user_notes || '-',
+          userAgent: log.user_agent || '-',
+          screen: `${log.screen_width || 0}x${log.screen_height || 0}`,
+          deviceId: log.device_id || '-',
+        });
+      });
+
+      // Style header row - BOLD + BLUE BACKGROUND + WHITE TEXT
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF3B82F6' } // Blue color
+      };
+      headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+      headerRow.height = 25;
+
+      // Add borders to all cells
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+        });
+      });
+
+      // Freeze header row
+      worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+      // Auto filter
+      worksheet.autoFilter = {
+        from: 'A1',
+        to: `L${logs.length + 1}`
+      };
+
+      // Generate file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      saveAs(blob, `debug-logs-${dateFrom}-${dateTo}.xlsx`);
+
+      toast({
+        title: "Export Berhasil",
+        description: `${logs.length} log berhasil diekspor ke Excel`
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export Gagal",
+        description: "Terjadi kesalahan saat mengekspor data",
+        variant: "destructive"
+      });
+    }
   };
 
   const filteredLogs = React.useMemo(() => {
