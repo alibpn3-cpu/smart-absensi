@@ -819,12 +819,18 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       // 1. Try polygon check first (if coordinates exist)
       if (geofence.coordinates && Array.isArray(geofence.coordinates) && (geofence.coordinates as unknown[]).length >= 3) {
         try {
-          const polygonCoords = geofence.coordinates as unknown as PolygonCoordinate[];
+          const rawCoords = geofence.coordinates as unknown[];
+          console.log(`🔍 Checking polygon "${geofence.name}": ${rawCoords.length} raw coordinates`);
+          console.log(`   Sample coordinate: ${JSON.stringify(rawCoords[0])}`);
+          
+          const polygonCoords = rawCoords as unknown as PolygonCoordinate[];
           isInsideThisGeofence = isPointInPolygon(lat, lng, accuracy || 0, polygonCoords);
           console.log(`📍 Polygon check for ${geofence.name}: ${isInsideThisGeofence ? 'INSIDE ✅' : 'OUTSIDE ❌'}`);
         } catch (error) {
           console.error('Error checking polygon geofence:', error);
         }
+      } else {
+        console.log(`⚠️ Geofence "${geofence.name}" has no valid polygon (coordinates: ${geofence.coordinates ? 'exists but invalid' : 'null'})`);
       }
       
       // 2. If polygon check failed OR no polygon, try radius check as fallback
@@ -1905,16 +1911,27 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       return;
     }
 
-    // Determine location: use detected coordinates if available; otherwise request permission
+    // Determine location: 
+    // For WFO check-out, ALWAYS get fresh GPS location (stale cache causes false "outside geofence")
+    // For other cases, use cached location if available
     let resolvedLocation: { lat: number; lng: number; address: string; coordinates: string; accuracy?: number } | null = null;
-    if (currentLocation) {
+    
+    const shouldForceFreshLocation = effectiveStatus === 'wfo' && isCheckOut;
+    
+    if (shouldForceFreshLocation) {
+      console.log('🔄 WFO Check-Out: Forcing fresh GPS location (ignoring cache)');
+      // Also force refresh geofences to ensure we have latest data
+      await fetchGeofences(true);
+    }
+    
+    if (!shouldForceFreshLocation && currentLocation) {
       console.log('📍 Using cached coordinates');
       resolvedLocation = currentLocation;
     } else {
       try {
-        console.log('🔍 Requesting location permission...');
+        console.log('🔍 Requesting fresh location permission...');
         resolvedLocation = await requestLocationPermission();
-        console.log('✅ Location obtained:', resolvedLocation);
+        console.log('✅ Fresh location obtained:', resolvedLocation);
       } catch (err) {
         console.error('❌ Failed to obtain location:', err);
         toast({
