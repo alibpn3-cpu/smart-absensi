@@ -12,6 +12,8 @@ import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -836,38 +838,96 @@ const EmployeeManager = () => {
     }
   };
 
-  const downloadEmployeesExcel = () => {
-    let employeesToExport = employees;
+  const downloadEmployeesExcel = async () => {
+    try {
+      let employeesToExport = employees;
 
-    // If there are selected employees, export only those
-    if (selectedEmployees.size > 0) {
-      employeesToExport = employees.filter(emp => selectedEmployees.has(emp.id));
+      // If there are selected employees, export only those
+      if (selectedEmployees.size > 0) {
+        employeesToExport = employees.filter(emp => selectedEmployees.has(emp.id));
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Employees');
+
+      // Define columns
+      worksheet.columns = [
+        { header: 'UID', key: 'uid', width: 12 },
+        { header: 'Name', key: 'name', width: 25 },
+        { header: 'Position', key: 'position', width: 20 },
+        { header: 'Work Area', key: 'workArea', width: 20 },
+        { header: 'Division', key: 'division', width: 15 },
+        { header: 'Employee Type', key: 'employeeType', width: 12 },
+        { header: 'Status', key: 'status', width: 10 },
+        { header: 'Created At', key: 'createdAt', width: 12 }
+      ];
+
+      // Add data rows
+      employeesToExport.forEach(emp => {
+        worksheet.addRow({
+          uid: emp.uid,
+          name: emp.name,
+          position: emp.position,
+          workArea: emp.work_area,
+          division: emp.division || '',
+          employeeType: emp.employee_type || 'staff',
+          status: emp.is_active ? 'Active' : 'Inactive',
+          createdAt: new Date(emp.created_at).toLocaleDateString('id-ID')
+        });
+      });
+
+      // Style header row - BOLD + BLUE BACKGROUND + WHITE TEXT
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF3B82F6' }
+      };
+      headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+      headerRow.height = 25;
+
+      // Add borders to all cells
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+        });
+      });
+
+      // Freeze header row
+      worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+      // Add auto filter
+      worksheet.autoFilter = {
+        from: 'A1',
+        to: `H${employeesToExport.length + 1}`
+      };
+
+      const fileName = selectedEmployees.size > 0 
+        ? `employees_selected_${selectedEmployees.size}.xlsx`
+        : `employees_all_${employees.length}.xlsx`;
+      
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, fileName);
+      
+      toast({
+        title: "Download Berhasil",
+        description: `${employeesToExport.length} data karyawan telah didownload`
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Gagal",
+        description: "Gagal mengexport data karyawan",
+        variant: "destructive"
+      });
     }
-
-    const exportData = employeesToExport.map(emp => ({
-      'UID': emp.uid,
-      'Name': emp.name,
-      'Position': emp.position,
-      'Work Area': emp.work_area,
-      'Division': emp.division || '',
-      'Status': emp.is_active ? 'Active' : 'Inactive',
-      'Created At': new Date(emp.created_at).toLocaleDateString('id-ID')
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Employees');
-
-    const fileName = selectedEmployees.size > 0 
-      ? `employees_selected_${selectedEmployees.size}.xlsx`
-      : `employees_all_${employees.length}.xlsx`;
-    
-    XLSX.writeFile(wb, fileName);
-    
-    toast({
-      title: "Download Berhasil",
-      description: `${employeesToExport.length} data karyawan telah didownload`
-    });
   };
 
   const downloadBatchQRCodes = async () => {
@@ -942,35 +1002,76 @@ const EmployeeManager = () => {
     });
   };
 
-  const exportTemplate = (format: 'xlsx' | 'csv') => {
-    const templateData = [
-      {
-        'UID': 'EMP001',
-        'Name': 'John Doe',
-        'Position': 'Manager',
-        'Work Area': 'Office A',
-        'Division': 'IT'
-      },
-      {
-        'UID': 'EMP002', 
-        'Name': 'Jane Smith',
-        'Position': 'Staff',
-        'Work Area': 'Office B',
-        'Division': 'HR'
+  const exportTemplate = async (format: 'xlsx' | 'csv') => {
+    try {
+      if (format === 'csv') {
+        // Use XLSX for CSV export
+        const templateData = [
+          { 'UID': 'EMP001', 'Name': 'John Doe', 'Position': 'Manager', 'Work Area': 'Office A', 'Division': 'IT', 'Employee Type': 'staff' },
+          { 'UID': 'EMP002', 'Name': 'Jane Smith', 'Position': 'Staff', 'Work Area': 'Office B', 'Division': 'HR', 'Employee Type': 'primary' }
+        ];
+        const ws = XLSX.utils.json_to_sheet(templateData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Employee Template');
+        XLSX.writeFile(wb, 'employee_template.csv');
+      } else {
+        // Use ExcelJS for XLSX with styling
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Employee Template');
+
+        worksheet.columns = [
+          { header: 'UID', key: 'uid', width: 12 },
+          { header: 'Name', key: 'name', width: 25 },
+          { header: 'Position', key: 'position', width: 20 },
+          { header: 'Work Area', key: 'workArea', width: 20 },
+          { header: 'Division', key: 'division', width: 15 },
+          { header: 'Employee Type', key: 'employeeType', width: 15 }
+        ];
+
+        // Add sample data
+        worksheet.addRow({ uid: 'EMP001', name: 'John Doe', position: 'Manager', workArea: 'Office A', division: 'IT', employeeType: 'staff' });
+        worksheet.addRow({ uid: 'EMP002', name: 'Jane Smith', position: 'Staff', workArea: 'Office B', division: 'HR', employeeType: 'primary' });
+
+        // Style header row
+        const headerRow = worksheet.getRow(1);
+        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        headerRow.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF3B82F6' }
+        };
+        headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+        headerRow.height = 25;
+
+        // Add borders
+        worksheet.eachRow((row) => {
+          row.eachCell((cell) => {
+            cell.border = {
+              top: { style: 'thin' },
+              left: { style: 'thin' },
+              bottom: { style: 'thin' },
+              right: { style: 'thin' }
+            };
+          });
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        saveAs(blob, 'employee_template.xlsx');
       }
-    ];
-
-    const ws = XLSX.utils.json_to_sheet(templateData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Employee Template');
-
-    const fileName = `employee_template.${format}`;
-    XLSX.writeFile(wb, fileName);
-    
-    toast({
-      title: "Template Exported",
-      description: `${format.toUpperCase()} template file has been downloaded`
-    });
+      
+      toast({
+        title: "Template Exported",
+        description: `${format.toUpperCase()} template file has been downloaded`
+      });
+    } catch (error) {
+      console.error('Export template error:', error);
+      toast({
+        title: "Gagal",
+        description: "Gagal mengexport template",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleBatchUpload = async () => {

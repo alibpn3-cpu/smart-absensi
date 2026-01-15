@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Download, FileSpreadsheet, Calendar, Filter, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -165,109 +165,144 @@ const ScoreExporter = () => {
   };
 
   const exportToExcel = async (data: any[]) => {
-    // Generate photo URLs for P2H/Toolbox
-    const photoUrls = await Promise.all(
-      data.map(async (record) => {
-        let p2hUrl = null;
-        let toolboxUrl = null;
-        
-        if (record.checklist?.p2h_photo_url) {
-          const { data: urlData } = supabase.storage
-            .from('p2h-photos')
-            .getPublicUrl(record.checklist.p2h_photo_url);
-          p2hUrl = urlData?.publicUrl || null;
+    try {
+      // Generate photo URLs for P2H/Toolbox
+      const photoUrls = await Promise.all(
+        data.map(async (record) => {
+          let p2hUrl = null;
+          let toolboxUrl = null;
+          
+          if (record.checklist?.p2h_photo_url) {
+            const { data: urlData } = supabase.storage
+              .from('p2h-photos')
+              .getPublicUrl(record.checklist.p2h_photo_url);
+            p2hUrl = urlData?.publicUrl || null;
+          }
+          
+          if (record.checklist?.toolbox_photo_url) {
+            const { data: urlData } = supabase.storage
+              .from('p2h-photos')
+              .getPublicUrl(record.checklist.toolbox_photo_url);
+            toolboxUrl = urlData?.publicUrl || null;
+          }
+          
+          return { p2h: p2hUrl, toolbox: toolboxUrl };
+        })
+      );
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Laporan Score');
+
+      // Define columns with headers and widths
+      worksheet.columns = [
+        { header: 'No', key: 'no', width: 5 },
+        { header: 'UID', key: 'uid', width: 12 },
+        { header: 'Nama', key: 'nama', width: 20 },
+        { header: 'Tanggal', key: 'tanggal', width: 12 },
+        { header: 'Tipe Karyawan', key: 'tipe', width: 12 },
+        { header: 'Area Kerja', key: 'area', width: 15 },
+        { header: 'Clock In', key: 'clockIn', width: 10 },
+        { header: 'Clock Out', key: 'clockOut', width: 10 },
+        { header: 'Score Clock In', key: 'scoreIn', width: 12 },
+        { header: 'Score Clock Out', key: 'scoreOut', width: 12 },
+        { header: 'Score P2H', key: 'p2h', width: 10 },
+        { header: 'Score Toolbox', key: 'toolbox', width: 10 },
+        { header: 'Final Score', key: 'final', width: 12 },
+        { header: 'Terlambat', key: 'terlambat', width: 10 },
+        { header: 'Foto P2H', key: 'fotoP2h', width: 12 },
+        { header: 'Foto Toolbox', key: 'fotoToolbox', width: 12 },
+        { header: 'Metode', key: 'metode', width: 12 }
+      ];
+
+      // Add data rows
+      data.forEach((record, index) => {
+        const row = worksheet.addRow({
+          no: index + 1,
+          uid: record.staff_uid,
+          nama: record.staff_name,
+          tanggal: new Date(record.score_date).toLocaleDateString('id-ID'),
+          tipe: record.employee_type === 'primary' ? 'Primary' : 'Staff',
+          area: record.work_area || '-',
+          clockIn: record.check_in_time || '-',
+          clockOut: record.check_out_time || '-',
+          scoreIn: record.clock_in_score,
+          scoreOut: record.clock_out_score,
+          p2h: record.p2h_score,
+          toolbox: record.toolbox_score,
+          final: record.final_score,
+          terlambat: record.is_late ? 'Ya' : 'Tidak',
+          fotoP2h: photoUrls[index]?.p2h ? 'Lihat Foto' : '-',
+          fotoToolbox: photoUrls[index]?.toolbox ? 'Lihat Foto' : '-',
+          metode: record.calculation_method || 'manual'
+        });
+
+        // Add hyperlinks for photos
+        if (photoUrls[index]?.p2h) {
+          const cell = row.getCell('fotoP2h');
+          cell.value = { text: 'Lihat Foto', hyperlink: photoUrls[index].p2h };
+          cell.font = { color: { argb: 'FF0000FF' }, underline: true };
         }
-        
-        if (record.checklist?.toolbox_photo_url) {
-          const { data: urlData } = supabase.storage
-            .from('p2h-photos')
-            .getPublicUrl(record.checklist.toolbox_photo_url);
-          toolboxUrl = urlData?.publicUrl || null;
+        if (photoUrls[index]?.toolbox) {
+          const cell = row.getCell('fotoToolbox');
+          cell.value = { text: 'Lihat Foto', hyperlink: photoUrls[index].toolbox };
+          cell.font = { color: { argb: 'FF0000FF' }, underline: true };
         }
-        
-        return { p2h: p2hUrl, toolbox: toolboxUrl };
-      })
-    );
+      });
 
-    const excelData = data.map((record, index) => ({
-      'No': index + 1,
-      'UID': record.staff_uid,
-      'Nama': record.staff_name,
-      'Tanggal': new Date(record.score_date).toLocaleDateString('id-ID'),
-      'Tipe Karyawan': record.employee_type === 'primary' ? 'Primary' : 'Staff',
-      'Area Kerja': record.work_area || '-',
-      'Clock In': record.check_in_time || '-',
-      'Clock Out': record.check_out_time || '-',
-      'Score Clock In': record.clock_in_score,
-      'Score Clock Out': record.clock_out_score,
-      'Score P2H': record.p2h_score,
-      'Score Toolbox': record.toolbox_score,
-      'Final Score': record.final_score,
-      'Terlambat': record.is_late ? 'Ya' : 'Tidak',
-      'Foto P2H': photoUrls[index]?.p2h ? 'Lihat Foto' : '-',
-      'Foto Toolbox': photoUrls[index]?.toolbox ? 'Lihat Foto' : '-',
-      'Metode Kalkulasi': record.calculation_method || 'manual'
-    }));
+      // Style header row - BOLD + BLUE BACKGROUND + WHITE TEXT
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF3B82F6' }
+      };
+      headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+      headerRow.height = 25;
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(excelData);
+      // Add borders to all cells
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+        });
+      });
 
-    // Add hyperlinks for P2H and Toolbox photos
-    data.forEach((record, index) => {
-      const rowIndex = index + 2;
-      
-      if (photoUrls[index]?.p2h) {
-        ws[`O${rowIndex}`] = {
-          t: 's',
-          v: 'Lihat Foto',
-          l: { Target: photoUrls[index].p2h, Tooltip: 'Buka foto P2H' }
-        };
-      }
-      
-      if (photoUrls[index]?.toolbox) {
-        ws[`P${rowIndex}`] = {
-          t: 's',
-          v: 'Lihat Foto',
-          l: { Target: photoUrls[index].toolbox, Tooltip: 'Buka foto Toolbox' }
-        };
-      }
-    });
+      // Freeze header row
+      worksheet.views = [{ state: 'frozen', ySplit: 1 }];
 
-    // Set column widths
-    ws['!cols'] = [
-      { wch: 5 },   // No
-      { wch: 12 },  // UID
-      { wch: 20 },  // Nama
-      { wch: 12 },  // Tanggal
-      { wch: 12 },  // Tipe
-      { wch: 15 },  // Area
-      { wch: 10 },  // Clock In
-      { wch: 10 },  // Clock Out
-      { wch: 12 },  // Score In
-      { wch: 12 },  // Score Out
-      { wch: 10 },  // P2H
-      { wch: 10 },  // Toolbox
-      { wch: 12 },  // Final
-      { wch: 10 },  // Terlambat
-      { wch: 12 },  // Foto P2H
-      { wch: 12 },  // Foto Toolbox
-      { wch: 12 }   // Metode
-    ];
+      // Add auto filter
+      worksheet.autoFilter = {
+        from: 'A1',
+        to: `Q${data.length + 1}`
+      };
 
-    XLSX.utils.book_append_sheet(wb, ws, 'Laporan Score');
+      // Generate filename
+      const startDate = new Date(filters.startDate).toLocaleDateString('id-ID').replace(/\//g, '-');
+      const endDate = new Date(filters.endDate).toLocaleDateString('id-ID').replace(/\//g, '-');
+      const filename = `Laporan-Score_${startDate}_${endDate}.xlsx`;
 
-    const startDate = new Date(filters.startDate).toLocaleDateString('id-ID').replace(/\//g, '-');
-    const endDate = new Date(filters.endDate).toLocaleDateString('id-ID').replace(/\//g, '-');
-    const filename = `Laporan-Score_${startDate}_${endDate}.xlsx`;
+      // Save file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, filename);
 
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(blob, filename);
-
-    toast({
-      title: "Berhasil",
-      description: `${data.length} data score berhasil diekspor`
-    });
+      toast({
+        title: "Berhasil",
+        description: `${data.length} data score berhasil diekspor`
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Gagal",
+        description: "Gagal mengekspor data score",
+        variant: "destructive"
+      });
+    }
   };
 
   const exportToPDF = (data: any[]) => {
