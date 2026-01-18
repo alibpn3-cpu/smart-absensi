@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2, ExternalLink, Circle, RefreshCw, ChevronUp, Search, MapPinned, TestTube, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2, ExternalLink, Circle, RefreshCw, ChevronUp, Search, MapPinned, TestTube, CheckCircle, XCircle, AlertTriangle, Play, StopCircle, Navigation } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { calculatePolygonArea, getPolygonCenter, PolygonCoordinate, sanitizeCoordinates, circleToPolygon, isPointInPolygon, getDistanceToPolygonEdge } from '@/utils/polygonValidator';
@@ -64,6 +64,19 @@ const PolygonGeofenceManager: React.FC = () => {
     results: TestResult[];
   } | null>(null);
   const testMarkerRef = useRef<any>(null);
+  
+  // Live GPS tracking state
+  const [isLiveTracking, setIsLiveTracking] = useState(false);
+  const [livePosition, setLivePosition] = useState<{
+    lat: number;
+    lng: number;
+    accuracy: number;
+    timestamp: number;
+  } | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const accuracyCircleRef = useRef<any>(null);
+  const trailLayerRef = useRef<any>(null);
+  const trailPositions = useRef<[number, number][]>([]);
   
   const mapRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -1148,6 +1161,308 @@ const PolygonGeofenceManager: React.FC = () => {
     }
   };
 
+  // ============= LIVE GPS TRACKING FUNCTIONS =============
+  
+  // Start live GPS tracking
+  const startLiveTracking = async () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "GPS Tidak Didukung",
+        description: "Browser tidak mendukung geolokasi",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Fetch fresh geofence data
+    const { data: freshGeofences } = await supabase
+      .from('geofence_areas')
+      .select('*')
+      .eq('is_active', true);
+    
+    if (!freshGeofences || freshGeofences.length === 0) {
+      toast({
+        title: "Tidak Ada Geofence Aktif",
+        description: "Tambahkan area geofence aktif terlebih dahulu",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Initialize map if not already open
+    if (!leafletMapRef.current && mapRef.current && LRef.current) {
+      const L = LRef.current;
+      leafletMapRef.current = L.map(mapRef.current).setView([-6.2088, 106.8456], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(leafletMapRef.current);
+    }
+    
+    setIsLiveTracking(true);
+    trailPositions.current = [];
+    
+    // Draw all active geofences on map
+    drawAllGeofencesOnMap(freshGeofences);
+    
+    toast({
+      title: "Live Tracking Dimulai",
+      description: "GPS akan terus melacak posisi Anda"
+    });
+    
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        
+        console.log(`📍 Live position: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (accuracy: ${accuracy.toFixed(1)}m)`);
+        
+        setLivePosition({
+          lat: latitude,
+          lng: longitude,
+          accuracy,
+          timestamp: position.timestamp
+        });
+        
+        // Update marker position
+        updateLiveMarker(latitude, longitude, accuracy);
+        
+        // Update geofence status
+        updateLiveGeofenceStatus(latitude, longitude, accuracy, freshGeofences);
+        
+        // Add to trail
+        trailPositions.current.push([latitude, longitude]);
+        updateTrailLine();
+      },
+      (error) => {
+        console.error('GPS Error:', error);
+        toast({
+          title: "GPS Error",
+          description: error.message,
+          variant: "destructive"
+        });
+      },
+      { 
+        enableHighAccuracy: true, 
+        timeout: 10000,
+        maximumAge: 0  // Always get fresh position
+      }
+    );
+  };
+  
+  // Stop live tracking
+  const stopLiveTracking = () => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setIsLiveTracking(false);
+    setLivePosition(null);
+    setTestResults(null);
+    
+    // Cleanup map layers
+    if (accuracyCircleRef.current) {
+      accuracyCircleRef.current.remove();
+      accuracyCircleRef.current = null;
+    }
+    if (trailLayerRef.current) {
+      trailLayerRef.current.remove();
+      trailLayerRef.current = null;
+    }
+    if (testMarkerRef.current) {
+      testMarkerRef.current.remove();
+      testMarkerRef.current = null;
+    }
+    
+    // Clear geofence layers
+    geofenceLayersRef.current.forEach(layer => layer.remove());
+    geofenceLayersRef.current = [];
+    
+    trailPositions.current = [];
+    
+    toast({
+      title: "Live Tracking Dihentikan"
+    });
+  };
+  
+  // Draw all active geofences on the live tracking map
+  const drawAllGeofencesOnMap = (geofences: any[]) => {
+    const L = LRef.current;
+    const map = leafletMapRef.current;
+    if (!L || !map) return;
+    
+    // Clear existing geofence layers
+    geofenceLayersRef.current.forEach(layer => layer.remove());
+    geofenceLayersRef.current = [];
+    
+    geofences.forEach(geofence => {
+      const hasValidPolygon = geofence.coordinates && 
+        Array.isArray(geofence.coordinates) && 
+        (geofence.coordinates as unknown[]).length >= 3;
+      
+      if (hasValidPolygon) {
+        const polygonCoords = sanitizeCoordinates(geofence.coordinates as unknown[]);
+        if (polygonCoords.length >= 3) {
+          const latLngs = polygonCoords.map((c: PolygonCoordinate) => [c.lat, c.lng]);
+          const polygonLayer = L.polygon(latLngs, {
+            color: '#10b981',
+            fillColor: '#10b981',
+            fillOpacity: 0.2,
+            weight: 2
+          }).addTo(map);
+          polygonLayer.bindTooltip(geofence.name, { permanent: false, direction: 'center' });
+          geofenceLayersRef.current.push(polygonLayer);
+        }
+      } else if (geofence.center_lat && geofence.center_lng && geofence.radius) {
+        const circleLayer = L.circle([geofence.center_lat, geofence.center_lng], {
+          radius: geofence.radius,
+          color: '#10b981',
+          fillColor: '#10b981',
+          fillOpacity: 0.2,
+          weight: 2
+        }).addTo(map);
+        circleLayer.bindTooltip(geofence.name, { permanent: false, direction: 'center' });
+        geofenceLayersRef.current.push(circleLayer);
+      }
+    });
+  };
+  
+  // Update live marker and accuracy circle
+  const updateLiveMarker = (lat: number, lng: number, accuracy: number) => {
+    const L = LRef.current;
+    const map = leafletMapRef.current;
+    if (!L || !map) return;
+    
+    // Update or create marker
+    if (testMarkerRef.current) {
+      testMarkerRef.current.setLatLng([lat, lng]);
+    } else {
+      const redIcon = L.icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+      });
+      testMarkerRef.current = L.marker([lat, lng], { icon: redIcon }).addTo(map);
+    }
+    
+    // Update popup
+    testMarkerRef.current.bindPopup(`<strong>Posisi Anda</strong><br>Akurasi: ${accuracy.toFixed(1)}m`);
+    
+    // Update or create accuracy circle (blue transparent)
+    if (accuracyCircleRef.current) {
+      accuracyCircleRef.current.setLatLng([lat, lng]);
+      accuracyCircleRef.current.setRadius(accuracy);
+    } else {
+      accuracyCircleRef.current = L.circle([lat, lng], {
+        radius: accuracy,
+        color: '#3b82f6',
+        fillColor: '#3b82f6',
+        fillOpacity: 0.15,
+        weight: 2,
+        dashArray: '5, 5'
+      }).addTo(map);
+    }
+    
+    // Pan map to follow user
+    map.panTo([lat, lng]);
+  };
+  
+  // Update trail line showing movement history
+  const updateTrailLine = () => {
+    const L = LRef.current;
+    const map = leafletMapRef.current;
+    if (!L || !map || trailPositions.current.length < 2) return;
+    
+    // Remove old trail
+    if (trailLayerRef.current) {
+      trailLayerRef.current.remove();
+    }
+    
+    // Draw new trail (keep last 50 positions)
+    const recentPositions = trailPositions.current.slice(-50);
+    trailLayerRef.current = L.polyline(recentPositions, {
+      color: '#ef4444',
+      weight: 3,
+      opacity: 0.7,
+      dashArray: '5, 10'
+    }).addTo(map);
+  };
+  
+  // Update live geofence status
+  const updateLiveGeofenceStatus = (lat: number, lng: number, accuracy: number, freshGeofences: any[]) => {
+    const results: TestResult[] = [];
+    
+    for (const geofence of freshGeofences) {
+      const maxTolerance = geofence.tolerance_meters || 20;
+      let isInside = false;
+      let distanceToEdge = Infinity;
+      
+      const hasValidPolygon = geofence.coordinates && 
+        Array.isArray(geofence.coordinates) && 
+        (geofence.coordinates as unknown[]).length >= 3;
+      
+      const mode: 'polygon' | 'radius' = hasValidPolygon ? 'polygon' : 'radius';
+      
+      if (hasValidPolygon) {
+        const polygonCoords = sanitizeCoordinates(geofence.coordinates as unknown[]);
+        if (polygonCoords.length >= 3) {
+          isInside = isPointInPolygon(lat, lng, accuracy, polygonCoords, maxTolerance);
+          distanceToEdge = getDistanceToPolygonEdge(lat, lng, polygonCoords);
+        }
+      }
+      
+      if (!isInside && geofence.center_lat && geofence.center_lng && geofence.radius) {
+        const R = 6371000;
+        const dLat = (lat - geofence.center_lat) * Math.PI / 180;
+        const dLng = (lng - geofence.center_lng) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                 Math.cos(geofence.center_lat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) *
+                 Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+        
+        if (distanceToEdge === Infinity) {
+          distanceToEdge = Math.max(0, distance - geofence.radius);
+        }
+        
+        const toleranceForRadius = maxTolerance > 20 
+          ? maxTolerance 
+          : Math.min(Math.max(accuracy * 0.5, 10), maxTolerance);
+        isInside = distance <= (geofence.radius + toleranceForRadius);
+      }
+      
+      const actualTolerance = maxTolerance > 20 
+        ? maxTolerance 
+        : Math.min(Math.max(accuracy * 0.5, 10), maxTolerance);
+      
+      results.push({
+        geofenceName: geofence.name,
+        geofenceId: geofence.id,
+        isInside,
+        distanceToEdge,
+        tolerance: actualTolerance,
+        mode
+      });
+    }
+    
+    setTestResults({
+      userLat: lat,
+      userLng: lng,
+      accuracy,
+      results
+    });
+  };
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Main Geofence List Card */}
@@ -1157,22 +1472,43 @@ const PolygonGeofenceManager: React.FC = () => {
             <Map className="h-5 w-5" />
             Semua Area Geofence
           </CardTitle>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={testCurrentLocation} 
-              disabled={!leafletLoaded || isTestingLocation || geofences.length === 0}
-            >
-              {isTestingLocation ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <TestTube className="h-4 w-4 mr-2" />
-              )}
-              Tes Lokasi Saya
-            </Button>
-            <Button onClick={openNewEditor} disabled={!leafletLoaded || isEditorOpen}>
+          <div className="flex gap-2 flex-wrap">
+            {!isLiveTracking ? (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={testCurrentLocation} 
+                  disabled={!leafletLoaded || isTestingLocation || geofences.length === 0}
+                >
+                  {isTestingLocation ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <TestTube className="h-4 w-4 mr-2" />
+                  )}
+                  Tes Lokasi
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={startLiveTracking} 
+                  disabled={!leafletLoaded || geofences.length === 0}
+                  className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Live Tracking
+                </Button>
+              </>
+            ) : (
+              <Button 
+                variant="destructive"
+                onClick={stopLiveTracking}
+              >
+                <StopCircle className="h-4 w-4 mr-2" />
+                Stop Tracking
+              </Button>
+            )}
+            <Button onClick={openNewEditor} disabled={!leafletLoaded || isEditorOpen || isLiveTracking}>
               <Plus className="h-4 w-4 mr-2" />
-              Tambah Area Baru
+              Tambah Area
             </Button>
           </div>
         </CardHeader>
@@ -1268,34 +1604,140 @@ const PolygonGeofenceManager: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Test Results Panel */}
-      {testResults && (
+      {/* Live Tracking Map Panel */}
+      {isLiveTracking && (
         <Card className="border-green-500 dark:border-green-700">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <TestTube className="h-5 w-5" />
-              Hasil Tes Lokasi
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                <Navigation className="h-5 w-5" />
+                Live GPS Tracking
+              </div>
             </CardTitle>
-            <Button variant="ghost" size="sm" onClick={clearTestResults}>
-              <X className="h-4 w-4" />
+            <Button variant="destructive" size="sm" onClick={stopLiveTracking}>
+              <StopCircle className="h-4 w-4 mr-1" />
+              Stop
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="p-3 bg-muted rounded-lg">
-              <p className="text-sm font-medium mb-1">📍 Lokasi Saat Ini:</p>
-              <p className="text-sm text-muted-foreground">
-                Lat: {testResults.userLat.toFixed(6)} | Lng: {testResults.userLng.toFixed(6)}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Akurasi GPS: {testResults.accuracy.toFixed(1)}m
-              </p>
+            {/* Live Position Info */}
+            {livePosition && (
+              <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="font-medium text-green-700 dark:text-green-400">Posisi Terkini</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Lat:</span>{' '}
+                    <span className="font-mono">{livePosition.lat.toFixed(7)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Lng:</span>{' '}
+                    <span className="font-mono">{livePosition.lng.toFixed(7)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Akurasi:</span>{' '}
+                    <span className={`font-medium ${livePosition.accuracy <= 10 ? 'text-green-600' : livePosition.accuracy <= 30 ? 'text-amber-600' : 'text-red-600'}`}>
+                      {livePosition.accuracy.toFixed(1)}m
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Update:</span>{' '}
+                    <span className="font-mono">{new Date(livePosition.timestamp).toLocaleTimeString('id-ID')}</span>
+                  </div>
+                </div>
+                {trailPositions.current.length > 1 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    📍 {trailPositions.current.length} posisi dilacak
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {/* Live Map */}
+            <div className="relative">
+              <div 
+                ref={mapRef} 
+                className="w-full h-[350px] rounded-lg border overflow-hidden"
+                style={{ zIndex: 0 }}
+              />
+              {!livePosition && (
+                <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded-lg">
+                  <div className="text-center">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-green-600" />
+                    <p className="text-sm text-muted-foreground">Menunggu GPS...</p>
+                  </div>
+                </div>
+              )}
             </div>
+            
+            {/* Legend */}
+            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-red-500" />
+                <span>Posisi Anda</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-blue-500 opacity-50" />
+                <span>Akurasi GPS</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-6 h-0.5 bg-red-500" style={{ borderStyle: 'dashed' }} />
+                <span>Jejak Pergerakan</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded bg-green-500 opacity-30 border border-green-500" />
+                <span>Area Geofence</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Test Results Panel */}
+      {testResults && (
+        <Card className={`${isLiveTracking ? 'border-green-500' : 'border-primary'} dark:border-green-700`}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              {isLiveTracking ? (
+                <>
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <Navigation className="h-5 w-5" />
+                  Status Geofence (Live)
+                </>
+              ) : (
+                <>
+                  <TestTube className="h-5 w-5" />
+                  Hasil Tes Lokasi
+                </>
+              )}
+            </CardTitle>
+            {!isLiveTracking && (
+              <Button variant="ghost" size="sm" onClick={clearTestResults}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!isLiveTracking && (
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm font-medium mb-1">📍 Lokasi Saat Ini:</p>
+                <p className="text-sm text-muted-foreground">
+                  Lat: {testResults.userLat.toFixed(6)} | Lng: {testResults.userLng.toFixed(6)}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Akurasi GPS: {testResults.accuracy.toFixed(1)}m
+                </p>
+              </div>
+            )}
             
             <div className="space-y-2">
               {testResults.results.map((result) => (
                 <div 
                   key={result.geofenceId} 
-                  className={`p-3 rounded-lg border ${
+                  className={`p-3 rounded-lg border transition-colors ${
                     result.isInside 
                       ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800' 
                       : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800'
@@ -1310,7 +1752,7 @@ const PolygonGeofenceManager: React.FC = () => {
                     <div className="flex-1">
                       <p className="font-medium">{result.geofenceName}</p>
                       <p className="text-sm text-muted-foreground">
-                        Status: <span className={result.isInside ? 'text-green-600' : 'text-red-600'}>
+                        Status: <span className={result.isInside ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
                           {result.isInside ? 'INSIDE ✅' : 'OUTSIDE ❌'}
                         </span>
                       </p>
