@@ -9,6 +9,7 @@ import { MapPin, Plus, Trash2, Edit, Undo2, Save, X, Map, Loader2, ExternalLink,
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { calculatePolygonArea, getPolygonCenter, PolygonCoordinate, sanitizeCoordinates, circleToPolygon, isPointInPolygon, getDistanceToPolygonEdge } from '@/utils/polygonValidator';
+import { calculateAdaptiveTolerance, GEOFENCE_CONSTANTS } from '@/utils/geofenceConstants';
 import * as turf from '@turf/turf';
 
 interface GeofenceArea {
@@ -29,6 +30,8 @@ interface TestResult {
   distanceToEdge: number;
   tolerance: number;
   mode: 'polygon' | 'radius';
+  gpsTolerance?: number;    // GPS-based tolerance component
+  adminTolerance?: number;  // Admin-set tolerance component
 }
 
 const PolygonGeofenceManager: React.FC = () => {
@@ -1088,25 +1091,23 @@ const PolygonGeofenceManager: React.FC = () => {
               distanceToEdge = Math.max(0, distance - geofence.radius);
             }
             
-            // FIXED: Apply same tolerance logic as polygon validator
-            const toleranceForRadius = maxTolerance > 20 
-              ? maxTolerance 
-              : Math.min(Math.max(accuracy * 0.5, 10), maxTolerance);
+            // ADAPTIVE TOLERANCE: Same logic as polygon validator
+            const { finalTolerance: toleranceForRadius } = calculateAdaptiveTolerance(accuracy, maxTolerance);
             isInside = distance <= (geofence.radius + toleranceForRadius);
           }
           
-          // Calculate actual tolerance used for display
-          const actualTolerance = maxTolerance > 20 
-            ? maxTolerance 
-            : Math.min(Math.max(accuracy * 0.5, 10), maxTolerance);
+          // Calculate actual adaptive tolerance for display
+          const { finalTolerance: actualTolerance, gpsTolerance } = calculateAdaptiveTolerance(accuracy, maxTolerance);
           
           results.push({
             geofenceName: geofence.name,
             geofenceId: geofence.id,
             isInside,
             distanceToEdge,
-            tolerance: actualTolerance,  // Show actual tolerance used, not maxTolerance
-            mode  // Mode stays as 'polygon' if geofence HAS polygon data
+            tolerance: actualTolerance,  // Show actual adaptive tolerance used
+            mode,
+            gpsTolerance,  // For detailed display
+            adminTolerance: maxTolerance
           });
         }
         
@@ -1506,7 +1507,13 @@ const PolygonGeofenceManager: React.FC = () => {
                         </span>
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Jarak ke tepi: {result.distanceToEdge.toFixed(1)}m | Toleransi: {result.tolerance}m | Mode: {result.mode}
+                        Jarak: {result.distanceToEdge.toFixed(1)}m | Toleransi: {result.gpsTolerance !== undefined && result.adminTolerance !== undefined ? (
+                          <span title="max(GPS, Admin) = Final">
+                            max({result.gpsTolerance.toFixed(0)}m GPS, {result.adminTolerance}m admin) = <strong>{result.tolerance.toFixed(0)}m</strong>
+                          </span>
+                        ) : (
+                          <strong>{result.tolerance.toFixed(0)}m</strong>
+                        )} | Mode: {result.mode}
                       </p>
                       {!result.isInside && result.distanceToEdge < 150 && (
                         <p className="text-sm text-amber-600 flex items-center gap-1 mt-1">
@@ -1712,7 +1719,7 @@ const PolygonGeofenceManager: React.FC = () => {
             {/* Tolerance Slider (shown for both modes) */}
             <div className="space-y-3 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
               <div className="flex items-center justify-between">
-                <Label htmlFor="geofence-tolerance">Toleransi GPS</Label>
+                <Label htmlFor="geofence-tolerance">Toleransi Admin</Label>
                 <span className="text-sm font-medium text-amber-700 dark:text-amber-400">{tolerance} meter</span>
               </div>
               <Slider
@@ -1723,9 +1730,18 @@ const PolygonGeofenceManager: React.FC = () => {
                 step={5}
                 className="w-full"
               />
-              <p className="text-xs text-muted-foreground">
-                Jarak maksimum dari tepi geofence yang masih dianggap INSIDE. Naikkan jika GPS sering meleset.
-              </p>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>
+                  <strong>Toleransi Adaptif:</strong> Sistem akan gunakan yang LEBIH BESAR antara:
+                </p>
+                <p className="pl-2">
+                  • <strong>GPS Tolerance</strong> = 50% akurasi GPS user (min 10m)<br/>
+                  • <strong>Admin Tolerance</strong> = {tolerance}m (setting ini)
+                </p>
+                <p>
+                  Contoh: GPS accuracy 65m → toleransi aktif = max(32.5m, {tolerance}m) = <strong>{Math.max(32.5, tolerance).toFixed(0)}m</strong>
+                </p>
+              </div>
             </div>
             
             {/* Polygon Mode Controls */}
@@ -1818,18 +1834,29 @@ const PolygonGeofenceManager: React.FC = () => {
                   </div>
                   
                   {/* Live Status for current geofence being edited */}
-                  {editorMode === 'polygon' && currentPolygon.length >= 3 && (
-                    <div className={`p-2 rounded text-sm font-medium ${
-                      isPointInPolygon(livePosition.lat, livePosition.lng, livePosition.accuracy, currentPolygon, tolerance)
-                        ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200'
-                        : 'bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200'
-                    }`}>
-                      {isPointInPolygon(livePosition.lat, livePosition.lng, livePosition.accuracy, currentPolygon, tolerance)
-                        ? '✅ INSIDE - Posisi di dalam polygon'
-                        : `❌ OUTSIDE - Jarak ke tepi: ${getDistanceToPolygonEdge(livePosition.lat, livePosition.lng, currentPolygon).toFixed(1)}m`
-                      }
-                    </div>
-                  )}
+                  {editorMode === 'polygon' && currentPolygon.length >= 3 && (() => {
+                    const { finalTolerance, gpsTolerance } = calculateAdaptiveTolerance(livePosition.accuracy, tolerance);
+                    const isInside = isPointInPolygon(livePosition.lat, livePosition.lng, livePosition.accuracy, currentPolygon, tolerance);
+                    const distToEdge = getDistanceToPolygonEdge(livePosition.lat, livePosition.lng, currentPolygon);
+                    
+                    return (
+                      <div className="space-y-1">
+                        <div className={`p-2 rounded text-sm font-medium ${
+                          isInside
+                            ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200'
+                            : 'bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200'
+                        }`}>
+                          {isInside
+                            ? '✅ INSIDE - Posisi di dalam polygon'
+                            : `❌ OUTSIDE - Jarak ke tepi: ${distToEdge.toFixed(1)}m`
+                          }
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Toleransi: max({gpsTolerance.toFixed(0)}m GPS, {tolerance}m admin) = <strong>{finalTolerance.toFixed(0)}m</strong>
+                        </p>
+                      </div>
+                    );
+                  })()}
                   
                   {editorMode === 'radius' && editingGeofence?.center_lat && editingGeofence?.center_lng && (
                     (() => {
@@ -1841,19 +1868,26 @@ const PolygonGeofenceManager: React.FC = () => {
                                Math.sin(dLng/2) * Math.sin(dLng/2);
                       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                       const distance = R * c;
-                      const effectiveTolerance = tolerance > 20 ? tolerance : Math.min(Math.max(livePosition.accuracy * 0.5, 10), tolerance);
-                      const isInsideRadius = distance <= (radius + effectiveTolerance);
+                      
+                      // Use adaptive tolerance
+                      const { finalTolerance, gpsTolerance } = calculateAdaptiveTolerance(livePosition.accuracy, tolerance);
+                      const isInsideRadius = distance <= (radius + finalTolerance);
                       
                       return (
-                        <div className={`p-2 rounded text-sm font-medium ${
-                          isInsideRadius
-                            ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200'
-                            : 'bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200'
-                        }`}>
-                          {isInsideRadius
-                            ? `✅ INSIDE - Jarak ke pusat: ${distance.toFixed(1)}m`
-                            : `❌ OUTSIDE - Jarak ke pusat: ${distance.toFixed(1)}m (radius: ${radius}m)`
-                          }
+                        <div className="space-y-1">
+                          <div className={`p-2 rounded text-sm font-medium ${
+                            isInsideRadius
+                              ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200'
+                              : 'bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200'
+                          }`}>
+                            {isInsideRadius
+                              ? `✅ INSIDE - Jarak ke pusat: ${distance.toFixed(1)}m`
+                              : `❌ OUTSIDE - Jarak ke pusat: ${distance.toFixed(1)}m (radius: ${radius}m)`
+                            }
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Toleransi: max({gpsTolerance.toFixed(0)}m GPS, {tolerance}m admin) = <strong>{finalTolerance.toFixed(0)}m</strong>
+                          </p>
                         </div>
                       );
                     })()

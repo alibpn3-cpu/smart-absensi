@@ -1,5 +1,6 @@
 // Polygon Geofence Validation using Turf.js
 import * as turf from '@turf/turf';
+import { calculateAdaptiveTolerance, GEOFENCE_CONSTANTS } from './geofenceConstants';
 
 export interface PolygonCoordinate {
   lat: number;
@@ -120,18 +121,17 @@ export const isPointInPolygon = (
       return true;
     }
     
-    // Step 2: If outside, check distance to edge with GPS tolerance
+    // Step 2: If outside, check distance to edge with ADAPTIVE tolerance
     // This handles cases where GPS inaccuracy puts user just outside boundary
     const distanceToEdge = getDistanceToPolygonEdge(userLat, userLng, polygonCoords);
     
-    // FIXED: Dynamic tolerance logic
-    // If admin set tolerance > 20m, use it directly (admin intentionally wants lenient area)
-    // Otherwise use GPS-based calculation capped at maxTolerance
-    const toleranceMeters = maxTolerance > 20 
-      ? maxTolerance  // Admin deliberately set high tolerance, use it
-      : Math.min(Math.max(accuracy * 0.5, 10), maxTolerance);  // GPS-based, min 10m, max default
+    // ADAPTIVE TOLERANCE LOGIC:
+    // 1. Calculate GPS-based tolerance = max(accuracy * 0.5, 10m minimum)
+    // 2. Use the LARGER of GPS-based tolerance or admin-set tolerance
+    // 3. Cap at MAX_ABSOLUTE_TOLERANCE (150m) to prevent abuse
+    const { finalTolerance: toleranceMeters, gpsTolerance } = calculateAdaptiveTolerance(accuracy, maxTolerance);
     
-    console.log(`📏 Distance to edge: ${distanceToEdge.toFixed(1)}m, tolerance: ${toleranceMeters.toFixed(1)}m (max: ${maxTolerance}m)`);
+    console.log(`📏 Distance to edge: ${distanceToEdge.toFixed(1)}m | Toleransi: max(${gpsTolerance.toFixed(0)}m GPS, ${maxTolerance}m admin) = ${toleranceMeters.toFixed(0)}m`);
     
     if (distanceToEdge <= toleranceMeters) {
       console.log(`✅ Within tolerance - considering INSIDE`);

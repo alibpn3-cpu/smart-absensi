@@ -34,6 +34,7 @@ import { format } from 'date-fns';
 import { getEnhancedLocation, getAccuracyLevel, clearLocationCache } from '@/utils/enhancedGeolocation';
 import { isPointInPolygon, PolygonCoordinate } from '@/utils/polygonValidator';
 import { validateGPSPosition, clearPositionHistory } from '@/utils/gpsValidator';
+import { calculateAdaptiveTolerance, GEOFENCE_CONSTANTS } from '@/utils/geofenceConstants';
 
 interface StaffUser {
   uid: string;
@@ -842,13 +843,14 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           parseFloat(geofence.center_lng.toString())
         );
         
-        // FIXED: Same tolerance logic as polygon validator
-        // If admin set tolerance > 20m, use it directly; otherwise GPS-based calculation
-        const radiusTolerance = maxTolerance > 20 
-          ? maxTolerance 
-          : (accuracy ? Math.min(Math.max(accuracy * 0.5, 10), maxTolerance) : 10);
+        // ADAPTIVE TOLERANCE: Same logic as polygon validator
+        // Uses the LARGER of GPS-based tolerance or admin-set tolerance
+        const { finalTolerance: radiusTolerance, gpsTolerance } = calculateAdaptiveTolerance(
+          accuracy || 0, 
+          maxTolerance
+        );
         const effectiveRadius = geofence.radius + radiusTolerance;
-        console.log(`📍 Radius fallback for ${geofence.name}: ${distance.toFixed(2)}m (radius: ${geofence.radius}m + tolerance: ${radiusTolerance.toFixed(0)}m = ${effectiveRadius.toFixed(0)}m)`);
+        console.log(`📍 Radius fallback for ${geofence.name}: ${distance.toFixed(2)}m (radius: ${geofence.radius}m + toleransi: max(${gpsTolerance.toFixed(0)}m GPS, ${maxTolerance}m admin) = ${radiusTolerance.toFixed(0)}m → effective: ${effectiveRadius.toFixed(0)}m)`);
         
         if (distance <= effectiveRadius) {
           isInsideThisGeofence = true;
