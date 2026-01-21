@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Flag, Star, LogIn, Code, FlaskConical } from 'lucide-react';
+import { Flag, Star, LogIn, Code, FlaskConical, Users } from 'lucide-react';
 
 interface FeatureFlag {
   key: string;
@@ -37,6 +37,13 @@ const FeatureFlagSettings = () => {
       description: 'Aktifkan mode beta untuk testing fitur baru di device tertentu',
       icon: <Code className="h-4 w-4" />,
       value: false
+    },
+    {
+      key: 'attendance_status_list_enabled',
+      label: 'Status In/Out',
+      description: 'Tampilkan list status check-in/out per area kerja di halaman utama',
+      icon: <Users className="h-4 w-4" />,
+      value: true
     }
   ]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,7 +62,7 @@ const FeatureFlagSettings = () => {
       const { data, error } = await supabase
         .from('app_settings')
         .select('setting_key, setting_value')
-        .in('setting_key', ['score_feature_enabled', 'login_required', 'beta_mode_enabled']);
+        .in('setting_key', ['score_feature_enabled', 'login_required', 'beta_mode_enabled', 'attendance_status_list_enabled']);
 
       if (error) throw error;
 

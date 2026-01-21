@@ -6,6 +6,7 @@ interface FeatureFlags {
   loginRequired: boolean;
   betaMode: boolean;
   isDeveloper: boolean;
+  attendanceStatusListEnabled: boolean;
   isLoading: boolean;
 }
 
@@ -15,6 +16,7 @@ export const useFeatureFlags = (): FeatureFlags => {
     loginRequired: false,
     betaMode: false,
     isDeveloper: false,
+    attendanceStatusListEnabled: true,
     isLoading: true
   });
 
@@ -24,7 +26,7 @@ export const useFeatureFlags = (): FeatureFlags => {
         const { data, error } = await supabase
           .from('app_settings')
           .select('setting_key, setting_value')
-          .in('setting_key', ['score_feature_enabled', 'login_required', 'beta_mode_enabled']);
+          .in('setting_key', ['score_feature_enabled', 'login_required', 'beta_mode_enabled', 'attendance_status_list_enabled']);
 
         if (error) {
           console.error('Error fetching feature flags:', error);
@@ -44,6 +46,7 @@ export const useFeatureFlags = (): FeatureFlags => {
           loginRequired: flagsMap['login_required'] || false,
           betaMode,
           isDeveloper,
+          attendanceStatusListEnabled: flagsMap['attendance_status_list_enabled'] !== false,
           isLoading: false
         });
       } catch (error) {

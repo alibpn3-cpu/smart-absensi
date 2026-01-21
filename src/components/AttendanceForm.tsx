@@ -2136,7 +2136,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         )}
         
         {/* Kiosk Mode: Attendance Status List shows who has/hasn't checked in */}
-        {sharedDeviceMode && (
+        {sharedDeviceMode && featureFlags.attendanceStatusListEnabled && (
           <AttendanceStatusList selectedWorkArea={selectedWorkArea} />
         )}
         
@@ -2567,7 +2567,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         )}
 
         {/* ========== USER MODE: Attendance Status List ========== */}
-        {isUserLoggedIn && !sharedDeviceMode && (
+        {isUserLoggedIn && !sharedDeviceMode && featureFlags.attendanceStatusListEnabled && (
           <AttendanceStatusList selectedWorkArea={selectedStaff?.work_area || 'all'} />
         )}
 
@@ -2576,6 +2576,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           <ManagerDivisionStatus 
             division={selectedStaff.division} 
             managerName={selectedStaff.name}
+            managerUid={selectedStaff.uid}
           />
         )}
 
