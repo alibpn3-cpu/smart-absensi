@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface ManagerDivisionStatusProps {
   division: string;
   managerName: string;
+  managerUid?: string;
 }
 
 interface StaffAttendance {
@@ -21,7 +22,7 @@ interface StaffAttendance {
   checkoutLocation: string | null;
 }
 
-const ManagerDivisionStatus: React.FC<ManagerDivisionStatusProps> = ({ division, managerName }) => {
+const ManagerDivisionStatus: React.FC<ManagerDivisionStatusProps> = ({ division, managerName, managerUid }) => {
   const [checkedInStaff, setCheckedInStaff] = useState<StaffAttendance[]>([]);
   const [notCheckedInStaff, setNotCheckedInStaff] = useState<StaffAttendance[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -40,12 +41,17 @@ const ManagerDivisionStatus: React.FC<ManagerDivisionStatusProps> = ({ division,
       // Fetch all active staff in the division
       const { data: staffData, error: staffError } = await supabase
         .from('staff_users')
-        .select('uid, name, position')
+        .select('uid, name, position, employee_type')
         .eq('division', division)
         .eq('is_active', true)
         .order('name');
       
       if (staffError) throw staffError;
+
+      // Filter: exclude primary users and the manager themselves
+      const filteredStaffData = staffData?.filter(staff => 
+        staff.employee_type !== 'primary' && staff.uid !== managerUid
+      ) || [];
       
       // Fetch today's attendance for all staff with location info
       const { data: attendanceData, error: attendanceError } = await supabase
@@ -79,7 +85,7 @@ const ManagerDivisionStatus: React.FC<ManagerDivisionStatusProps> = ({ division,
       const checked: StaffAttendance[] = [];
       const notChecked: StaffAttendance[] = [];
       
-      staffData?.forEach(staff => {
+      filteredStaffData.forEach(staff => {
         const attendance = attendanceMap.get(staff.uid);
         if (attendance?.checkInTime) {
           checked.push({
