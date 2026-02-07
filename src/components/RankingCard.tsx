@@ -12,10 +12,10 @@ import { cn } from '@/lib/utils';
 interface RankingUser {
   staff_uid: string;
   staff_name: string;
-  avg_score: number;
   total_score: number;
   total_days: number;
   photo_url?: string;
+  globalRank?: number; // Position in overall ranking
 }
 
 interface MedalTier {
@@ -23,11 +23,11 @@ interface MedalTier {
   icon: React.ReactNode;
   color: string;
   bgColor: string;
-  minScore: number;
+  rankRange: string; // e.g., "#1-10"
   users: RankingUser[];
 }
 
-const MAX_USERS_PER_TIER = 20;
+const USERS_PER_TIER = 10;
 const USERS_PER_SLIDE = 5;
 
 const RankingCard = () => {
@@ -127,60 +127,50 @@ const RankingCard = () => {
 
         if (overrideError) throw overrideError;
 
-        // If we have overrides, use them
+        // If we have overrides, use them (treat display_score as total)
         if (overrides && overrides.length > 0) {
-          const tierMap: Record<string, RankingUser[]> = {
-            platinum: [],
-            gold: [],
-            silver: [],
-            bronze: []
-          };
+          const allUsers: RankingUser[] = overrides.map((o, idx) => ({
+            staff_uid: o.staff_uid,
+            staff_name: o.staff_name,
+            total_score: Number(o.display_score),
+            total_days: 0,
+            photo_url: o.photo_url || undefined,
+            globalRank: idx + 1
+          }));
 
-          overrides.forEach(o => {
-            if (tierMap[o.tier]) {
-              tierMap[o.tier].push({
-                staff_uid: o.staff_uid,
-                staff_name: o.staff_name,
-                avg_score: Number(o.display_score),
-                total_score: 0, // Override doesn't have total
-                total_days: 0,
-                photo_url: o.photo_url || undefined
-              });
-            }
-          });
-
+          // Split into position-based tiers
           const tiers: MedalTier[] = [
             {
               name: 'Platinum',
               icon: <Trophy className="h-5 w-5" />,
               color: 'text-cyan-600 dark:text-cyan-400',
               bgColor: 'bg-gradient-to-r from-cyan-100 to-slate-100 dark:from-cyan-900/30 dark:to-slate-900/30',
-              minScore: 4.5,
-              users: tierMap.platinum.slice(0, MAX_USERS_PER_TIER)
+              rankRange: '#1-10',
+              users: allUsers.slice(0, USERS_PER_TIER)
             },
             {
               name: 'Gold',
               icon: <Medal className="h-5 w-5" />,
               color: 'text-yellow-600 dark:text-yellow-400',
               bgColor: 'bg-gradient-to-r from-yellow-100 to-amber-100 dark:from-yellow-900/30 dark:to-amber-900/30',
-              minScore: 4.0,
-              users: tierMap.gold.slice(0, MAX_USERS_PER_TIER)
+              rankRange: '#11-20',
+              users: allUsers.slice(USERS_PER_TIER, USERS_PER_TIER * 2)
             },
             {
               name: 'Silver',
               icon: <Award className="h-5 w-5" />,
               color: 'text-slate-500 dark:text-slate-400',
               bgColor: 'bg-gradient-to-r from-slate-100 to-gray-100 dark:from-slate-800/30 dark:to-gray-800/30',
-              minScore: 3.5,
-              users: tierMap.silver.slice(0, MAX_USERS_PER_TIER)
+              rankRange: '#21-30',
+              users: allUsers.slice(USERS_PER_TIER * 2, USERS_PER_TIER * 3)
             },
             {
               name: 'Bronze',
               icon: <Star className="h-5 w-5" />,
               color: 'text-orange-600 dark:text-orange-400',
               bgColor: 'bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30',
-              minScore: 3.0,
-              users: tierMap.bronze.slice(0, MAX_USERS_PER_TIER)
+              rankRange: '#31-40',
+              users: allUsers.slice(USERS_PER_TIER * 3, USERS_PER_TIER * 4)
             }
           ];
 
@@ -202,7 +192,7 @@ const RankingCard = () => {
 
         if (error) throw error;
 
-        // Calculate average and total score per user
+        // Calculate total score per user
         const userScores = new Map<string, { name: string; scores: number[] }>();
         
         scores?.forEach(score => {
@@ -212,30 +202,28 @@ const RankingCard = () => {
           userScores.get(score.staff_uid)!.scores.push(Number(score.final_score));
         });
 
-        // Calculate averages, totals, and sort
-        const avgScores: RankingUser[] = [];
+        // Calculate totals and sort by total_score DESC
+        const allUsers: RankingUser[] = [];
         for (const [uid, data] of userScores) {
           const total = data.scores.reduce((a, b) => a + b, 0);
-          const avg = total / data.scores.length;
-          avgScores.push({
+          allUsers.push({
             staff_uid: uid,
             staff_name: data.name,
-            avg_score: Math.round(avg * 100) / 100, // 2 decimal places
             total_score: Math.round(total * 10) / 10, // 1 decimal place
             total_days: data.scores.length
           });
         }
 
-        // Sort by avg_score DESC, then total_score DESC as tie-breaker
-        avgScores.sort((a, b) => {
-          if (b.avg_score !== a.avg_score) {
-            return b.avg_score - a.avg_score;
-          }
-          return b.total_score - a.total_score;
+        // Sort by total_score DESC
+        allUsers.sort((a, b) => b.total_score - a.total_score);
+
+        // Assign global ranks
+        allUsers.forEach((user, idx) => {
+          user.globalRank = idx + 1;
         });
 
-        // Fetch photos for top users (up to 80 for all tiers)
-        const topUids = avgScores.slice(0, 80).map(u => u.staff_uid);
+        // Fetch photos for top 40 users
+        const topUids = allUsers.slice(0, 40).map(u => u.staff_uid);
         if (topUids.length > 0) {
           const { data: users } = await supabase
             .from('staff_users')
@@ -243,44 +231,44 @@ const RankingCard = () => {
             .in('uid', topUids);
 
           const photoMap = new Map(users?.map(u => [u.uid, u.photo_url]) || []);
-          avgScores.forEach(u => {
+          allUsers.forEach(u => {
             u.photo_url = photoMap.get(u.staff_uid) || undefined;
           });
         }
 
-        // Group by medal tiers
+        // Group by position-based tiers (10 users per tier)
         const tiers: MedalTier[] = [
           {
             name: 'Platinum',
             icon: <Trophy className="h-5 w-5" />,
             color: 'text-cyan-600 dark:text-cyan-400',
             bgColor: 'bg-gradient-to-r from-cyan-100 to-slate-100 dark:from-cyan-900/30 dark:to-slate-900/30',
-            minScore: 4.5,
-            users: avgScores.filter(u => u.avg_score >= 4.5).slice(0, MAX_USERS_PER_TIER)
+            rankRange: '#1-10',
+            users: allUsers.slice(0, USERS_PER_TIER)
           },
           {
             name: 'Gold',
             icon: <Medal className="h-5 w-5" />,
             color: 'text-yellow-600 dark:text-yellow-400',
             bgColor: 'bg-gradient-to-r from-yellow-100 to-amber-100 dark:from-yellow-900/30 dark:to-amber-900/30',
-            minScore: 4.0,
-            users: avgScores.filter(u => u.avg_score >= 4.0 && u.avg_score < 4.5).slice(0, MAX_USERS_PER_TIER)
+            rankRange: '#11-20',
+            users: allUsers.slice(USERS_PER_TIER, USERS_PER_TIER * 2)
           },
           {
             name: 'Silver',
             icon: <Award className="h-5 w-5" />,
             color: 'text-slate-500 dark:text-slate-400',
             bgColor: 'bg-gradient-to-r from-slate-100 to-gray-100 dark:from-slate-800/30 dark:to-gray-800/30',
-            minScore: 3.5,
-            users: avgScores.filter(u => u.avg_score >= 3.5 && u.avg_score < 4.0).slice(0, MAX_USERS_PER_TIER)
+            rankRange: '#21-30',
+            users: allUsers.slice(USERS_PER_TIER * 2, USERS_PER_TIER * 3)
           },
           {
             name: 'Bronze',
             icon: <Star className="h-5 w-5" />,
             color: 'text-orange-600 dark:text-orange-400',
             bgColor: 'bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30',
-            minScore: 3.0,
-            users: avgScores.filter(u => u.avg_score >= 3.0 && u.avg_score < 3.5).slice(0, MAX_USERS_PER_TIER)
+            rankRange: '#31-40',
+            users: allUsers.slice(USERS_PER_TIER * 3, USERS_PER_TIER * 4)
           }
         ];
 
@@ -310,14 +298,9 @@ const RankingCard = () => {
     return chunks;
   };
 
-  // Calculate global rank offset for each slide
-  const getRankOffset = (slideIndex: number): number => {
-    return slideIndex * USERS_PER_SLIDE;
-  };
-
-  const renderUserItem = (user: RankingUser, globalRank: number, tierColor: string) => (
+  const renderUserItem = (user: RankingUser, tierColor: string) => (
     <div key={user.staff_uid} className="flex items-center gap-2 bg-background/80 rounded-full px-2 py-1.5">
-      <span className={`text-xs font-bold w-5 ${tierColor}`}>#{globalRank}</span>
+      <span className={`text-xs font-bold w-5 ${tierColor}`}>#{user.globalRank}</span>
       <Avatar className="h-7 w-7 border border-border">
         <AvatarImage src={user.photo_url} alt={user.staff_name} />
         <AvatarFallback className="text-[10px] bg-primary/10">
@@ -329,16 +312,9 @@ const RankingCard = () => {
           {user.staff_name}
         </span>
       </div>
-      <div className="text-right">
-        <span className="text-xs font-semibold text-muted-foreground">
-          ⭐{user.avg_score.toFixed(2)}
-        </span>
-        {user.total_score > 0 && (
-          <span className="text-[10px] text-muted-foreground/70 ml-1">
-            ({Math.round(user.total_score)}⭐)
-          </span>
-        )}
-      </div>
+      <span className="text-xs font-semibold text-muted-foreground">
+        {Math.round(user.total_score)}⭐
+      </span>
     </div>
   );
 
@@ -353,7 +329,7 @@ const RankingCard = () => {
           <div className={`flex items-center gap-2 ${tier.color}`}>
             {tier.icon}
             <span className="text-sm font-bold">{tier.name}</span>
-            <span className="text-xs opacity-70">≥{tier.minScore}</span>
+            <span className="text-xs opacity-70">{tier.rankRange}</span>
           </div>
           <span className="text-xs text-muted-foreground">
             {tier.users.length} karyawan
@@ -378,8 +354,8 @@ const RankingCard = () => {
                 {userChunks.map((chunk, slideIndex) => (
                   <CarouselItem key={slideIndex}>
                     <div className="space-y-1.5">
-                      {chunk.map((user, idx) => 
-                        renderUserItem(user, getRankOffset(slideIndex) + idx + 1, tier.color)
+                      {chunk.map((user) => 
+                        renderUserItem(user, tier.color)
                       )}
                     </div>
                   </CarouselItem>
@@ -403,8 +379,8 @@ const RankingCard = () => {
           </div>
         ) : (
           <div className="space-y-1.5">
-            {tier.users.map((user, idx) => 
-              renderUserItem(user, idx + 1, tier.color)
+            {tier.users.map((user) => 
+              renderUserItem(user, tier.color)
             )}
           </div>
         )}
