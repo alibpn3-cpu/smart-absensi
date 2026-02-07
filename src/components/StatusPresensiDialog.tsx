@@ -75,7 +75,13 @@ const StatusPresensiDialog: React.FC<StatusPresensiDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !loading && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent 
+        className="max-w-md"
+        onOpenAutoFocus={(e) => {
+          // Prevent auto-focus on textarea to avoid keyboard popup on mobile
+          e.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">
             Status Presensi - {getActionLabel()}

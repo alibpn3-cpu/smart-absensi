@@ -13,6 +13,8 @@ interface RankingUser {
   staff_uid: string;
   staff_name: string;
   avg_score: number;
+  total_score: number;
+  total_days: number;
   photo_url?: string;
 }
 
@@ -25,22 +27,20 @@ interface MedalTier {
   users: RankingUser[];
 }
 
-const MAX_USERS_PER_TIER = 5;
+const MAX_USERS_PER_TIER = 20;
+const USERS_PER_SLIDE = 5;
 
 const RankingCard = () => {
+  const [rankings, setRankings] = useState<MedalTier[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [tierApis, setTierApis] = useState<Record<string, CarouselApi>>({});
+  const [tierCurrentSlides, setTierCurrentSlides] = useState<Record<string, number>>({});
+  const [mainApi, setMainApi] = useState<CarouselApi>();
+  const [mainCurrent, setMainCurrent] = useState(0);
+  
   // Check if we should show ranking card (only on 1st-15th of month)
   const today = new Date();
   const dayOfMonth = today.getDate();
-  
-  // Hide card completely on 16th-end of month
-  if (dayOfMonth > 15) {
-    return null;
-  }
-  
-  const [rankings, setRankings] = useState<MedalTier[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [api, setApi] = useState<CarouselApi>();
-  const [current, setCurrent] = useState(0);
   
   // Show previous month's ranking (since we're on 1st-15th)
   const getDefaultMonth = () => {
@@ -69,13 +69,30 @@ const RankingCard = () => {
   const years = Array.from({ length: 3 }, (_, i) => currentYear - 2 + i);
 
   useEffect(() => {
-    if (!api) return;
+    if (!mainApi) return;
 
-    setCurrent(api.selectedScrollSnap());
-    api.on('select', () => {
-      setCurrent(api.selectedScrollSnap());
+    setMainCurrent(mainApi.selectedScrollSnap());
+    mainApi.on('select', () => {
+      setMainCurrent(mainApi.selectedScrollSnap());
     });
-  }, [api]);
+  }, [mainApi]);
+
+  // Setup tier carousel listeners
+  useEffect(() => {
+    Object.entries(tierApis).forEach(([tierName, api]) => {
+      if (!api) return;
+      
+      const updateSlide = () => {
+        setTierCurrentSlides(prev => ({
+          ...prev,
+          [tierName]: api.selectedScrollSnap()
+        }));
+      };
+      
+      updateSlide();
+      api.on('select', updateSlide);
+    });
+  }, [tierApis]);
 
   const navigateMonth = (direction: 'prev' | 'next') => {
     if (direction === 'prev') {
@@ -125,6 +142,8 @@ const RankingCard = () => {
                 staff_uid: o.staff_uid,
                 staff_name: o.staff_name,
                 avg_score: Number(o.display_score),
+                total_score: 0, // Override doesn't have total
+                total_days: 0,
                 photo_url: o.photo_url || undefined
               });
             }
@@ -183,7 +202,7 @@ const RankingCard = () => {
 
         if (error) throw error;
 
-        // Calculate average score per user
+        // Calculate average and total score per user
         const userScores = new Map<string, { name: string; scores: number[] }>();
         
         scores?.forEach(score => {
@@ -193,21 +212,30 @@ const RankingCard = () => {
           userScores.get(score.staff_uid)!.scores.push(Number(score.final_score));
         });
 
-        // Calculate averages and sort
+        // Calculate averages, totals, and sort
         const avgScores: RankingUser[] = [];
         for (const [uid, data] of userScores) {
-          const avg = data.scores.reduce((a, b) => a + b, 0) / data.scores.length;
+          const total = data.scores.reduce((a, b) => a + b, 0);
+          const avg = total / data.scores.length;
           avgScores.push({
             staff_uid: uid,
             staff_name: data.name,
-            avg_score: Math.round(avg * 10) / 10
+            avg_score: Math.round(avg * 100) / 100, // 2 decimal places
+            total_score: Math.round(total * 10) / 10, // 1 decimal place
+            total_days: data.scores.length
           });
         }
 
-        avgScores.sort((a, b) => b.avg_score - a.avg_score);
+        // Sort by avg_score DESC, then total_score DESC as tie-breaker
+        avgScores.sort((a, b) => {
+          if (b.avg_score !== a.avg_score) {
+            return b.avg_score - a.avg_score;
+          }
+          return b.total_score - a.total_score;
+        });
 
-        // Fetch photos for top users
-        const topUids = avgScores.slice(0, 20).map(u => u.staff_uid);
+        // Fetch photos for top users (up to 80 for all tiers)
+        const topUids = avgScores.slice(0, 80).map(u => u.staff_uid);
         if (topUids.length > 0) {
           const { data: users } = await supabase
             .from('staff_users')
@@ -268,36 +296,121 @@ const RankingCard = () => {
     fetchRankings();
   }, [selectedMonth, selectedYear]);
 
-  const renderTierContent = (tier: MedalTier) => (
-    <div className={`rounded-lg p-3 ${tier.bgColor} min-h-[140px]`}>
-      <div className={`flex items-center gap-2 mb-3 ${tier.color}`}>
-        {tier.icon}
-        <span className="text-sm font-bold">{tier.name}</span>
-        <span className="text-xs opacity-70">≥{tier.minScore}</span>
+  // Hide card completely on 16th-end of month (after all hooks are called)
+  if (dayOfMonth > 15) {
+    return null;
+  }
+
+  // Helper to chunk users into slides
+  const chunkUsers = (users: RankingUser[]): RankingUser[][] => {
+    const chunks: RankingUser[][] = [];
+    for (let i = 0; i < users.length; i += USERS_PER_SLIDE) {
+      chunks.push(users.slice(i, i + USERS_PER_SLIDE));
+    }
+    return chunks;
+  };
+
+  // Calculate global rank offset for each slide
+  const getRankOffset = (slideIndex: number): number => {
+    return slideIndex * USERS_PER_SLIDE;
+  };
+
+  const renderUserItem = (user: RankingUser, globalRank: number, tierColor: string) => (
+    <div key={user.staff_uid} className="flex items-center gap-2 bg-background/80 rounded-full px-2 py-1.5">
+      <span className={`text-xs font-bold w-5 ${tierColor}`}>#{globalRank}</span>
+      <Avatar className="h-7 w-7 border border-border">
+        <AvatarImage src={user.photo_url} alt={user.staff_name} />
+        <AvatarFallback className="text-[10px] bg-primary/10">
+          {user.staff_name.charAt(0)}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <span className="text-xs font-medium truncate block">
+          {user.staff_name}
+        </span>
       </div>
-      <div className="space-y-2">
-        {tier.users.map((user, idx) => (
-          <div key={user.staff_uid} className="flex items-center gap-2 bg-background/80 rounded-full px-2 py-1.5">
-            <span className={`text-xs font-bold w-4 ${tier.color}`}>#{idx + 1}</span>
-            <Avatar className="h-7 w-7 border border-border">
-              <AvatarImage src={user.photo_url} alt={user.staff_name} />
-              <AvatarFallback className="text-[10px] bg-primary/10">
-                {user.staff_name.charAt(0)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <span className="text-xs font-medium truncate block">
-                {user.staff_name}
-              </span>
-            </div>
-            <span className="text-xs font-semibold text-muted-foreground">
-              ⭐{user.avg_score.toFixed(1)}
-            </span>
-          </div>
-        ))}
+      <div className="text-right">
+        <span className="text-xs font-semibold text-muted-foreground">
+          ⭐{user.avg_score.toFixed(2)}
+        </span>
+        {user.total_score > 0 && (
+          <span className="text-[10px] text-muted-foreground/70 ml-1">
+            ({Math.round(user.total_score)}⭐)
+          </span>
+        )}
       </div>
     </div>
   );
+
+  const renderTierContent = (tier: MedalTier) => {
+    const userChunks = chunkUsers(tier.users);
+    const hasMultipleSlides = userChunks.length > 1;
+    const currentSlide = tierCurrentSlides[tier.name] || 0;
+
+    return (
+      <div className={`rounded-lg p-3 ${tier.bgColor} min-h-[180px]`}>
+        <div className={`flex items-center justify-between mb-3`}>
+          <div className={`flex items-center gap-2 ${tier.color}`}>
+            {tier.icon}
+            <span className="text-sm font-bold">{tier.name}</span>
+            <span className="text-xs opacity-70">≥{tier.minScore}</span>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {tier.users.length} karyawan
+          </span>
+        </div>
+        
+        {hasMultipleSlides ? (
+          <div>
+            <Carousel
+              setApi={(api) => {
+                if (api) {
+                  setTierApis(prev => ({ ...prev, [tier.name]: api }));
+                }
+              }}
+              opts={{ loop: true }}
+              plugins={[
+                Autoplay({ delay: 5000, stopOnInteraction: false })
+              ]}
+              className="w-full"
+            >
+              <CarouselContent>
+                {userChunks.map((chunk, slideIndex) => (
+                  <CarouselItem key={slideIndex}>
+                    <div className="space-y-1.5">
+                      {chunk.map((user, idx) => 
+                        renderUserItem(user, getRankOffset(slideIndex) + idx + 1, tier.color)
+                      )}
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+            </Carousel>
+            {/* Inner carousel dot indicators */}
+            <div className="flex justify-center gap-1 mt-2">
+              {userChunks.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => tierApis[tier.name]?.scrollTo(index)}
+                  className={cn(
+                    "w-1.5 h-1.5 rounded-full transition-colors duration-300",
+                    index === currentSlide ? "bg-foreground/60" : "bg-foreground/20"
+                  )}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {tier.users.map((user, idx) => 
+              renderUserItem(user, idx + 1, tier.color)
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -378,16 +491,16 @@ const RankingCard = () => {
             </p>
           </div>
         ) : rankings.length === 1 ? (
-          // Only one tier - no carousel needed
+          // Only one tier - no main carousel needed
           renderTierContent(rankings[0])
         ) : (
-          // Multiple tiers - use carousel
+          // Multiple tiers - use main carousel
           <div>
             <Carousel
-              setApi={setApi}
+              setApi={setMainApi}
               opts={{ loop: true }}
               plugins={[
-                Autoplay({ delay: 5000, stopOnInteraction: false })
+                Autoplay({ delay: 8000, stopOnInteraction: false })
               ]}
               className="w-full"
             >
@@ -399,15 +512,15 @@ const RankingCard = () => {
                 ))}
               </CarouselContent>
             </Carousel>
-            {/* Dot Indicators */}
+            {/* Main carousel dot indicators */}
             <div className="flex justify-center gap-1.5 mt-3">
               {rankings.map((tier, index) => (
                 <button
                   key={tier.name}
-                  onClick={() => api?.scrollTo(index)}
+                  onClick={() => mainApi?.scrollTo(index)}
                   className={cn(
                     "w-2 h-2 rounded-full transition-colors duration-300",
-                    index === current ? "bg-primary" : "bg-muted-foreground/30"
+                    index === mainCurrent ? "bg-primary" : "bg-muted-foreground/30"
                   )}
                   aria-label={`Go to ${tier.name} tier`}
                 />
