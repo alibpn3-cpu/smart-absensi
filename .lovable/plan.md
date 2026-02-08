@@ -1,130 +1,149 @@
 
-# Rencana Implementasi
 
-## Ringkasan Perubahan
-1. **RankingCard Enhancement** - Tampilkan total score + ranking 1-20 per tier dengan auto-slide
-2. **StatusPresensiDialog Fix** - Prevent auto-focus ke textarea di mobile
+# Rencana Perbaikan RankingCard
+
+## Perubahan Inti
+
+### 1. Batas Minimal Total Bintang per Band
+
+Berdasarkan analisis data Januari 2026 (195 user, max 104.3⭐):
+
+| Band | Batas Minimal | Penjelasan |
+|------|---------------|------------|
+| Platinum | >= 60⭐ | Top tier (11 user lolos di Jan) |
+| Gold | >= 50⭐ | (17 user lolos di Jan) |
+| Silver | >= 40⭐ | (25 user lolos di Jan) |
+| Bronze | >= 30⭐ | (30 user lolos di Jan) |
+
+User dengan total < 30⭐ tidak masuk band manapun.
+
+### 2. Penomoran Ranking per Band (1-10)
+
+Setiap band memiliki urutan independen:
+- Platinum: #1, #2, #3... (max #10)
+- Gold: #1, #2, #3... (max #10) - bukan #11, #12...
+- Silver: #1, #2, #3... (max #10)
+- Bronze: #1, #2, #3... (max #10)
+
+### 3. Satu Slide per Band
+
+- Tampilkan maksimal 10 user per band dalam 1 slide
+- Auto-slide hanya antar band (bukan antar halaman dalam 1 band)
+- Hapus nested carousel, gunakan carousel utama saja
 
 ---
 
-## 1. RankingCard Enhancement
+## Perubahan Teknis
 
-### Analisis Perhitungan Saat Ini
+### File: `src/components/RankingCard.tsx`
 
-Data Januari 2026 menunjukkan:
-- 11 user memiliki avg score 5.00 (perfect)
-- FATONI ICHWAN dengan 21 hari kerja dan total 104.3 score ada di ranking 12 karena avg 4.97
-
-### Rekomendasi: Gunakan Kombinasi Average + Total
-
-**Logika baru:**
-- Primary sort: Average score (DESC)
-- Secondary sort: Total score (DESC) - untuk tie-breaker
-- Tampilkan keduanya: `⭐4.97 (104.3)`
-
-Ini lebih fair karena jika avg sama, yang lebih rajin (total lebih tinggi) di atas.
-
-### Perubahan UI
-
-**A. Tampilkan Total Score:**
+**A. Konstanta Batas Band (baris baru):**
 ```typescript
-// Di RankingUser interface, tambah:
+const TIER_THRESHOLDS = {
+  platinum: 60,  // >= 60 bintang
+  gold: 50,      // >= 50 bintang
+  silver: 40,    // >= 40 bintang
+  bronze: 30,    // >= 30 bintang
+};
+
+const MAX_USERS_PER_TIER = 10;
+```
+
+**B. Logika Grouping Baru (mengganti slicing posisi):**
+```typescript
+// Sebelum (posisi-based):
+users: allUsers.slice(0, 10)  // Platinum #1-10
+users: allUsers.slice(10, 20) // Gold #11-20
+
+// Sesudah (threshold-based):
+const platinumUsers = allUsers
+  .filter(u => u.total_score >= TIER_THRESHOLDS.platinum)
+  .slice(0, MAX_USERS_PER_TIER)
+  .map((u, idx) => ({ ...u, tierRank: idx + 1 }));
+
+const goldUsers = allUsers
+  .filter(u => 
+    u.total_score >= TIER_THRESHOLDS.gold && 
+    u.total_score < TIER_THRESHOLDS.platinum &&
+    !platinumUsers.some(p => p.staff_uid === u.staff_uid)
+  )
+  .slice(0, MAX_USERS_PER_TIER)
+  .map((u, idx) => ({ ...u, tierRank: idx + 1 }));
+// dst...
+```
+
+**C. Update Interface:**
+```typescript
 interface RankingUser {
   staff_uid: string;
   staff_name: string;
-  avg_score: number;
-  total_score: number;  // BARU
-  total_days: number;   // BARU (opsional)
+  total_score: number;
+  total_days: number;
   photo_url?: string;
+  tierRank?: number;  // Urutan dalam band (1-10)
 }
 ```
 
-**B. Expand MAX_USERS_PER_TIER dari 5 ke 20:**
+**D. Hapus `globalRank`, ganti dengan `tierRank`:**
 ```typescript
-const MAX_USERS_PER_TIER = 20; // Sebelumnya 5
+// Display:
+<span className={`text-xs font-bold w-5 ${tierColor}`}>
+  #{user.tierRank}
+</span>
 ```
 
-**C. Pagination/Slide per 5 user dalam satu tier:**
+**E. Hapus Nested Carousel:**
+- Hapus `chunkUsers()` function
+- Hapus `tierApis` dan `tierCurrentSlides` state
+- Render langsung 10 user dalam satu div (bukan carousel dalam tier)
+- Auto-slide hanya pada carousel utama antar band
 
-Jika tier punya >5 user, bagi jadi beberapa "page" dalam carousel nested:
-
-```text
-Platinum Tier (20 users)
-┌─────────────────────────┐
-│ Slide 1: #1-5           │
-│ Slide 2: #6-10          │
-│ Slide 3: #11-15         │
-│ Slide 4: #16-20         │
-└─────────────────────────┘
-Auto-slide setiap 5 detik
-```
-
-**D. Update Display:**
+**F. Update `rankRange` Display:**
 ```typescript
-// Sebelum:
-⭐4.97
-
-// Sesudah:
-⭐4.97 (104⭐)  // avg (total)
+// Tampilkan batas threshold, bukan posisi
+rankRange: '≥60⭐'  // untuk Platinum
+rankRange: '≥50⭐'  // untuk Gold
+// dst
 ```
 
-### File yang Diubah
+---
+
+## Contoh Output Visual
+
+### Platinum (≥60⭐) - 8 user lolos
+```
+#1  FATONI ICHWAN       104⭐
+#2  SARIF               88⭐
+#3  SUYATNO             86⭐
+#4  NURUL ANISA         85⭐
+#5  KARMAN              85⭐
+#6  AFIF MEIDIANSYAH    82⭐
+#7  EVI YUNIATI         81⭐
+#8  RATIH Y. CHULLY     78⭐
+```
+
+### Gold (≥50⭐) - 10 user lolos
+```
+#1  EVA SUKINA          76⭐
+#2  RIFKI AULIA         76⭐
+#3  ...                 ...
+#10 ...                 ...
+```
+
+---
+
+## Ringkasan Perubahan
+
+| Aspek | Sebelum | Sesudah |
+|-------|---------|---------|
+| Penentuan band | Posisi #1-10, #11-20, dst | Batas bintang ≥60, ≥50, dst |
+| Urutan dalam band | Global (#1-40) | Per band (#1-10) |
+| Slide per band | Nested carousel 5 user | 1 slide, 10 user |
+| User < 30⭐ | Tidak ditampilkan | Sama (tidak ditampilkan) |
+| Band kosong | Tetap tampil | Tidak tampil |
+
+---
+
+## File yang Diubah
 - `src/components/RankingCard.tsx`
 
----
-
-## 2. StatusPresensiDialog Focus Fix
-
-### Masalah
-DialogContent dari Radix UI auto-focus ke elemen interaktif pertama. Textarea mendapat focus, memicu keyboard di mobile yang menutupi status selection.
-
-### Solusi
-Gunakan `onOpenAutoFocus` event dari DialogContent untuk prevent default dan focus ke elemen lain (atau tidak focus sama sekali).
-
-### Perubahan Code
-
-**File:** `src/components/StatusPresensiDialog.tsx`
-
-```typescript
-// Tambah ref untuk tombol konfirmasi
-const confirmButtonRef = useRef<HTMLButtonElement>(null);
-
-// Di DialogContent, tambah onOpenAutoFocus:
-<DialogContent 
-  className="max-w-md"
-  onOpenAutoFocus={(e) => {
-    e.preventDefault();
-    // Opsional: focus ke tombol konfirmasi
-    // confirmButtonRef.current?.focus();
-  }}
->
-```
-
-Dengan `e.preventDefault()`, dialog tidak akan auto-focus ke textarea, sehingga keyboard mobile tidak muncul otomatis.
-
-### File yang Diubah
-- `src/components/StatusPresensiDialog.tsx`
-
----
-
-## Ringkasan Teknis
-
-| File | Perubahan |
-|------|-----------|
-| `src/components/RankingCard.tsx` | - MAX_USERS_PER_TIER: 5 → 20<br>- Tambah total_score di interface<br>- Update query untuk fetch SUM<br>- Secondary sort by total_score<br>- Pagination/chunk per 5 user dalam tier<br>- Display format: `⭐avg (total)` |
-| `src/components/StatusPresensiDialog.tsx` | - Tambah onOpenAutoFocus handler<br>- Prevent auto-focus ke textarea |
-
----
-
-## Hasil Akhir
-
-### RankingCard:
-- Menampilkan avg score DAN total score
-- Ranking hingga 20 user per tier
-- Auto-slide per 5 user dalam satu tier
-- Lebih fair: tie-breaker menggunakan total score
-
-### StatusPresensiDialog:
-- Dialog muncul tanpa keyboard mobile otomatis
-- User bisa lihat semua pilihan status dan tombol konfirmasi
-- Baru focus ke textarea jika user tap manual
