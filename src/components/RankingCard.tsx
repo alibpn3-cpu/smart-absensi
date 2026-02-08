@@ -9,13 +9,23 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
+// Tier thresholds based on total stars
+const TIER_THRESHOLDS = {
+  platinum: 60,  // >= 60 stars
+  gold: 50,      // >= 50 stars
+  silver: 40,    // >= 40 stars
+  bronze: 30,    // >= 30 stars
+};
+
+const MAX_USERS_PER_TIER = 10;
+
 interface RankingUser {
   staff_uid: string;
   staff_name: string;
   total_score: number;
   total_days: number;
   photo_url?: string;
-  globalRank?: number; // Position in overall ranking
+  tierRank?: number; // Position within the tier (1-10)
 }
 
 interface MedalTier {
@@ -23,18 +33,13 @@ interface MedalTier {
   icon: React.ReactNode;
   color: string;
   bgColor: string;
-  rankRange: string; // e.g., "#1-10"
+  rankRange: string; // e.g., "≥60⭐"
   users: RankingUser[];
 }
-
-const USERS_PER_TIER = 10;
-const USERS_PER_SLIDE = 5;
 
 const RankingCard = () => {
   const [rankings, setRankings] = useState<MedalTier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [tierApis, setTierApis] = useState<Record<string, CarouselApi>>({});
-  const [tierCurrentSlides, setTierCurrentSlides] = useState<Record<string, number>>({});
   const [mainApi, setMainApi] = useState<CarouselApi>();
   const [mainCurrent, setMainCurrent] = useState(0);
   
@@ -77,23 +82,6 @@ const RankingCard = () => {
     });
   }, [mainApi]);
 
-  // Setup tier carousel listeners
-  useEffect(() => {
-    Object.entries(tierApis).forEach(([tierName, api]) => {
-      if (!api) return;
-      
-      const updateSlide = () => {
-        setTierCurrentSlides(prev => ({
-          ...prev,
-          [tierName]: api.selectedScrollSnap()
-        }));
-      };
-      
-      updateSlide();
-      api.on('select', updateSlide);
-    });
-  }, [tierApis]);
-
   const navigateMonth = (direction: 'prev' | 'next') => {
     if (direction === 'prev') {
       if (selectedMonth === 0) {
@@ -110,6 +98,92 @@ const RankingCard = () => {
         setSelectedMonth(prev => prev + 1);
       }
     }
+  };
+
+  // Helper function to group users by threshold-based tiers
+  const groupUsersByThreshold = (allUsers: RankingUser[]): MedalTier[] => {
+    // Platinum: >= 60 stars
+    const platinumUsers = allUsers
+      .filter(u => u.total_score >= TIER_THRESHOLDS.platinum)
+      .slice(0, MAX_USERS_PER_TIER)
+      .map((u, idx) => ({ ...u, tierRank: idx + 1 }));
+
+    const platinumUids = new Set(platinumUsers.map(u => u.staff_uid));
+
+    // Gold: >= 50 stars AND < 60 stars (exclude platinum users)
+    const goldUsers = allUsers
+      .filter(u => 
+        u.total_score >= TIER_THRESHOLDS.gold && 
+        u.total_score < TIER_THRESHOLDS.platinum &&
+        !platinumUids.has(u.staff_uid)
+      )
+      .slice(0, MAX_USERS_PER_TIER)
+      .map((u, idx) => ({ ...u, tierRank: idx + 1 }));
+
+    const goldUids = new Set(goldUsers.map(u => u.staff_uid));
+
+    // Silver: >= 40 stars AND < 50 stars (exclude platinum & gold users)
+    const silverUsers = allUsers
+      .filter(u => 
+        u.total_score >= TIER_THRESHOLDS.silver && 
+        u.total_score < TIER_THRESHOLDS.gold &&
+        !platinumUids.has(u.staff_uid) &&
+        !goldUids.has(u.staff_uid)
+      )
+      .slice(0, MAX_USERS_PER_TIER)
+      .map((u, idx) => ({ ...u, tierRank: idx + 1 }));
+
+    const silverUids = new Set(silverUsers.map(u => u.staff_uid));
+
+    // Bronze: >= 30 stars AND < 40 stars (exclude all above)
+    const bronzeUsers = allUsers
+      .filter(u => 
+        u.total_score >= TIER_THRESHOLDS.bronze && 
+        u.total_score < TIER_THRESHOLDS.silver &&
+        !platinumUids.has(u.staff_uid) &&
+        !goldUids.has(u.staff_uid) &&
+        !silverUids.has(u.staff_uid)
+      )
+      .slice(0, MAX_USERS_PER_TIER)
+      .map((u, idx) => ({ ...u, tierRank: idx + 1 }));
+
+    const tiers: MedalTier[] = [
+      {
+        name: 'Platinum',
+        icon: <Trophy className="h-5 w-5" />,
+        color: 'text-cyan-600 dark:text-cyan-400',
+        bgColor: 'bg-gradient-to-r from-cyan-100 to-slate-100 dark:from-cyan-900/30 dark:to-slate-900/30',
+        rankRange: `≥${TIER_THRESHOLDS.platinum}⭐`,
+        users: platinumUsers
+      },
+      {
+        name: 'Gold',
+        icon: <Medal className="h-5 w-5" />,
+        color: 'text-yellow-600 dark:text-yellow-400',
+        bgColor: 'bg-gradient-to-r from-yellow-100 to-amber-100 dark:from-yellow-900/30 dark:to-amber-900/30',
+        rankRange: `≥${TIER_THRESHOLDS.gold}⭐`,
+        users: goldUsers
+      },
+      {
+        name: 'Silver',
+        icon: <Award className="h-5 w-5" />,
+        color: 'text-slate-500 dark:text-slate-400',
+        bgColor: 'bg-gradient-to-r from-slate-100 to-gray-100 dark:from-slate-800/30 dark:to-gray-800/30',
+        rankRange: `≥${TIER_THRESHOLDS.silver}⭐`,
+        users: silverUsers
+      },
+      {
+        name: 'Bronze',
+        icon: <Star className="h-5 w-5" />,
+        color: 'text-orange-600 dark:text-orange-400',
+        bgColor: 'bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30',
+        rankRange: `≥${TIER_THRESHOLDS.bronze}⭐`,
+        users: bronzeUsers
+      }
+    ];
+
+    // Only return tiers that have users
+    return tiers.filter(t => t.users.length > 0);
   };
 
   useEffect(() => {
@@ -129,52 +203,18 @@ const RankingCard = () => {
 
         // If we have overrides, use them (treat display_score as total)
         if (overrides && overrides.length > 0) {
-          const allUsers: RankingUser[] = overrides.map((o, idx) => ({
+          const allUsers: RankingUser[] = overrides.map((o) => ({
             staff_uid: o.staff_uid,
             staff_name: o.staff_name,
             total_score: Number(o.display_score),
             total_days: 0,
-            photo_url: o.photo_url || undefined,
-            globalRank: idx + 1
+            photo_url: o.photo_url || undefined
           }));
 
-          // Split into position-based tiers
-          const tiers: MedalTier[] = [
-            {
-              name: 'Platinum',
-              icon: <Trophy className="h-5 w-5" />,
-              color: 'text-cyan-600 dark:text-cyan-400',
-              bgColor: 'bg-gradient-to-r from-cyan-100 to-slate-100 dark:from-cyan-900/30 dark:to-slate-900/30',
-              rankRange: '#1-10',
-              users: allUsers.slice(0, USERS_PER_TIER)
-            },
-            {
-              name: 'Gold',
-              icon: <Medal className="h-5 w-5" />,
-              color: 'text-yellow-600 dark:text-yellow-400',
-              bgColor: 'bg-gradient-to-r from-yellow-100 to-amber-100 dark:from-yellow-900/30 dark:to-amber-900/30',
-              rankRange: '#11-20',
-              users: allUsers.slice(USERS_PER_TIER, USERS_PER_TIER * 2)
-            },
-            {
-              name: 'Silver',
-              icon: <Award className="h-5 w-5" />,
-              color: 'text-slate-500 dark:text-slate-400',
-              bgColor: 'bg-gradient-to-r from-slate-100 to-gray-100 dark:from-slate-800/30 dark:to-gray-800/30',
-              rankRange: '#21-30',
-              users: allUsers.slice(USERS_PER_TIER * 2, USERS_PER_TIER * 3)
-            },
-            {
-              name: 'Bronze',
-              icon: <Star className="h-5 w-5" />,
-              color: 'text-orange-600 dark:text-orange-400',
-              bgColor: 'bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30',
-              rankRange: '#31-40',
-              users: allUsers.slice(USERS_PER_TIER * 3, USERS_PER_TIER * 4)
-            }
-          ];
-
-          setRankings(tiers.filter(t => t.users.length > 0));
+          // Sort by total_score DESC before grouping
+          allUsers.sort((a, b) => b.total_score - a.total_score);
+          
+          setRankings(groupUsersByThreshold(allUsers));
           return;
         }
 
@@ -202,7 +242,7 @@ const RankingCard = () => {
           userScores.get(score.staff_uid)!.scores.push(Number(score.final_score));
         });
 
-        // Calculate totals and sort by total_score DESC
+        // Calculate totals
         const allUsers: RankingUser[] = [];
         for (const [uid, data] of userScores) {
           const total = data.scores.reduce((a, b) => a + b, 0);
@@ -217,13 +257,10 @@ const RankingCard = () => {
         // Sort by total_score DESC
         allUsers.sort((a, b) => b.total_score - a.total_score);
 
-        // Assign global ranks
-        allUsers.forEach((user, idx) => {
-          user.globalRank = idx + 1;
-        });
-
-        // Fetch photos for top 40 users
-        const topUids = allUsers.slice(0, 40).map(u => u.staff_uid);
+        // Fetch photos for users that meet minimum threshold (>= 30 stars)
+        const qualifiedUsers = allUsers.filter(u => u.total_score >= TIER_THRESHOLDS.bronze);
+        const topUids = qualifiedUsers.slice(0, 40).map(u => u.staff_uid);
+        
         if (topUids.length > 0) {
           const { data: users } = await supabase
             .from('staff_users')
@@ -236,44 +273,8 @@ const RankingCard = () => {
           });
         }
 
-        // Group by position-based tiers (10 users per tier)
-        const tiers: MedalTier[] = [
-          {
-            name: 'Platinum',
-            icon: <Trophy className="h-5 w-5" />,
-            color: 'text-cyan-600 dark:text-cyan-400',
-            bgColor: 'bg-gradient-to-r from-cyan-100 to-slate-100 dark:from-cyan-900/30 dark:to-slate-900/30',
-            rankRange: '#1-10',
-            users: allUsers.slice(0, USERS_PER_TIER)
-          },
-          {
-            name: 'Gold',
-            icon: <Medal className="h-5 w-5" />,
-            color: 'text-yellow-600 dark:text-yellow-400',
-            bgColor: 'bg-gradient-to-r from-yellow-100 to-amber-100 dark:from-yellow-900/30 dark:to-amber-900/30',
-            rankRange: '#11-20',
-            users: allUsers.slice(USERS_PER_TIER, USERS_PER_TIER * 2)
-          },
-          {
-            name: 'Silver',
-            icon: <Award className="h-5 w-5" />,
-            color: 'text-slate-500 dark:text-slate-400',
-            bgColor: 'bg-gradient-to-r from-slate-100 to-gray-100 dark:from-slate-800/30 dark:to-gray-800/30',
-            rankRange: '#21-30',
-            users: allUsers.slice(USERS_PER_TIER * 2, USERS_PER_TIER * 3)
-          },
-          {
-            name: 'Bronze',
-            icon: <Star className="h-5 w-5" />,
-            color: 'text-orange-600 dark:text-orange-400',
-            bgColor: 'bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30',
-            rankRange: '#31-40',
-            users: allUsers.slice(USERS_PER_TIER * 3, USERS_PER_TIER * 4)
-          }
-        ];
-
-        // Filter out empty tiers
-        setRankings(tiers.filter(t => t.users.length > 0));
+        // Group by threshold-based tiers
+        setRankings(groupUsersByThreshold(allUsers));
       } catch (error) {
         console.error('Error fetching rankings:', error);
       } finally {
@@ -289,18 +290,9 @@ const RankingCard = () => {
     return null;
   }
 
-  // Helper to chunk users into slides
-  const chunkUsers = (users: RankingUser[]): RankingUser[][] => {
-    const chunks: RankingUser[][] = [];
-    for (let i = 0; i < users.length; i += USERS_PER_SLIDE) {
-      chunks.push(users.slice(i, i + USERS_PER_SLIDE));
-    }
-    return chunks;
-  };
-
   const renderUserItem = (user: RankingUser, tierColor: string) => (
     <div key={user.staff_uid} className="flex items-center gap-2 bg-background/80 rounded-full px-2 py-1.5">
-      <span className={`text-xs font-bold w-5 ${tierColor}`}>#{user.globalRank}</span>
+      <span className={`text-xs font-bold w-5 ${tierColor}`}>#{user.tierRank}</span>
       <Avatar className="h-7 w-7 border border-border">
         <AvatarImage src={user.photo_url} alt={user.staff_name} />
         <AvatarFallback className="text-[10px] bg-primary/10">
@@ -319,13 +311,9 @@ const RankingCard = () => {
   );
 
   const renderTierContent = (tier: MedalTier) => {
-    const userChunks = chunkUsers(tier.users);
-    const hasMultipleSlides = userChunks.length > 1;
-    const currentSlide = tierCurrentSlides[tier.name] || 0;
-
     return (
       <div className={`rounded-lg p-3 ${tier.bgColor} min-h-[180px]`}>
-        <div className={`flex items-center justify-between mb-3`}>
+        <div className="flex items-center justify-between mb-3">
           <div className={`flex items-center gap-2 ${tier.color}`}>
             {tier.icon}
             <span className="text-sm font-bold">{tier.name}</span>
@@ -336,54 +324,12 @@ const RankingCard = () => {
           </span>
         </div>
         
-        {hasMultipleSlides ? (
-          <div>
-            <Carousel
-              setApi={(api) => {
-                if (api) {
-                  setTierApis(prev => ({ ...prev, [tier.name]: api }));
-                }
-              }}
-              opts={{ loop: true }}
-              plugins={[
-                Autoplay({ delay: 5000, stopOnInteraction: false })
-              ]}
-              className="w-full"
-            >
-              <CarouselContent>
-                {userChunks.map((chunk, slideIndex) => (
-                  <CarouselItem key={slideIndex}>
-                    <div className="space-y-1.5">
-                      {chunk.map((user) => 
-                        renderUserItem(user, tier.color)
-                      )}
-                    </div>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-            </Carousel>
-            {/* Inner carousel dot indicators */}
-            <div className="flex justify-center gap-1 mt-2">
-              {userChunks.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => tierApis[tier.name]?.scrollTo(index)}
-                  className={cn(
-                    "w-1.5 h-1.5 rounded-full transition-colors duration-300",
-                    index === currentSlide ? "bg-foreground/60" : "bg-foreground/20"
-                  )}
-                  aria-label={`Go to slide ${index + 1}`}
-                />
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            {tier.users.map((user) => 
-              renderUserItem(user, tier.color)
-            )}
-          </div>
-        )}
+        {/* Render all users in single view (max 10) */}
+        <div className="space-y-1.5">
+          {tier.users.map((user) => 
+            renderUserItem(user, tier.color)
+          )}
+        </div>
       </div>
     );
   };
@@ -470,7 +416,7 @@ const RankingCard = () => {
           // Only one tier - no main carousel needed
           renderTierContent(rankings[0])
         ) : (
-          // Multiple tiers - use main carousel
+          // Multiple tiers - use main carousel (auto-slide between tiers)
           <div>
             <Carousel
               setApi={setMainApi}
@@ -496,9 +442,9 @@ const RankingCard = () => {
                   onClick={() => mainApi?.scrollTo(index)}
                   className={cn(
                     "w-2 h-2 rounded-full transition-colors duration-300",
-                    index === mainCurrent ? "bg-primary" : "bg-muted-foreground/30"
+                    index === mainCurrent ? "bg-primary" : "bg-primary/30"
                   )}
-                  aria-label={`Go to ${tier.name} tier`}
+                  aria-label={`Go to ${tier.name}`}
                 />
               ))}
             </div>
