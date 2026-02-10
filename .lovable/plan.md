@@ -1,152 +1,143 @@
-# ✅ Rencana Perbaikan RankingCard - SELESAI
 
-**Status**: Implementasi selesai pada 2026-02-08
+# Rencana Perbaikan
 
+## 1. Bug: Tombol "Ambil Foto" Disabled (Marianus - Android 10)
 
-# Rencana Perbaikan RankingCard
+### Analisis Root Cause
 
-## Perubahan Inti
+Di `CameraCapture.tsx` baris 43-52, sebelum memanggil `getUserMedia`, ada pengecekan:
 
-### 1. Batas Minimal Total Bintang per Band
-
-Berdasarkan analisis data Januari 2026 (195 user, max 104.3⭐):
-
-| Band | Batas Minimal | Penjelasan |
-|------|---------------|------------|
-| Platinum | >= 60⭐ | Top tier (11 user lolos di Jan) |
-| Gold | >= 50⭐ | (17 user lolos di Jan) |
-| Silver | >= 40⭐ | (25 user lolos di Jan) |
-| Bronze | >= 30⭐ | (30 user lolos di Jan) |
-
-User dengan total < 30⭐ tidak masuk band manapun.
-
-### 2. Penomoran Ranking per Band (1-10)
-
-Setiap band memiliki urutan independen:
-- Platinum: #1, #2, #3... (max #10)
-- Gold: #1, #2, #3... (max #10) - bukan #11, #12...
-- Silver: #1, #2, #3... (max #10)
-- Bronze: #1, #2, #3... (max #10)
-
-### 3. Satu Slide per Band
-
-- Tampilkan maksimal 10 user per band dalam 1 slide
-- Auto-slide hanya antar band (bukan antar halaman dalam 1 band)
-- Hapus nested carousel, gunakan carousel utama saja
-
----
-
-## Perubahan Teknis
-
-### File: `src/components/RankingCard.tsx`
-
-**A. Konstanta Batas Band (baris baru):**
 ```typescript
-const TIER_THRESHOLDS = {
-  platinum: 60,  // >= 60 bintang
-  gold: 50,      // >= 50 bintang
-  silver: 40,    // >= 40 bintang
-  bronze: 30,    // >= 30 bintang
-};
-
-const MAX_USERS_PER_TIER = 10;
-```
-
-**B. Logika Grouping Baru (mengganti slicing posisi):**
-```typescript
-// Sebelum (posisi-based):
-users: allUsers.slice(0, 10)  // Platinum #1-10
-users: allUsers.slice(10, 20) // Gold #11-20
-
-// Sesudah (threshold-based):
-const platinumUsers = allUsers
-  .filter(u => u.total_score >= TIER_THRESHOLDS.platinum)
-  .slice(0, MAX_USERS_PER_TIER)
-  .map((u, idx) => ({ ...u, tierRank: idx + 1 }));
-
-const goldUsers = allUsers
-  .filter(u => 
-    u.total_score >= TIER_THRESHOLDS.gold && 
-    u.total_score < TIER_THRESHOLDS.platinum &&
-    !platinumUsers.some(p => p.staff_uid === u.staff_uid)
-  )
-  .slice(0, MAX_USERS_PER_TIER)
-  .map((u, idx) => ({ ...u, tierRank: idx + 1 }));
-// dst...
-```
-
-**C. Update Interface:**
-```typescript
-interface RankingUser {
-  staff_uid: string;
-  staff_name: string;
-  total_score: number;
-  total_days: number;
-  photo_url?: string;
-  tierRank?: number;  // Urutan dalam band (1-10)
+const permissions = await navigator.permissions.query({ name: 'camera' as PermissionName });
+if (permissions.state === 'denied') {
+  // return early - stream TIDAK pernah di-set
 }
 ```
 
-**D. Hapus `globalRank`, ganti dengan `tierRank`:**
+Masalah: `navigator.permissions.query({ name: 'camera' })` **tidak didukung secara konsisten** di Android WebView dan Chrome versi lama. Pada beberapa device Android 10, API ini bisa:
+- Throw error (tertangkap catch, lalu dialog muncul - bukan kasus ini)
+- Return `'denied'` padahal kamera sebenarnya bisa diakses (kasus Marianus)
+
+Karena function return early sebelum `getUserMedia` dipanggil, `stream` tetap `null`, dan tombol tetap disabled (`disabled={!stream}`).
+
+### Solusi
+
+Hapus pre-check `navigator.permissions.query` dan langsung panggil `getUserMedia`. Jika gagal, error handler yang sudah ada akan menangani (dialog konfirmasi muncul). Ini lebih reliable karena `getUserMedia` adalah satu-satunya cara pasti untuk tahu apakah kamera bisa diakses.
+
+### Perubahan Code
+
+**File:** `src/components/CameraCapture.tsx`
+
+Hapus baris 42-52 (permissions.query pre-check), langsung ke `getUserMedia`:
+
 ```typescript
-// Display:
-<span className={`text-xs font-bold w-5 ${tierColor}`}>
-  #{user.tierRank}
-</span>
+const startCamera = async () => {
+  try {
+    // Langsung request camera - jangan pre-check permissions
+    // karena navigator.permissions.query('camera') tidak reliable di semua Android
+    const mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { 
+        facingMode: 'user',
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      },
+      audio: false
+    });
+    
+    setStream(mediaStream);
+    if (videoRef.current) {
+      videoRef.current.srcObject = mediaStream;
+    }
+    localStorage.setItem('camera_permission_granted', 'true');
+    
+  } catch (error: any) {
+    // ... existing error handling tetap sama
+  }
+};
 ```
 
-**E. Hapus Nested Carousel:**
-- Hapus `chunkUsers()` function
-- Hapus `tierApis` dan `tierCurrentSlides` state
-- Render langsung 10 user dalam satu div (bukan carousel dalam tier)
-- Auto-slide hanya pada carousel utama antar band
+---
 
-**F. Update `rankRange` Display:**
+## 2. ScoreCard: Ganti "Score Kemarin" ke "Total Bintang Bulan Ini"
+
+### Konsep
+
+Ganti dari menampilkan score 1 hari kemarin menjadi akumulasi total bintang dari tanggal 1 bulan berjalan sampai hari kemarin. Reset otomatis setiap tanggal 1.
+
+Contoh:
+- Tanggal 3: total = score tgl 1 + score tgl 2
+- Tanggal 1: total = 0 (belum ada data bulan ini)
+
+### Apakah Berat?
+
+**Tidak berat.** Query-nya sederhana:
+
+```sql
+SELECT SUM(final_score) as total
+FROM daily_scores
+WHERE staff_uid = ?
+AND score_date >= '2026-02-01'  -- tanggal 1 bulan ini
+AND score_date < '2026-02-10'   -- hari ini (tidak termasuk hari ini)
+```
+
+Ini single aggregate query yang sangat ringan, sama beratnya dengan query score kemarin yang sudah ada.
+
+### Perubahan Code
+
+**File:** `src/hooks/useScoreCalculation.ts`
+
+Tambah function baru:
+
 ```typescript
-// Tampilkan batas threshold, bukan posisi
-rankRange: '≥60⭐'  // untuk Platinum
-rankRange: '≥50⭐'  // untuk Gold
-// dst
+export const getMonthlyAccumulatedScore = async (staffUid: string): Promise<number | null> => {
+  const today = new Date();
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const firstOfMonthStr = firstOfMonth.toISOString().split('T')[0];
+  const todayStr = today.toISOString().split('T')[0];
+
+  // Jika tanggal 1, belum ada data bulan ini
+  if (firstOfMonthStr === todayStr) return null;
+
+  const { data, error } = await supabase
+    .from('daily_scores')
+    .select('final_score')
+    .eq('staff_uid', staffUid)
+    .gte('score_date', firstOfMonthStr)
+    .lt('score_date', todayStr);
+
+  if (error || !data || data.length === 0) return null;
+
+  return data.reduce((sum, row) => sum + Number(row.final_score), 0);
+};
+```
+
+**File:** `src/components/ScoreCard.tsx`
+
+Update untuk menampilkan total akumulasi bulan ini:
+
+- Import `getMonthlyAccumulatedScore` (ganti `getYesterdayScore`)
+- Tampilkan total bintang (bukan score 0-5)
+- Ubah label: "Score Kemarin" menjadi "Total Bintang Bulan Ini"
+- Tampilkan angka total (misal: "45.5 bintang") tanpa star rating 1-5
+- Hapus render stars (karena total bisa lebih dari 5)
+- Tampilkan icon bintang tunggal dengan angka total
+
+### UI Baru ScoreCard
+
+```
+┌──────────────────────────────────────┐
+│ Total Bintang Bulan Ini              │
+│ Februari 2026            ⭐ 45.5     │
+└──────────────────────────────────────┘
 ```
 
 ---
 
-## Contoh Output Visual
+## Ringkasan
 
-### Platinum (≥60⭐) - 8 user lolos
-```
-#1  FATONI ICHWAN       104⭐
-#2  SARIF               88⭐
-#3  SUYATNO             86⭐
-#4  NURUL ANISA         85⭐
-#5  KARMAN              85⭐
-#6  AFIF MEIDIANSYAH    82⭐
-#7  EVI YUNIATI         81⭐
-#8  RATIH Y. CHULLY     78⭐
-```
-
-### Gold (≥50⭐) - 10 user lolos
-```
-#1  EVA SUKINA          76⭐
-#2  RIFKI AULIA         76⭐
-#3  ...                 ...
-#10 ...                 ...
-```
-
----
-
-## Ringkasan Perubahan
-
-| Aspek | Sebelum | Sesudah |
-|-------|---------|---------|
-| Penentuan band | Posisi #1-10, #11-20, dst | Batas bintang ≥60, ≥50, dst |
-| Urutan dalam band | Global (#1-40) | Per band (#1-10) |
-| Slide per band | Nested carousel 5 user | 1 slide, 10 user |
-| User < 30⭐ | Tidak ditampilkan | Sama (tidak ditampilkan) |
-| Band kosong | Tetap tampil | Tidak tampil |
-
----
-
-## File yang Diubah
-- `src/components/RankingCard.tsx`
+| File | Perubahan |
+|------|-----------|
+| `src/components/CameraCapture.tsx` | Hapus `navigator.permissions.query` pre-check, langsung `getUserMedia` |
+| `src/hooks/useScoreCalculation.ts` | Tambah `getMonthlyAccumulatedScore()` |
+| `src/components/ScoreCard.tsx` | Ganti dari score kemarin ke total bintang bulan ini |
 
