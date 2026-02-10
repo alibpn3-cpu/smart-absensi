@@ -39,18 +39,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose, loadi
 
   const startCamera = async () => {
     try {
-      // Check if permissions are already granted
-      const permissions = await navigator.permissions.query({ name: 'camera' as PermissionName });
-      
-      if (permissions.state === 'denied') {
-        toast({
-          title: "Akses Kamera Ditolak",
-          description: "Silakan izinkan akses kamera di pengaturan browser dan refresh halaman ini.",
-          variant: "destructive"
-        });
-        return;
-      }
-
+      // Langsung request camera - jangan pre-check permissions
+      // karena navigator.permissions.query('camera') tidak reliable di semua Android
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: 'user',

@@ -373,5 +373,32 @@ export const getTodayScore = async (staffUid: string): Promise<number | null> =>
   }
 };
 
+// Get monthly accumulated score (sum of all daily scores from 1st of current month to yesterday)
+export const getMonthlyAccumulatedScore = async (staffUid: string): Promise<number | null> => {
+  try {
+    const today = new Date();
+    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const firstOfMonthStr = firstOfMonth.toISOString().split('T')[0];
+    const todayStr = today.toISOString().split('T')[0];
+
+    // Jika tanggal 1, belum ada data bulan ini
+    if (firstOfMonthStr === todayStr) return null;
+
+    const { data, error } = await supabase
+      .from('daily_scores')
+      .select('final_score')
+      .eq('staff_uid', staffUid)
+      .gte('score_date', firstOfMonthStr)
+      .lt('score_date', todayStr);
+
+    if (error || !data || data.length === 0) return null;
+
+    return data.reduce((sum, row) => sum + Number(row.final_score), 0);
+  } catch (error) {
+    console.error('Error fetching monthly accumulated score:', error);
+    return null;
+  }
+};
+
 // Pre-load schedules on module init
 fetchSchedules().catch(console.error);
