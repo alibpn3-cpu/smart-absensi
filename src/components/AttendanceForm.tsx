@@ -1293,11 +1293,11 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             staff_uid: selectedStaff!.uid,
             staff_name: selectedStaff!.name,
             date: format(now, 'yyyy-MM-dd'),
-            status: 'dinas',
+            status: attendanceStatus, // Use actual selected status (wfh or dinas)
             attendance_type: 'regular',
             check_in_time: checkInFormatted,
             check_out_time: checkOutFormatted,
-            checkin_location_address: 'Manual - Dinas Luar',
+            checkin_location_address: attendanceStatus === 'wfh' ? 'Manual - WFH' : 'Manual - Dinas Luar',
             checkin_location_lat: null,
             checkin_location_lng: null,
             checkout_location_address: usedLocation.address,
@@ -1311,7 +1311,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         if (error) throw error;
         
         toast({
-          title: "✅ Checkout Dinas Berhasil",
+          title: `✅ Checkout ${attendanceStatus === 'wfh' ? 'WFH' : 'Dinas'} Berhasil`,
           description: `Check-in manual: ${manualCheckInTime.hour}:${manualCheckInTime.minute}. Total jam: ${hoursWorked} jam`
         });
         
@@ -1810,6 +1810,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     try {
       const location = await requestLocationPermission();
       setCurrentLocation(location);
+      // Reset loading/processing BEFORE showing camera so buttons are not disabled
+      setLoading(false);
+      setIsButtonProcessing(false);
       setShowCamera(true);
     } catch (error) {
       console.error('Location error:', error);
@@ -1899,14 +1902,15 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     const currentRecord = attendanceType === 'regular' ? regularAttendance : overtimeAttendance;
     const isCheckOut = action === 'check-out';
     
-    // SPECIAL CASE: WFO/Dinas regular checkout without check-in (Fast Checkout)
+    // SPECIAL CASE: WFO/WFH/Dinas regular checkout without check-in (Fast Checkout)
     if (attendanceType === 'regular' && 
         isCheckOut && 
-        (effectiveStatus === 'wfo' || effectiveStatus === 'dinas') && 
+        (effectiveStatus === 'wfo' || effectiveStatus === 'wfh' || effectiveStatus === 'dinas') && 
         !regularAttendance?.check_in_time) {
       if (effectiveStatus === 'wfo') {
         setShowWfoFastCheckoutDialog(true);
       } else {
+        // WFH and Dinas use the same fast checkout dialog
         setShowDinasFastCheckoutDialog(true);
       }
       return; // Dialog will handle rest
@@ -2703,9 +2707,11 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         }}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-lg font-bold">Input Clock In Manual - Dinas</DialogTitle>
+              <DialogTitle className="text-lg font-bold">
+                Input Clock In Manual - {attendanceStatus === 'wfh' ? 'WFH' : 'Dinas'}
+              </DialogTitle>
               <DialogDescription className="text-left text-sm">
-                Anda clock out saja dengan status Dinas Luar? 
+                Anda clock out saja dengan status {attendanceStatus === 'wfh' ? 'WFH (Work From Home)' : 'Dinas Luar'}? 
                 Silahkan masukan jam perkiraan clock in anda dan alasan,
                 kemudian sistem akan meminta foto selfie untuk clock out
               </DialogDescription>
@@ -2734,9 +2740,11 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
                 </div>
               </div>
               <div>
-                <Label className="text-sm font-medium mb-2 block">Alasan Clock Out Dinas Luar</Label>
+                <Label className="text-sm font-medium mb-2 block">
+                  Alasan Clock Out {attendanceStatus === 'wfh' ? 'WFH' : 'Dinas Luar'}
+                </Label>
                 <Textarea
-                  placeholder="Contoh: Sudah clock in pukul 08:00 untuk dinas ke lokasi X"
+                   placeholder={attendanceStatus === 'wfh' ? 'Contoh: Sudah clock in pukul 08:00 untuk WFH' : 'Contoh: Sudah clock in pukul 08:00 untuk dinas ke lokasi X'}
                   value={dinasFastCheckoutReason}
                   onChange={(e) => setDinasFastCheckoutReason(e.target.value)}
                   rows={4}
