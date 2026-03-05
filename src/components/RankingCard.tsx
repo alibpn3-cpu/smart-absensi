@@ -11,10 +11,10 @@ import { cn } from '@/lib/utils';
 
 // Tier thresholds based on total stars
 const TIER_THRESHOLDS = {
-  platinum: 50,  // >= 50 stars
-  gold: 40,      // >= 40 stars
-  silver: 30,    // >= 30 stars
-  bronze: 25,    // >= 25 stars
+  platinum: 100,  // >= 100 stars
+  gold: 90,       // >= 90 stars
+  silver: 80,     // >= 80 stars
+  bronze: 70,     // >= 70 stars
 };
 
 const MAX_USERS_PER_TIER = 10;
