@@ -224,11 +224,32 @@ const RankingCard = () => {
         const firstDayStr = firstDay.toISOString().split('T')[0];
         const lastDayStr = lastDay.toISOString().split('T')[0];
 
-        const { data: scores, error } = await supabase
-          .from('daily_scores')
-          .select('staff_uid, staff_name, final_score')
-          .gte('score_date', firstDayStr)
-          .lte('score_date', lastDayStr);
+        // Fetch ALL daily scores for the month (default limit is 1000, we need more)
+        let allScores: { staff_uid: string; staff_name: string; final_score: number }[] = [];
+        let from = 0;
+        const pageSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data: scores, error: pageError } = await supabase
+            .from('daily_scores')
+            .select('staff_uid, staff_name, final_score')
+            .gte('score_date', firstDayStr)
+            .lte('score_date', lastDayStr)
+            .range(from, from + pageSize - 1);
+
+          if (pageError) throw pageError;
+
+          if (scores && scores.length > 0) {
+            allScores = allScores.concat(scores);
+            from += pageSize;
+            hasMore = scores.length === pageSize;
+          } else {
+            hasMore = false;
+          }
+        }
+
+        const scores = allScores;
 
         if (error) throw error;
 
