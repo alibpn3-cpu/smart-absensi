@@ -1829,6 +1829,20 @@ const EmployeeManager = () => {
                     >
                       <Crown className={`h-4 w-4 ${employee.is_manager ? 'text-purple-600' : 'text-muted-foreground'}`} />
                     </Button>
+
+                    {/* Toggle Attendance Status Visibility */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleAttendanceStatusVisibility(employee)}
+                      title={(employee as any).show_attendance_status ? "Sembunyikan Status In/Out" : "Tampilkan Status In/Out"}
+                    >
+                      {(employee as any).show_attendance_status ? (
+                        <Eye className="h-4 w-4 text-blue-600" />
+                      ) : (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
                     
                     {/* Toggle Active Status */}
                     <Button
