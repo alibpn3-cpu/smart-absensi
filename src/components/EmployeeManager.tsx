@@ -1758,6 +1758,12 @@ const EmployeeManager = () => {
                         Manager
                       </Badge>
                     )}
+                    {(employee as any).show_attendance_status && (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-300">
+                        <Eye className="h-3 w-3 mr-1" />
+                        Status In/Out
+                      </Badge>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
                     <div>
