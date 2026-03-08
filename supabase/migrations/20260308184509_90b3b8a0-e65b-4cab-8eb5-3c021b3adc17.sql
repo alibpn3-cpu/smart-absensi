@@ -1,0 +1,1 @@
+ALTER TABLE public.staff_users ADD COLUMN show_attendance_status boolean DEFAULT false;

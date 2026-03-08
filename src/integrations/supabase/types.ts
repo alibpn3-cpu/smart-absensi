@@ -492,6 +492,7 @@ export type Database = {
           password_hash: string | null
           photo_url: string | null
           position: string
+          show_attendance_status: boolean | null
           uid: string
           updated_at: string
           work_area: string
@@ -509,6 +510,7 @@ export type Database = {
           password_hash?: string | null
           photo_url?: string | null
           position: string
+          show_attendance_status?: boolean | null
           uid: string
           updated_at?: string
           work_area: string
@@ -526,6 +528,7 @@ export type Database = {
           password_hash?: string | null
           photo_url?: string | null
           position?: string
+          show_attendance_status?: boolean | null
           uid?: string
           updated_at?: string
           work_area?: string

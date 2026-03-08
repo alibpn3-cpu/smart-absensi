@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera, CheckSquare, Square, ChevronsUpDown, Check, KeyRound, Shield, ShieldOff, QrCode, Crown } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera, CheckSquare, Square, ChevronsUpDown, Check, KeyRound, Shield, ShieldOff, QrCode, Crown, Eye, EyeOff } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -720,6 +720,32 @@ const EmployeeManager = () => {
       toast({
         title: "Gagal",
         description: "Gagal mengubah status manajer",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const toggleAttendanceStatusVisibility = async (employee: StaffUser) => {
+    try {
+      const newStatus = !(employee as any).show_attendance_status;
+      const { error } = await supabase
+        .from('staff_users')
+        .update({ show_attendance_status: newStatus } as any)
+        .eq('id', employee.id);
+
+      if (error) throw error;
+
+      await logActivity(newStatus ? 'enable_attendance_status' : 'disable_attendance_status', employee.name, { uid: employee.uid });
+
+      toast({
+        title: "Berhasil",
+        description: `Status In/Out ${newStatus ? 'ditampilkan' : 'disembunyikan'} untuk ${employee.name}`
+      });
+      fetchEmployees();
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: "Gagal mengubah visibilitas status",
         variant: "destructive"
       });
     }
@@ -1732,6 +1758,12 @@ const EmployeeManager = () => {
                         Manager
                       </Badge>
                     )}
+                    {(employee as any).show_attendance_status && (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-300">
+                        <Eye className="h-3 w-3 mr-1" />
+                        Status In/Out
+                      </Badge>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
                     <div>
@@ -1802,6 +1834,20 @@ const EmployeeManager = () => {
                       title={employee.is_manager ? "Cabut Manager" : "Jadikan Manager"}
                     >
                       <Crown className={`h-4 w-4 ${employee.is_manager ? 'text-purple-600' : 'text-muted-foreground'}`} />
+                    </Button>
+
+                    {/* Toggle Attendance Status Visibility */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleAttendanceStatusVisibility(employee)}
+                      title={(employee as any).show_attendance_status ? "Sembunyikan Status In/Out" : "Tampilkan Status In/Out"}
+                    >
+                      {(employee as any).show_attendance_status ? (
+                        <Eye className="h-4 w-4 text-blue-600" />
+                      ) : (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      )}
                     </Button>
                     
                     {/* Toggle Active Status */}
