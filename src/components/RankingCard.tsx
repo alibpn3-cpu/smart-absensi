@@ -251,7 +251,7 @@ const RankingCard = () => {
 
         const scores = allScores;
 
-        if (error) throw error;
+        // Error handling is done per-page above
 
         // Calculate total score per user
         const userScores = new Map<string, { name: string; scores: number[] }>();
