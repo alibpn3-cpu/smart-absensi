@@ -19,6 +19,7 @@ interface UserSession {
   is_admin: boolean;
   is_manager: boolean;
   employee_type?: string;
+  show_attendance_status?: boolean;
 }
 
 const UserLogin = () => {
