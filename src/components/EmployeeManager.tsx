@@ -725,6 +725,32 @@ const EmployeeManager = () => {
     }
   };
 
+  const toggleAttendanceStatusVisibility = async (employee: StaffUser) => {
+    try {
+      const newStatus = !(employee as any).show_attendance_status;
+      const { error } = await supabase
+        .from('staff_users')
+        .update({ show_attendance_status: newStatus } as any)
+        .eq('id', employee.id);
+
+      if (error) throw error;
+
+      await logActivity(newStatus ? 'enable_attendance_status' : 'disable_attendance_status', employee.name, { uid: employee.uid });
+
+      toast({
+        title: "Berhasil",
+        description: `Status In/Out ${newStatus ? 'ditampilkan' : 'disembunyikan'} untuk ${employee.name}`
+      });
+      fetchEmployees();
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: "Gagal mengubah visibilitas status",
+        variant: "destructive"
+      });
+    }
+  };
+
   const toggleSelectEmployee = (employeeId: string) => {
     const newSelected = new Set(selectedEmployees);
     if (newSelected.has(employeeId)) {
