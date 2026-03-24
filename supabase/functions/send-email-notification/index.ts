@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import nodemailer from "npm:nodemailer@6.9.10";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,7 +12,7 @@ interface EmailPayload {
   subject: string;
   message_type: 'request_submitted' | 'approval_needed' | 'status_update';
   request_number: string;
-  request_type: string; // 'Cuti' or 'Ijin'
+  request_type: string;
   creator_name?: string;
   status?: string;
   approver_name?: string;
@@ -135,39 +135,36 @@ serve(async (req: Request) => {
     }
 
     console.log(`📧 Sending email to: ${payload.to_email}`);
+    console.log(`📧 SMTP config: host=${SMTP_HOST}, port=${SMTP_PORT}, user=${SMTP_USER}`);
 
     const emailHtml = generateEmailHTML(payload);
-    const fromEmail = SMTP_FROM_EMAIL || "noreply@digital-absensi.com";
-
+    const fromEmail = SMTP_FROM_EMAIL || SMTP_USER;
     const smtpPort = parseInt(SMTP_PORT || "587");
-    const useTls = smtpPort === 465;
 
-    const client = new SMTPClient({
-      connection: {
-        hostname: SMTP_HOST,
-        port: smtpPort,
-        tls: useTls,
-        auth: {
-          username: SMTP_USER,
-          password: SMTP_PASSWORD,
-        },
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASSWORD,
+      },
+      tls: {
+        rejectUnauthorized: false,
       },
     });
 
-    await client.send({
-      from: fromEmail,
+    const info = await transporter.sendMail({
+      from: `"Digital Absensi" <${fromEmail}>`,
       to: payload.to_email,
       subject: payload.subject,
-      content: emailHtml,
       html: emailHtml,
     });
 
-    await client.close();
-
-    console.log(`✅ Email sent to: ${payload.to_email}`);
+    console.log(`✅ Email sent to: ${payload.to_email}, messageId: ${info.messageId}`);
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ success: true, messageId: info.messageId }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error: any) {
