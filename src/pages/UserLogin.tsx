@@ -92,7 +92,7 @@ const UserLogin = () => {
       // Find staff by UID
       const { data: staff, error } = await supabase
         .from('staff_users')
-        .select('uid, name, position, work_area, division, photo_url, is_active, password_hash, is_first_login, is_admin, is_manager, employee_type, show_attendance_status')
+        .select('uid, name, position, work_area, division, photo_url, is_active, password_hash, is_first_login, is_admin, is_manager, employee_type, show_attendance_status, phone_number, supervisor_uid, hcga_approver_uid, join_date')
         .eq('uid', credentials.uid.toUpperCase().trim())
         .maybeSingle();
 

@@ -165,7 +165,9 @@ const EmployeeManager = () => {
     position: '',
     work_area: '',
     division: '',
-    employee_type: ''
+    employee_type: '',
+    supervisor_uid: '',
+    hcga_approver_uid: ''
   });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
