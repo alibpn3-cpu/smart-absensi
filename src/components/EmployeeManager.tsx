@@ -32,6 +32,11 @@ interface StaffUser {
   is_admin?: boolean;
   is_manager?: boolean;
   employee_type?: string;
+  show_attendance_status?: boolean;
+  phone_number?: string;
+  supervisor_uid?: string;
+  hcga_approver_uid?: string;
+  join_date?: string;
 }
 
 // Combobox component for editable dropdowns with auto-uppercase
