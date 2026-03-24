@@ -25,7 +25,18 @@ const AttendanceStatusList: React.FC<AttendanceStatusListProps> = ({ selectedWor
   const [loading, setLoading] = useState(false);
 
   const fetchAttendanceStatus = async () => {
-    if (!selectedWorkArea || selectedWorkArea === 'all') return;
+    // Fallback to user session work_area if selectedWorkArea is 'all' or empty
+    let workArea = selectedWorkArea;
+    if (!workArea || workArea === 'all') {
+      try {
+        const sessionData = localStorage.getItem('userSession');
+        if (sessionData) {
+          const session = JSON.parse(sessionData);
+          workArea = session.work_area;
+        }
+      } catch {}
+    }
+    if (!workArea || workArea === 'all') return;
     
     setLoading(true);
     try {
@@ -38,7 +49,7 @@ const AttendanceStatusList: React.FC<AttendanceStatusListProps> = ({ selectedWor
       const { data: staffData, error: staffError } = await supabase
         .from('staff_users')
         .select('uid, name, position')
-        .eq('work_area', selectedWorkArea)
+        .eq('work_area', workArea)
         .eq('is_active', true)
         .order('name');
       

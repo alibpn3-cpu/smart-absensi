@@ -397,6 +397,120 @@ export type Database = {
         }
         Relationships: []
       }
+      leave_balances: {
+        Row: {
+          created_at: string | null
+          id: string
+          staff_uid: string
+          total_days: number
+          updated_at: string | null
+          used_days: number
+          year: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          staff_uid: string
+          total_days?: number
+          updated_at?: string | null
+          used_days?: number
+          year: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          staff_uid?: string
+          total_days?: number
+          updated_at?: string | null
+          used_days?: number
+          year?: number
+        }
+        Relationships: []
+      }
+      leave_requests: {
+        Row: {
+          created_at: string | null
+          days_requested: number
+          department: string | null
+          hcga_approved_at: string | null
+          hcga_approver_uid: string | null
+          hcga_notes: string | null
+          hcga_status: string | null
+          id: string
+          join_date: string | null
+          leave_dates: Json
+          leave_year: number
+          other_decisions: string | null
+          position: string | null
+          previous_year_balance: number | null
+          remaining_balance: number | null
+          request_number: string
+          staff_name: string
+          staff_uid: string
+          status: string | null
+          supervisor_approved_at: string | null
+          supervisor_notes: string | null
+          supervisor_recommendation: string | null
+          supervisor_status: string | null
+          supervisor_uid: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          days_requested: number
+          department?: string | null
+          hcga_approved_at?: string | null
+          hcga_approver_uid?: string | null
+          hcga_notes?: string | null
+          hcga_status?: string | null
+          id?: string
+          join_date?: string | null
+          leave_dates: Json
+          leave_year: number
+          other_decisions?: string | null
+          position?: string | null
+          previous_year_balance?: number | null
+          remaining_balance?: number | null
+          request_number: string
+          staff_name: string
+          staff_uid: string
+          status?: string | null
+          supervisor_approved_at?: string | null
+          supervisor_notes?: string | null
+          supervisor_recommendation?: string | null
+          supervisor_status?: string | null
+          supervisor_uid?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          days_requested?: number
+          department?: string | null
+          hcga_approved_at?: string | null
+          hcga_approver_uid?: string | null
+          hcga_notes?: string | null
+          hcga_status?: string | null
+          id?: string
+          join_date?: string | null
+          leave_dates?: Json
+          leave_year?: number
+          other_decisions?: string | null
+          position?: string | null
+          previous_year_balance?: number | null
+          remaining_balance?: number | null
+          request_number?: string
+          staff_name?: string
+          staff_uid?: string
+          status?: string | null
+          supervisor_approved_at?: string | null
+          supervisor_notes?: string | null
+          supervisor_recommendation?: string | null
+          supervisor_status?: string | null
+          supervisor_uid?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       monthly_ranking_overrides: {
         Row: {
           created_at: string | null
@@ -478,21 +592,100 @@ export type Database = {
         }
         Relationships: []
       }
+      permission_requests: {
+        Row: {
+          created_at: string | null
+          department: string | null
+          hcga_approved_at: string | null
+          hcga_approver_uid: string | null
+          hcga_notes: string | null
+          hcga_status: string | null
+          id: string
+          join_date: string | null
+          permission_date: string
+          permission_duration: string
+          phone_number: string | null
+          position: string | null
+          reason: string
+          request_number: string
+          staff_name: string
+          staff_uid: string
+          status: string | null
+          supervisor_approved_at: string | null
+          supervisor_notes: string | null
+          supervisor_status: string | null
+          supervisor_uid: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          department?: string | null
+          hcga_approved_at?: string | null
+          hcga_approver_uid?: string | null
+          hcga_notes?: string | null
+          hcga_status?: string | null
+          id?: string
+          join_date?: string | null
+          permission_date: string
+          permission_duration: string
+          phone_number?: string | null
+          position?: string | null
+          reason: string
+          request_number: string
+          staff_name: string
+          staff_uid: string
+          status?: string | null
+          supervisor_approved_at?: string | null
+          supervisor_notes?: string | null
+          supervisor_status?: string | null
+          supervisor_uid?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          department?: string | null
+          hcga_approved_at?: string | null
+          hcga_approver_uid?: string | null
+          hcga_notes?: string | null
+          hcga_status?: string | null
+          id?: string
+          join_date?: string | null
+          permission_date?: string
+          permission_duration?: string
+          phone_number?: string | null
+          position?: string | null
+          reason?: string
+          request_number?: string
+          staff_name?: string
+          staff_uid?: string
+          status?: string | null
+          supervisor_approved_at?: string | null
+          supervisor_notes?: string | null
+          supervisor_status?: string | null
+          supervisor_uid?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       staff_users: {
         Row: {
           created_at: string
           division: string | null
           employee_type: string | null
+          hcga_approver_uid: string | null
           id: string
           is_active: boolean
           is_admin: boolean | null
           is_first_login: boolean | null
           is_manager: boolean | null
+          join_date: string | null
           name: string
           password_hash: string | null
+          phone_number: string | null
           photo_url: string | null
           position: string
           show_attendance_status: boolean | null
+          supervisor_uid: string | null
           uid: string
           updated_at: string
           work_area: string
@@ -501,16 +694,20 @@ export type Database = {
           created_at?: string
           division?: string | null
           employee_type?: string | null
+          hcga_approver_uid?: string | null
           id?: string
           is_active?: boolean
           is_admin?: boolean | null
           is_first_login?: boolean | null
           is_manager?: boolean | null
+          join_date?: string | null
           name: string
           password_hash?: string | null
+          phone_number?: string | null
           photo_url?: string | null
           position: string
           show_attendance_status?: boolean | null
+          supervisor_uid?: string | null
           uid: string
           updated_at?: string
           work_area: string
@@ -519,16 +716,20 @@ export type Database = {
           created_at?: string
           division?: string | null
           employee_type?: string | null
+          hcga_approver_uid?: string | null
           id?: string
           is_active?: boolean
           is_admin?: boolean | null
           is_first_login?: boolean | null
           is_manager?: boolean | null
+          join_date?: string | null
           name?: string
           password_hash?: string | null
+          phone_number?: string | null
           photo_url?: string | null
           position?: string
           show_attendance_status?: boolean | null
+          supervisor_uid?: string | null
           uid?: string
           updated_at?: string
           work_area?: string

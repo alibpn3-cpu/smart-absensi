@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Flag, Star, LogIn, Code, FlaskConical, Users } from 'lucide-react';
+import { Flag, Star, LogIn, Code, FlaskConical, Users, CalendarDays, FileText } from 'lucide-react';
 
 interface FeatureFlag {
   key: string;
@@ -44,6 +44,20 @@ const FeatureFlagSettings = () => {
       description: 'Tampilkan list status check-in/out per area kerja di halaman utama',
       icon: <Users className="h-4 w-4" />,
       value: true
+    },
+    {
+      key: 'leave_request_enabled',
+      label: 'Fitur Cuti Request',
+      description: 'Aktifkan fitur permintaan cuti untuk semua user',
+      icon: <CalendarDays className="h-4 w-4" />,
+      value: false
+    },
+    {
+      key: 'permission_request_enabled',
+      label: 'Fitur Ijin Request',
+      description: 'Aktifkan fitur permintaan ijin untuk semua user',
+      icon: <FileText className="h-4 w-4" />,
+      value: false
     }
   ]);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,7 +76,7 @@ const FeatureFlagSettings = () => {
       const { data, error } = await supabase
         .from('app_settings')
         .select('setting_key, setting_value')
-        .in('setting_key', ['score_feature_enabled', 'login_required', 'beta_mode_enabled', 'attendance_status_list_enabled']);
+        .in('setting_key', ['score_feature_enabled', 'login_required', 'beta_mode_enabled', 'attendance_status_list_enabled', 'leave_request_enabled', 'permission_request_enabled']);
 
       if (error) throw error;
 

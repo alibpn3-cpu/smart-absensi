@@ -32,6 +32,11 @@ interface StaffUser {
   is_admin?: boolean;
   is_manager?: boolean;
   employee_type?: string;
+  show_attendance_status?: boolean;
+  phone_number?: string;
+  supervisor_uid?: string;
+  hcga_approver_uid?: string;
+  join_date?: string;
 }
 
 // Combobox component for editable dropdowns with auto-uppercase
@@ -135,7 +140,11 @@ const EmployeeManager = () => {
     work_area: '',
     division: '',
     photo_url: '',
-    employee_type: 'staff'
+    employee_type: 'staff',
+    phone_number: '',
+    supervisor_uid: '',
+    hcga_approver_uid: '',
+    join_date: ''
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
@@ -156,7 +165,9 @@ const EmployeeManager = () => {
     position: '',
     work_area: '',
     division: '',
-    employee_type: ''
+    employee_type: '',
+    supervisor_uid: '',
+    hcga_approver_uid: ''
   });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -401,7 +412,11 @@ const EmployeeManager = () => {
       work_area: '',
       division: '',
       photo_url: '',
-      employee_type: 'staff'
+      employee_type: 'staff',
+      phone_number: '',
+      supervisor_uid: '',
+      hcga_approver_uid: '',
+      join_date: ''
     });
     setEditingEmployee(null);
     setPhotoFile(null);
@@ -411,7 +426,7 @@ const EmployeeManager = () => {
   const openDialog = (employee?: StaffUser) => {
     if (employee) {
       setEditingEmployee(employee);
-      setOriginalUid(employee.uid); // Track original UID for change detection
+      setOriginalUid(employee.uid);
       setFormData({
         uid: employee.uid,
         name: employee.name,
@@ -419,7 +434,11 @@ const EmployeeManager = () => {
         work_area: employee.work_area,
         division: employee.division || '',
         photo_url: employee.photo_url || '',
-        employee_type: employee.employee_type || 'staff'
+        employee_type: employee.employee_type || 'staff',
+        phone_number: (employee as any).phone_number || '',
+        supervisor_uid: (employee as any).supervisor_uid || '',
+        hcga_approver_uid: (employee as any).hcga_approver_uid || '',
+        join_date: (employee as any).join_date || ''
       });
       setPhotoPreview(employee.photo_url || '');
     } else {
@@ -488,13 +507,17 @@ const EmployeeManager = () => {
         }
       }
 
-      const employeeData = {
+      const employeeData: any = {
         name: formData.name,
         position: formData.position,
         work_area: formData.work_area,
         division: formData.division || null,
         photo_url: photoUrl,
-        employee_type: formData.employee_type || 'staff'
+        employee_type: formData.employee_type || 'staff',
+        phone_number: formData.phone_number || null,
+        supervisor_uid: formData.supervisor_uid && formData.supervisor_uid !== 'none' ? formData.supervisor_uid : null,
+        hcga_approver_uid: formData.hcga_approver_uid && formData.hcga_approver_uid !== 'none' ? formData.hcga_approver_uid : null,
+        join_date: formData.join_date || null
       };
 
       if (editingEmployee) {
@@ -727,10 +750,10 @@ const EmployeeManager = () => {
 
   const toggleAttendanceStatusVisibility = async (employee: StaffUser) => {
     try {
-      const newStatus = !(employee as any).show_attendance_status;
+      const newStatus = !employee.show_attendance_status;
       const { error } = await supabase
         .from('staff_users')
-        .update({ show_attendance_status: newStatus } as any)
+        .update({ show_attendance_status: newStatus })
         .eq('id', employee.id);
 
       if (error) throw error;
@@ -812,7 +835,7 @@ const EmployeeManager = () => {
   const handleBatchUpdate = async () => {
     if (selectedEmployees.size === 0) return;
 
-    if (!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division && !batchUpdateData.employee_type) {
+    if (!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division && !batchUpdateData.employee_type && !batchUpdateData.supervisor_uid && !batchUpdateData.hcga_approver_uid) {
       toast({
         title: "Gagal",
         description: "Pilih minimal satu field untuk diupdate",
@@ -827,6 +850,8 @@ const EmployeeManager = () => {
       if (batchUpdateData.work_area) updatePayload.work_area = batchUpdateData.work_area;
       if (batchUpdateData.division) updatePayload.division = batchUpdateData.division;
       if (batchUpdateData.employee_type) updatePayload.employee_type = batchUpdateData.employee_type;
+      if (batchUpdateData.supervisor_uid) updatePayload.supervisor_uid = batchUpdateData.supervisor_uid === 'none' ? null : batchUpdateData.supervisor_uid;
+      if (batchUpdateData.hcga_approver_uid) updatePayload.hcga_approver_uid = batchUpdateData.hcga_approver_uid === 'none' ? null : batchUpdateData.hcga_approver_uid;
 
       const { error } = await supabase
         .from('staff_users')
@@ -851,7 +876,7 @@ const EmployeeManager = () => {
       });
 
       setIsBatchUpdateDialogOpen(false);
-      setBatchUpdateData({ position: '', work_area: '', division: '', employee_type: '' });
+      setBatchUpdateData({ position: '', work_area: '', division: '', employee_type: '', supervisor_uid: '', hcga_approver_uid: '' });
       setSelectedEmployees(new Set());
       fetchEmployees();
       fetchDropdownData();
@@ -1469,6 +1494,62 @@ const EmployeeManager = () => {
                   </div>
 
                   <div className="space-y-2">
+                    <Label htmlFor="phone_number">No. WhatsApp (Optional)</Label>
+                    <Input
+                      id="phone_number"
+                      value={formData.phone_number}
+                      onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
+                      placeholder="e.g., 6281234567890"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="join_date">Tanggal Mulai Kerja (Optional)</Label>
+                    <Input
+                      id="join_date"
+                      type="date"
+                      value={formData.join_date}
+                      onChange={(e) => setFormData({...formData, join_date: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="supervisor_uid">Atasan (Optional)</Label>
+                    <Select
+                      value={formData.supervisor_uid}
+                      onValueChange={(value) => setFormData({...formData, supervisor_uid: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih atasan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">-- Tidak ada --</SelectItem>
+                        {employees.filter(e => e.uid !== formData.uid).map(emp => (
+                          <SelectItem key={emp.uid} value={emp.uid}>{emp.name} ({emp.uid})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="hcga_approver_uid">HC&GA Site Approver (Optional)</Label>
+                    <Select
+                      value={formData.hcga_approver_uid}
+                      onValueChange={(value) => setFormData({...formData, hcga_approver_uid: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih HC&GA Site" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">-- Tidak ada --</SelectItem>
+                        {employees.filter(e => e.uid !== formData.uid).map(emp => (
+                          <SelectItem key={emp.uid} value={emp.uid}>{emp.name} ({emp.uid})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="photo">Photo (Optional)</Label>
                     <div className="flex items-center gap-4">
                       {photoPreview ? (
@@ -1758,7 +1839,7 @@ const EmployeeManager = () => {
                         Manager
                       </Badge>
                     )}
-                    {(employee as any).show_attendance_status && (
+                    {employee.show_attendance_status && (
                       <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-300">
                         <Eye className="h-3 w-3 mr-1" />
                         Status In/Out
@@ -1841,9 +1922,9 @@ const EmployeeManager = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => toggleAttendanceStatusVisibility(employee)}
-                      title={(employee as any).show_attendance_status ? "Sembunyikan Status In/Out" : "Tampilkan Status In/Out"}
+                      title={employee.show_attendance_status ? "Sembunyikan Status In/Out" : "Tampilkan Status In/Out"}
                     >
-                      {(employee as any).show_attendance_status ? (
+                      {employee.show_attendance_status ? (
                         <Eye className="h-4 w-4 text-blue-600" />
                       ) : (
                         <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -2038,6 +2119,42 @@ const EmployeeManager = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label>Atasan (Optional)</Label>
+              <Select
+                value={batchUpdateData.supervisor_uid}
+                onValueChange={(value) => setBatchUpdateData({...batchUpdateData, supervisor_uid: value})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih atasan (tidak diubah jika kosong)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">-- Hapus atasan --</SelectItem>
+                  {employees.map(emp => (
+                    <SelectItem key={emp.uid} value={emp.uid}>{emp.name} ({emp.uid})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>HC&GA Site Approver (Optional)</Label>
+              <Select
+                value={batchUpdateData.hcga_approver_uid}
+                onValueChange={(value) => setBatchUpdateData({...batchUpdateData, hcga_approver_uid: value})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih HC&GA Site (tidak diubah jika kosong)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">-- Hapus HC&GA --</SelectItem>
+                  {employees.map(emp => (
+                    <SelectItem key={emp.uid} value={emp.uid}>{emp.name} ({emp.uid})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">
@@ -2049,7 +2166,7 @@ const EmployeeManager = () => {
               <Button 
                 onClick={handleBatchUpdate}
                 className="flex-1"
-                disabled={!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division && !batchUpdateData.employee_type}
+                disabled={!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division && !batchUpdateData.employee_type && !batchUpdateData.supervisor_uid && !batchUpdateData.hcga_approver_uid}
               >
                 Update {selectedEmployees.size} Karyawan
               </Button>
@@ -2058,7 +2175,7 @@ const EmployeeManager = () => {
                 variant="outline" 
                 onClick={() => {
                   setIsBatchUpdateDialogOpen(false);
-                  setBatchUpdateData({ position: '', work_area: '', division: '', employee_type: '' });
+                  setBatchUpdateData({ position: '', work_area: '', division: '', employee_type: '', supervisor_uid: '', hcga_approver_uid: '' });
                 }}
               >
                 Batal

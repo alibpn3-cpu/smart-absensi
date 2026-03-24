@@ -1,0 +1,1 @@
+INSERT INTO app_settings (setting_key, setting_value, description) VALUES ('leave_request_enabled', 'false', 'Aktifkan fitur permintaan cuti'), ('permission_request_enabled', 'false', 'Aktifkan fitur permintaan ijin');

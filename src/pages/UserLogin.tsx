@@ -20,6 +20,10 @@ interface UserSession {
   is_manager: boolean;
   employee_type?: string;
   show_attendance_status?: boolean;
+  phone_number?: string;
+  supervisor_uid?: string;
+  hcga_approver_uid?: string;
+  join_date?: string;
 }
 
 const UserLogin = () => {
@@ -88,7 +92,7 @@ const UserLogin = () => {
       // Find staff by UID
       const { data: staff, error } = await supabase
         .from('staff_users')
-        .select('uid, name, position, work_area, division, photo_url, is_active, password_hash, is_first_login, is_admin, is_manager, employee_type, show_attendance_status')
+        .select('uid, name, position, work_area, division, photo_url, is_active, password_hash, is_first_login, is_admin, is_manager, employee_type, show_attendance_status, phone_number, supervisor_uid, hcga_approver_uid, join_date')
         .eq('uid', credentials.uid.toUpperCase().trim())
         .maybeSingle();
 
@@ -142,7 +146,11 @@ const UserLogin = () => {
         is_admin: staff.is_admin || false,
         is_manager: staff.is_manager || false,
         employee_type: staff.employee_type || 'staff',
-        show_attendance_status: staff.show_attendance_status || false
+        show_attendance_status: staff.show_attendance_status || false,
+        phone_number: staff.phone_number || undefined,
+        supervisor_uid: staff.supervisor_uid || undefined,
+        hcga_approver_uid: staff.hcga_approver_uid || undefined,
+        join_date: staff.join_date || undefined
       };
 
       // Check if first login - require password change
