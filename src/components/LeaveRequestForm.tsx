@@ -5,14 +5,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { CalendarIcon, Loader2, FileText } from 'lucide-react';
+import { Loader2, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { notifyRequestSubmitted, notifyApproverNewRequest } from '@/utils/notificationHelper';
 
 interface UserSession {
   uid: string;
@@ -62,11 +61,7 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
     const years = [currentYear];
-    
-    // Include previous year if before July
-    if (currentMonth <= 6) {
-      years.unshift(currentYear - 1);
-    }
+    if (currentMonth <= 6) years.unshift(currentYear - 1);
 
     const { data } = await supabase
       .from('leave_balances')
@@ -79,15 +74,11 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
       const existing = data?.find(d => d.year === yr);
       if (existing) {
         const remaining = existing.total_days - existing.used_days;
-        // Previous year balance only valid until June
         if (yr < currentYear && (currentMonth > 6 || remaining <= 0)) continue;
         result.push({ year: yr, total_days: existing.total_days, used_days: existing.used_days, remaining });
-      } else {
-        // Auto-create balance for current year
-        if (yr === currentYear) {
-          await supabase.from('leave_balances').insert({ staff_uid: staffUid, year: yr, total_days: 12, used_days: 0 });
-          result.push({ year: yr, total_days: 12, used_days: 0, remaining: 12 });
-        }
+      } else if (yr === currentYear) {
+        await supabase.from('leave_balances').insert({ staff_uid: staffUid, year: yr, total_days: 12, used_days: 0 });
+        result.push({ year: yr, total_days: 12, used_days: 0, remaining: 12 });
       }
     }
 
@@ -138,6 +129,25 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
       if (error) throw error;
 
       toast({ title: "Berhasil", description: "Permintaan cuti berhasil diajukan" });
+
+      // Send notifications (fire-and-forget)
+      const detailStr = `📅 ${selectedDates.length} hari cuti - Tahun ${selectedYear}\n📆 ${leaveDates.map(d => format(new Date(d), 'dd MMM', { locale: idLocale })).join(', ')}`;
+
+      notifyRequestSubmitted({
+        requestNumber, requestType: 'Cuti',
+        staffUid: userSession.uid, staffName: userSession.name,
+        details: detailStr,
+      });
+
+      if (userSession.supervisor_uid) {
+        notifyApproverNewRequest({
+          requestId: '', requestNumber, requestType: 'Cuti',
+          creatorName: userSession.name,
+          approverUid: userSession.supervisor_uid,
+          details: detailStr,
+        });
+      }
+
       setSelectedDates([]);
       onSubmitted();
       onClose();
@@ -161,7 +171,6 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
 
         {userSession && (
           <div className="space-y-4">
-            {/* Info User */}
             <div className="grid grid-cols-2 gap-2 text-sm bg-muted/50 p-3 rounded-lg">
               <div><span className="text-muted-foreground">Nama:</span> <strong>{userSession.name}</strong></div>
               <div><span className="text-muted-foreground">UID:</span> <strong>{userSession.uid}</strong></div>
@@ -177,14 +186,11 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
               </div>
             )}
 
-            {/* Pilih Tahun Cuti */}
             {balances.length > 0 && (
               <div className="space-y-2">
                 <Label>Periode Cuti (Tahun)</Label>
                 <Select value={selectedYear} onValueChange={setSelectedYear}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih tahun" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
                   <SelectContent>
                     {balances.map(b => (
                       <SelectItem key={b.year} value={String(b.year)}>
@@ -196,7 +202,6 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
               </div>
             )}
 
-            {/* Pilih Tanggal */}
             {selectedBalance && (
               <div className="space-y-2">
                 <Label>Tanggal Cuti ({selectedDates.length} hari dipilih, maks {selectedBalance.remaining})</Label>
@@ -215,7 +220,6 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
               </div>
             )}
 
-            {/* Summary */}
             {selectedDates.length > 0 && selectedBalance && (
               <div className="bg-muted/50 p-3 rounded-lg text-sm space-y-1">
                 <p><strong>Jumlah hari:</strong> {selectedDates.length} hari</p>
