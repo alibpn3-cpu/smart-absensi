@@ -505,13 +505,17 @@ const EmployeeManager = () => {
         }
       }
 
-      const employeeData = {
+      const employeeData: any = {
         name: formData.name,
         position: formData.position,
         work_area: formData.work_area,
         division: formData.division || null,
         photo_url: photoUrl,
-        employee_type: formData.employee_type || 'staff'
+        employee_type: formData.employee_type || 'staff',
+        phone_number: formData.phone_number || null,
+        supervisor_uid: formData.supervisor_uid || null,
+        hcga_approver_uid: formData.hcga_approver_uid || null,
+        join_date: formData.join_date || null
       };
 
       if (editingEmployee) {
