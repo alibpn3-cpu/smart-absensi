@@ -145,6 +145,15 @@ const UserProfile = () => {
               <Button
                 variant="outline"
                 className="w-full justify-start h-12"
+                onClick={() => navigate('/requests')}
+              >
+                <FileText className="h-5 w-5 mr-3" />
+                Permintaan Cuti & Ijin
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full justify-start h-12"
                 onClick={() => setShowChangePassword(true)}
               >
                 <Lock className="h-5 w-5 mr-3" />
