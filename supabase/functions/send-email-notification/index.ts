@@ -84,7 +84,7 @@ const generateEmailHTML = (payload: EmailPayload): string => {
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
         <tr><td align="center" style="background:${headerBg};padding:24px 20px;border-radius:10px 10px 0 0;">
           <h1 style="margin:0;color:#fff;font-size:20px;">${headerTitle}</h1>
-          <p style="margin:6px 0 0;color:rgba(255,255,255,0.8);font-size:13px;">Digital Absensi</p>
+          <p style="margin:6px 0 0;color:rgba(255,255,255,0.8);font-size:13px;">Digital Presensi</p>
         </td></tr>
         <tr><td style="background:#fff;padding:24px 30px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;font-size:14px;color:#333;line-height:1.6;">
           ${bodyContent}
