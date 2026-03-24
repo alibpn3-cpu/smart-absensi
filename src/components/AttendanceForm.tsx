@@ -2548,15 +2548,6 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         {/* ========== CARD 7: Ranking Card ========== */}
         {featureFlags.scoreEnabled && <RankingCard />}
 
-        {/* ========== USER MODE: CARD 8 - GPS Status Indicator ========== */}
-        {isUserLoggedIn && !sharedDeviceMode && (
-          <LocationAccuracyIndicator
-            accuracy={gpsStatus.accuracy}
-            isLoading={gpsStatus.isLoading}
-            onRetry={checkGpsStatus}
-          />
-        )}
-
         {/* ========== USER MODE: P2H/Toolbox Card (if primary & already checked in) ========== */}
         {featureFlags.scoreEnabled && 
          selectedStaff?.employee_type === 'primary' && 
@@ -2587,26 +2578,6 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             managerUid={selectedStaff.uid}
           />
         )}
-
-        {/* ========== FOOTER: Version + Update + Debug ========== */}
-        <div className="text-center text-xs text-muted-foreground mt-2 space-y-2">
-          <div>Versi aplikasi : {appVersion} IT Division</div>
-          <div className="flex items-center justify-center gap-3 flex-wrap">
-            <Button variant="outline" size="sm" onClick={handleClearCache}>
-              Update (Hapus Cache)
-            </Button>
-            <DebugLogger 
-              staffUid={selectedStaff?.uid}
-              staffName={selectedStaff?.name}
-              workAreas={workAreas}
-              permissions={permissions}
-            />
-            <PermissionIndicators 
-              permissions={permissions} 
-              onPermissionsUpdate={savePermissions}
-            />
-          </div>
-        </div>
 
         {/* StatusPresensiDialog - For User Login Mode */}
         <StatusPresensiDialog
