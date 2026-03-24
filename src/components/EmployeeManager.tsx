@@ -140,7 +140,11 @@ const EmployeeManager = () => {
     work_area: '',
     division: '',
     photo_url: '',
-    employee_type: 'staff'
+    employee_type: 'staff',
+    phone_number: '',
+    supervisor_uid: '',
+    hcga_approver_uid: '',
+    join_date: ''
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
