@@ -2,3 +2,9 @@ project_id = "spqakoyhyziuxfgdkgpm"
 
 [functions.calculate-daily-scores]
 verify_jwt = false
+
+[functions.send-whatsapp-notification]
+verify_jwt = false
+
+[functions.send-email-notification]
+verify_jwt = false
