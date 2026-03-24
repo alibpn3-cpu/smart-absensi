@@ -47,6 +47,7 @@ const AppContent = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/user-login" element={<UserLogin />} />
         <Route path="/user-profile" element={<UserProfile />} />
+        <Route path="/requests" element={<RequestsPage />} />
         <Route path="/dashboard" element={
           <ProtectedRoute>
             <Dashboard />
