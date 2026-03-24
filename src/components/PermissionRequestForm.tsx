@@ -51,7 +51,32 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
       setUserSession(session);
       setPhoneNumber(session.phone_number || '');
       setJoinDateStr(session.join_date || '');
-      fetchApproverNames(session.supervisor_uid, session.hcga_approver_uid);
+
+      // Always re-fetch from DB to get latest supervisor/hcga assignment
+      const refreshUserData = async () => {
+        const { data } = await supabase
+          .from('staff_users')
+          .select('supervisor_uid, hcga_approver_uid, join_date, phone_number, division')
+          .eq('uid', session.uid)
+          .maybeSingle();
+        if (data) {
+          const updatedSession = {
+            ...session,
+            supervisor_uid: data.supervisor_uid || undefined,
+            hcga_approver_uid: data.hcga_approver_uid || undefined,
+            join_date: data.join_date || undefined,
+            phone_number: data.phone_number || undefined,
+          };
+          setUserSession(updatedSession);
+          setPhoneNumber(data.phone_number || '');
+          setJoinDateStr(data.join_date || '');
+          localStorage.setItem('userSession', JSON.stringify({ ...JSON.parse(sessionData), ...updatedSession }));
+          fetchApproverNames(data.supervisor_uid || undefined, data.hcga_approver_uid || undefined);
+        } else {
+          fetchApproverNames(session.supervisor_uid, session.hcga_approver_uid);
+        }
+      };
+      refreshUserData();
     }
     setPermissionDate(undefined);
     setDuration('');
