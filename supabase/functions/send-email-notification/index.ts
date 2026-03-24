@@ -139,11 +139,14 @@ serve(async (req: Request) => {
     const emailHtml = generateEmailHTML(payload);
     const fromEmail = SMTP_FROM_EMAIL || "noreply@digital-absensi.com";
 
+    const smtpPort = parseInt(SMTP_PORT || "587");
+    const useTls = smtpPort === 465;
+
     const client = new SMTPClient({
       connection: {
         hostname: SMTP_HOST,
-        port: parseInt(SMTP_PORT || "587"),
-        tls: true,
+        port: smtpPort,
+        tls: useTls,
         auth: {
           username: SMTP_USER,
           password: SMTP_PASSWORD,
