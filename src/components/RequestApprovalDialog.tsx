@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { notifyStatusUpdate, notifyApproverNewRequest } from '@/utils/notificationHelper';
 
 interface RequestApprovalDialogProps {
   isOpen: boolean;
@@ -34,14 +35,17 @@ const RequestApprovalDialog: React.FC<RequestApprovalDialogProps> = ({
       const notesField = approverRole === 'supervisor' ? 'supervisor_notes' : 'hcga_notes';
       const approvedAtField = approverRole === 'supervisor' ? 'supervisor_approved_at' : 'hcga_approved_at';
 
+      const userSession = JSON.parse(localStorage.getItem('userSession') || '{}');
+      const approverUidField = approverRole === 'supervisor' ? 'supervisor_uid' : 'hcga_approver_uid';
+
       const updateData: Record<string, any> = {
         [statusField]: action,
         [notesField]: notes || null,
         [approvedAtField]: new Date().toISOString(),
+        [approverUidField]: userSession.uid || null,
         updated_at: new Date().toISOString(),
       };
 
-      // Add recommendation & other_decisions for leave requests supervisor
       if (requestType === 'leave' && approverRole === 'supervisor') {
         updateData.supervisor_recommendation = recommendation || null;
       }
@@ -49,8 +53,8 @@ const RequestApprovalDialog: React.FC<RequestApprovalDialogProps> = ({
         updateData.other_decisions = otherDecisions || null;
       }
 
-      // Check if both approvals are done to set final status
-      const { data: currentReq } = await supabase.from(table).select('supervisor_status, hcga_status').eq('id', requestId).single();
+      // Check if both approvals are done
+      const { data: currentReq } = await supabase.from(table).select('*').eq('id', requestId).single();
 
       if (currentReq) {
         const supervisorFinal = approverRole === 'supervisor' ? action : currentReq.supervisor_status;
@@ -58,35 +62,54 @@ const RequestApprovalDialog: React.FC<RequestApprovalDialogProps> = ({
 
         if (supervisorFinal === 'approved' && hcgaFinal === 'approved') {
           updateData.status = 'approved';
-          // Update leave balance if leave request approved
+          // Update leave balance
           if (requestType === 'leave') {
-            const { data: leaveReq } = await supabase.from('leave_requests').select('staff_uid, leave_year, days_requested').eq('id', requestId).single();
-            if (leaveReq) {
+            const { data: balance } = await supabase.from('leave_balances')
+              .select('used_days')
+              .eq('staff_uid', currentReq.staff_uid)
+              .eq('year', currentReq.leave_year)
+              .single();
+            if (balance) {
               await supabase.from('leave_balances')
-                .update({ used_days: supabase.rpc as any })
-                .eq('staff_uid', leaveReq.staff_uid)
-                .eq('year', leaveReq.leave_year);
-              // Simple increment
-              const { data: balance } = await supabase.from('leave_balances')
-                .select('used_days')
-                .eq('staff_uid', leaveReq.staff_uid)
-                .eq('year', leaveReq.leave_year)
-                .single();
-              if (balance) {
-                await supabase.from('leave_balances')
-                  .update({ used_days: balance.used_days + leaveReq.days_requested })
-                  .eq('staff_uid', leaveReq.staff_uid)
-                  .eq('year', leaveReq.leave_year);
-              }
+                .update({ used_days: balance.used_days + currentReq.days_requested })
+                .eq('staff_uid', currentReq.staff_uid)
+                .eq('year', currentReq.leave_year);
             }
           }
         } else if (supervisorFinal === 'rejected' || hcgaFinal === 'rejected') {
           updateData.status = 'rejected';
         }
-      }
 
-      const { error } = await supabase.from(table).update(updateData).eq('id', requestId);
-      if (error) throw error;
+        const { error } = await supabase.from(table).update(updateData).eq('id', requestId);
+        if (error) throw error;
+
+        // Send notifications
+        const reqTypeName = requestType === 'leave' ? 'Cuti' : 'Ijin';
+        const approverName = userSession.name || approverRole;
+
+        // Notify the staff about status
+        notifyStatusUpdate({
+          requestNumber,
+          requestType: reqTypeName,
+          staffUid: currentReq.staff_uid,
+          staffName: currentReq.staff_name,
+          status: action,
+          approverName,
+          notes: notes || undefined,
+        });
+
+        // If supervisor approved, notify HC&GA for next approval
+        if (approverRole === 'supervisor' && action === 'approved' && currentReq.hcga_approver_uid) {
+          notifyApproverNewRequest({
+            requestId,
+            requestNumber,
+            requestType: reqTypeName,
+            creatorName: currentReq.staff_name,
+            approverUid: currentReq.hcga_approver_uid,
+            details: `Sudah disetujui oleh atasan (${approverName})`,
+          });
+        }
+      }
 
       toast({
         title: action === 'approved' ? "Disetujui" : "Ditolak",

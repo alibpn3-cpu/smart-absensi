@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { notifyRequestSubmitted, notifyApproverNewRequest } from '@/utils/notificationHelper';
 
 interface UserSession {
   uid: string;
@@ -52,7 +53,6 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
       setJoinDateStr(session.join_date || '');
       fetchApproverNames(session.supervisor_uid, session.hcga_approver_uid);
     }
-    // Reset form
     setPermissionDate(undefined);
     setDuration('');
     setReason('');
@@ -97,6 +97,25 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
       if (error) throw error;
 
       toast({ title: "Berhasil", description: "Permintaan ijin berhasil diajukan" });
+
+      // Send notifications
+      const detailStr = `⏱️ Durasi: ${duration.trim()}\n📅 Tanggal: ${format(permissionDate, 'dd MMM yyyy', { locale: idLocale })}\n📝 ${reason.trim()}`;
+
+      notifyRequestSubmitted({
+        requestNumber, requestType: 'Ijin',
+        staffUid: userSession.uid, staffName: userSession.name,
+        details: detailStr,
+      });
+
+      if (userSession.supervisor_uid) {
+        notifyApproverNewRequest({
+          requestId: '', requestNumber, requestType: 'Ijin',
+          creatorName: userSession.name,
+          approverUid: userSession.supervisor_uid,
+          details: detailStr,
+        });
+      }
+
       onSubmitted();
       onClose();
     } catch (error: any) {
@@ -119,7 +138,6 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
 
         {userSession && (
           <div className="space-y-4">
-            {/* Info User */}
             <div className="grid grid-cols-2 gap-2 text-sm bg-muted/50 p-3 rounded-lg">
               <div><span className="text-muted-foreground">Nama:</span> <strong>{userSession.name}</strong></div>
               <div><span className="text-muted-foreground">UID:</span> <strong>{userSession.uid}</strong></div>
@@ -135,28 +153,16 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
               </div>
             )}
 
-            {/* Tanggal Mulai Kerja */}
             <div className="space-y-2">
               <Label>Mulai Menjadi Karyawan</Label>
-              <Input
-                type="date"
-                value={joinDateStr}
-                onChange={(e) => setJoinDateStr(e.target.value)}
-                placeholder="Tanggal mulai kerja"
-              />
+              <Input type="date" value={joinDateStr} onChange={(e) => setJoinDateStr(e.target.value)} />
             </div>
 
-            {/* Durasi Ijin */}
             <div className="space-y-2">
               <Label>Ijin yang Dimohon (jam/hari)</Label>
-              <Input
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                placeholder="Misal: 2 jam, 1 hari"
-              />
+              <Input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Misal: 2 jam, 1 hari" />
             </div>
 
-            {/* Tanggal Ijin */}
             <div className="space-y-2">
               <Label>Tanggal Ijin Dilaksanakan</Label>
               <Popover>
@@ -172,25 +178,14 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
               </Popover>
             </div>
 
-            {/* Nomor HP */}
             <div className="space-y-2">
               <Label>Nomor HP yang Bisa Dihubungi</Label>
-              <Input
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="08xxxxxxxxxx"
-              />
+              <Input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="08xxxxxxxxxx" />
             </div>
 
-            {/* Alasan */}
             <div className="space-y-2">
               <Label>Alasan Ijin</Label>
-              <Textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Jelaskan alasan ijin..."
-                rows={3}
-              />
+              <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Jelaskan alasan ijin..." rows={3} />
             </div>
           </div>
         )}
