@@ -1490,7 +1490,60 @@ const EmployeeManager = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="photo">Photo (Optional)</Label>
+                    <Label htmlFor="phone_number">No. WhatsApp (Optional)</Label>
+                    <Input
+                      id="phone_number"
+                      value={formData.phone_number}
+                      onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
+                      placeholder="e.g., 6281234567890"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="join_date">Tanggal Mulai Kerja (Optional)</Label>
+                    <Input
+                      id="join_date"
+                      type="date"
+                      value={formData.join_date}
+                      onChange={(e) => setFormData({...formData, join_date: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="supervisor_uid">Atasan (Optional)</Label>
+                    <Select
+                      value={formData.supervisor_uid}
+                      onValueChange={(value) => setFormData({...formData, supervisor_uid: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih atasan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">-- Tidak ada --</SelectItem>
+                        {employees.filter(e => e.uid !== formData.uid).map(emp => (
+                          <SelectItem key={emp.uid} value={emp.uid}>{emp.name} ({emp.uid})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="hcga_approver_uid">HC&GA Site Approver (Optional)</Label>
+                    <Select
+                      value={formData.hcga_approver_uid}
+                      onValueChange={(value) => setFormData({...formData, hcga_approver_uid: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih HC&GA Site" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">-- Tidak ada --</SelectItem>
+                        {employees.filter(e => e.uid !== formData.uid).map(emp => (
+                          <SelectItem key={emp.uid} value={emp.uid}>{emp.name} ({emp.uid})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                     <div className="flex items-center gap-4">
                       {photoPreview ? (
                         <div className="relative">
