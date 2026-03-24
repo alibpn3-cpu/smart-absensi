@@ -97,7 +97,7 @@ const generateEmailHTML = (payload: EmailPayload): string => {
           </table>
         </td></tr>
         <tr><td align="center" style="padding:16px;border-top:1px solid #e0e0e0;">
-          <p style="margin:0;font-size:11px;color:#999;">Email otomatis dari Digital Absensi</p>
+          <p style="margin:0;font-size:11px;color:#999;">Email otomatis dari Digital Presensi</p>
         </td></tr>
       </table>
     </td></tr>
