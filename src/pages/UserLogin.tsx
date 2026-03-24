@@ -20,6 +20,10 @@ interface UserSession {
   is_manager: boolean;
   employee_type?: string;
   show_attendance_status?: boolean;
+  phone_number?: string;
+  supervisor_uid?: string;
+  hcga_approver_uid?: string;
+  join_date?: string;
 }
 
 const UserLogin = () => {
