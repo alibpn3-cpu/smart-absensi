@@ -6,6 +6,7 @@ import { Shield, User, LogIn, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import AttendanceForm from '../components/AttendanceForm';
 import AdPopup from '../components/AdPopup';
+import UserSidebar from '../components/UserSidebar';
 import { toast } from '@/hooks/use-toast';
 
 interface UserSession {
@@ -253,16 +254,9 @@ const Index = () => {
                 <LogOut className="h-3 w-3" />
               </Button>
 
-              {/* Profile button - only show when logged in (not kiosk) */}
+              {/* Sidebar menu - only for logged in users (not kiosk) */}
               {userSession && !sharedDeviceMode && (
-                <Button
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => navigate('/user-profile')}
-                  className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 p-2"
-                >
-                  <User className="h-4 w-4" />
-                </Button>
+                <UserSidebar />
               )}
 
               {/* Login button for kiosk mode - to access personal mode */}
