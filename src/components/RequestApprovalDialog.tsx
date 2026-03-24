@@ -54,7 +54,7 @@ const RequestApprovalDialog: React.FC<RequestApprovalDialogProps> = ({
       }
 
       // Check if both approvals are done
-      const { data: currentReq } = await supabase.from(table).select('*').eq('id', requestId).single();
+      const { data: currentReq } = await supabase.from(table).select('*').eq('id', requestId).single() as { data: any };
 
       if (currentReq) {
         const supervisorFinal = approverRole === 'supervisor' ? action : currentReq.supervisor_status;
