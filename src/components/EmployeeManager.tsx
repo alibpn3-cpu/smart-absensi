@@ -751,7 +751,7 @@ const EmployeeManager = () => {
       const newStatus = !employee.show_attendance_status;
       const { error } = await supabase
         .from('staff_users')
-        .update({ show_attendance_status: newStatus } as any)
+        .update({ show_attendance_status: newStatus })
         .eq('id', employee.id);
 
       if (error) throw error;

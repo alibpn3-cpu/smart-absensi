@@ -49,7 +49,7 @@ const AttendanceStatusList: React.FC<AttendanceStatusListProps> = ({ selectedWor
       const { data: staffData, error: staffError } = await supabase
         .from('staff_users')
         .select('uid, name, position')
-        .eq('work_area', selectedWorkArea)
+        .eq('work_area', workArea)
         .eq('is_active', true)
         .order('name');
       
