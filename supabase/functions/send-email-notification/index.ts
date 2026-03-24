@@ -21,7 +21,7 @@ interface EmailPayload {
 }
 
 const generateEmailHTML = (payload: EmailPayload): string => {
-  const appLink = payload.app_url || 'https://digital-absensi.lovable.app';
+  const appLink = payload.app_url || 'https://absensi.petrolog.my.id';
   const requestsUrl = `${appLink}/requests`;
 
   let headerBg = '#3b82f6';
@@ -84,7 +84,7 @@ const generateEmailHTML = (payload: EmailPayload): string => {
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
         <tr><td align="center" style="background:${headerBg};padding:24px 20px;border-radius:10px 10px 0 0;">
           <h1 style="margin:0;color:#fff;font-size:20px;">${headerTitle}</h1>
-          <p style="margin:6px 0 0;color:rgba(255,255,255,0.8);font-size:13px;">Digital Absensi</p>
+          <p style="margin:6px 0 0;color:rgba(255,255,255,0.8);font-size:13px;">Digital Presensi</p>
         </td></tr>
         <tr><td style="background:#fff;padding:24px 30px;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;font-size:14px;color:#333;line-height:1.6;">
           ${bodyContent}
@@ -97,7 +97,7 @@ const generateEmailHTML = (payload: EmailPayload): string => {
           </table>
         </td></tr>
         <tr><td align="center" style="padding:16px;border-top:1px solid #e0e0e0;">
-          <p style="margin:0;font-size:11px;color:#999;">Email otomatis dari Digital Absensi</p>
+          <p style="margin:0;font-size:11px;color:#999;">Email otomatis dari Digital Presensi</p>
         </td></tr>
       </table>
     </td></tr>
@@ -155,7 +155,7 @@ serve(async (req: Request) => {
     });
 
     const info = await transporter.sendMail({
-      from: `"Digital Absensi" <${fromEmail}>`,
+      from: `"Digital Presensi" <${fromEmail}>`,
       to: payload.to_email,
       subject: payload.subject,
       html: emailHtml,
