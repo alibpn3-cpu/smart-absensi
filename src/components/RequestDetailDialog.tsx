@@ -1,10 +1,13 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import ApprovalProgressLine from './ApprovalProgressLine';
+import { generateLeaveRequestPDF, generatePermissionRequestPDF } from '@/utils/pdfExportRequest';
 
 interface RequestDetailDialogProps {
   isOpen: boolean;
@@ -30,6 +33,19 @@ const RequestDetailDialog: React.FC<RequestDetailDialogProps> = ({ isOpen, onClo
       <span className="font-medium text-right max-w-[60%]">{value || '-'}</span>
     </div>
   );
+
+  const handleDownloadPDF = () => {
+    const approverInfo = {
+      supervisorName: approverNames[request.supervisor_uid || ''],
+      hcgaName: approverNames[request.hcga_approver_uid || ''],
+    };
+
+    if (isLeave) {
+      generateLeaveRequestPDF(request, approverInfo);
+    } else {
+      generatePermissionRequestPDF(request, approverInfo);
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -114,6 +130,12 @@ const RequestDetailDialog: React.FC<RequestDetailDialogProps> = ({ isOpen, onClo
               </div>
             )}
           </div>
+
+          {/* Download PDF */}
+          <Button variant="outline" className="w-full" onClick={handleDownloadPDF}>
+            <Download className="h-4 w-4 mr-2" />
+            Download PDF
+          </Button>
 
           <div className="text-[10px] text-muted-foreground">
             Diajukan: {request.created_at ? format(new Date(request.created_at), 'dd MMM yyyy HH:mm', { locale: idLocale }) : '-'}
