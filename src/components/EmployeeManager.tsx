@@ -748,7 +748,7 @@ const EmployeeManager = () => {
 
   const toggleAttendanceStatusVisibility = async (employee: StaffUser) => {
     try {
-      const newStatus = !(employee as any).show_attendance_status;
+      const newStatus = !employee.show_attendance_status;
       const { error } = await supabase
         .from('staff_users')
         .update({ show_attendance_status: newStatus } as any)
