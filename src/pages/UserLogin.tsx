@@ -146,7 +146,11 @@ const UserLogin = () => {
         is_admin: staff.is_admin || false,
         is_manager: staff.is_manager || false,
         employee_type: staff.employee_type || 'staff',
-        show_attendance_status: staff.show_attendance_status || false
+        show_attendance_status: staff.show_attendance_status || false,
+        phone_number: staff.phone_number || undefined,
+        supervisor_uid: staff.supervisor_uid || undefined,
+        hcga_approver_uid: staff.hcga_approver_uid || undefined,
+        join_date: staff.join_date || undefined
       };
 
       // Check if first login - require password change

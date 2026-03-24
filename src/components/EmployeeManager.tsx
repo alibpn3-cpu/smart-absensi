@@ -2119,6 +2119,42 @@ const EmployeeManager = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label>Atasan (Optional)</Label>
+              <Select
+                value={batchUpdateData.supervisor_uid}
+                onValueChange={(value) => setBatchUpdateData({...batchUpdateData, supervisor_uid: value})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih atasan (tidak diubah jika kosong)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">-- Hapus atasan --</SelectItem>
+                  {employees.map(emp => (
+                    <SelectItem key={emp.uid} value={emp.uid}>{emp.name} ({emp.uid})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>HC&GA Site Approver (Optional)</Label>
+              <Select
+                value={batchUpdateData.hcga_approver_uid}
+                onValueChange={(value) => setBatchUpdateData({...batchUpdateData, hcga_approver_uid: value})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih HC&GA Site (tidak diubah jika kosong)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">-- Hapus HC&GA --</SelectItem>
+                  {employees.map(emp => (
+                    <SelectItem key={emp.uid} value={emp.uid}>{emp.name} ({emp.uid})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">
@@ -2130,7 +2166,7 @@ const EmployeeManager = () => {
               <Button 
                 onClick={handleBatchUpdate}
                 className="flex-1"
-                disabled={!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division && !batchUpdateData.employee_type}
+                disabled={!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division && !batchUpdateData.employee_type && !batchUpdateData.supervisor_uid && !batchUpdateData.hcga_approver_uid}
               >
                 Update {selectedEmployees.size} Karyawan
               </Button>
