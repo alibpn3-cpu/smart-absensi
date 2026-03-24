@@ -410,7 +410,11 @@ const EmployeeManager = () => {
       work_area: '',
       division: '',
       photo_url: '',
-      employee_type: 'staff'
+      employee_type: 'staff',
+      phone_number: '',
+      supervisor_uid: '',
+      hcga_approver_uid: '',
+      join_date: ''
     });
     setEditingEmployee(null);
     setPhotoFile(null);
@@ -420,7 +424,7 @@ const EmployeeManager = () => {
   const openDialog = (employee?: StaffUser) => {
     if (employee) {
       setEditingEmployee(employee);
-      setOriginalUid(employee.uid); // Track original UID for change detection
+      setOriginalUid(employee.uid);
       setFormData({
         uid: employee.uid,
         name: employee.name,
@@ -428,7 +432,11 @@ const EmployeeManager = () => {
         work_area: employee.work_area,
         division: employee.division || '',
         photo_url: employee.photo_url || '',
-        employee_type: employee.employee_type || 'staff'
+        employee_type: employee.employee_type || 'staff',
+        phone_number: (employee as any).phone_number || '',
+        supervisor_uid: (employee as any).supervisor_uid || '',
+        hcga_approver_uid: (employee as any).hcga_approver_uid || '',
+        join_date: (employee as any).join_date || ''
       });
       setPhotoPreview(employee.photo_url || '');
     } else {
