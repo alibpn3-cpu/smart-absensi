@@ -76,7 +76,7 @@ const FeatureFlagSettings = () => {
       const { data, error } = await supabase
         .from('app_settings')
         .select('setting_key, setting_value')
-        .in('setting_key', ['score_feature_enabled', 'login_required', 'beta_mode_enabled', 'attendance_status_list_enabled']);
+        .in('setting_key', ['score_feature_enabled', 'login_required', 'beta_mode_enabled', 'attendance_status_list_enabled', 'leave_request_enabled', 'permission_request_enabled']);
 
       if (error) throw error;
 
