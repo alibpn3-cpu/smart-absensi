@@ -835,7 +835,7 @@ const EmployeeManager = () => {
   const handleBatchUpdate = async () => {
     if (selectedEmployees.size === 0) return;
 
-    if (!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division && !batchUpdateData.employee_type) {
+    if (!batchUpdateData.position && !batchUpdateData.work_area && !batchUpdateData.division && !batchUpdateData.employee_type && !batchUpdateData.supervisor_uid && !batchUpdateData.hcga_approver_uid) {
       toast({
         title: "Gagal",
         description: "Pilih minimal satu field untuk diupdate",
@@ -850,6 +850,8 @@ const EmployeeManager = () => {
       if (batchUpdateData.work_area) updatePayload.work_area = batchUpdateData.work_area;
       if (batchUpdateData.division) updatePayload.division = batchUpdateData.division;
       if (batchUpdateData.employee_type) updatePayload.employee_type = batchUpdateData.employee_type;
+      if (batchUpdateData.supervisor_uid) updatePayload.supervisor_uid = batchUpdateData.supervisor_uid === 'none' ? null : batchUpdateData.supervisor_uid;
+      if (batchUpdateData.hcga_approver_uid) updatePayload.hcga_approver_uid = batchUpdateData.hcga_approver_uid === 'none' ? null : batchUpdateData.hcga_approver_uid;
 
       const { error } = await supabase
         .from('staff_users')
