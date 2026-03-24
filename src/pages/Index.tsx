@@ -6,6 +6,7 @@ import { Shield, User, LogIn, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import AttendanceForm from '../components/AttendanceForm';
 import AdPopup from '../components/AdPopup';
+import UserSidebar from '../components/UserSidebar';
 import { toast } from '@/hooks/use-toast';
 
 interface UserSession {
