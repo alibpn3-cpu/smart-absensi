@@ -12,6 +12,7 @@ import Login from "./pages/Login";
 import UserLogin from "./pages/UserLogin";
 import UserProfile from "./pages/UserProfile";
 import Dashboard from "./pages/Dashboard";
+import RequestsPage from "./pages/RequestsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -46,6 +47,7 @@ const AppContent = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/user-login" element={<UserLogin />} />
         <Route path="/user-profile" element={<UserProfile />} />
+        <Route path="/requests" element={<RequestsPage />} />
         <Route path="/dashboard" element={
           <ProtectedRoute>
             <Dashboard />
