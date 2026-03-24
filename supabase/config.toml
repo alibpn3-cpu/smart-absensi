@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.send-email-notification]
 verify_jwt = false
+
+[functions.remind-clock-out]
+verify_jwt = false
