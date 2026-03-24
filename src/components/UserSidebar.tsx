@@ -182,7 +182,7 @@ const UserSidebar: React.FC = () => {
             <Menu className="h-4 w-4" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="right" className="w-[300px] sm:w-[340px] overflow-y-auto">
+        <SheetContent side="right" className="w-[85vw] max-w-[340px] overflow-y-auto">
           <SheetHeader className="text-left">
             <SheetTitle className="text-lg">Menu</SheetTitle>
           </SheetHeader>
