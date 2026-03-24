@@ -1862,9 +1862,9 @@ const EmployeeManager = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => toggleAttendanceStatusVisibility(employee)}
-                      title={(employee as any).show_attendance_status ? "Sembunyikan Status In/Out" : "Tampilkan Status In/Out"}
+                      title={employee.show_attendance_status ? "Sembunyikan Status In/Out" : "Tampilkan Status In/Out"}
                     >
-                      {(employee as any).show_attendance_status ? (
+                      {employee.show_attendance_status ? (
                         <Eye className="h-4 w-4 text-blue-600" />
                       ) : (
                         <EyeOff className="h-4 w-4 text-muted-foreground" />
