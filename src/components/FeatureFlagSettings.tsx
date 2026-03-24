@@ -44,6 +44,20 @@ const FeatureFlagSettings = () => {
       description: 'Tampilkan list status check-in/out per area kerja di halaman utama',
       icon: <Users className="h-4 w-4" />,
       value: true
+    },
+    {
+      key: 'leave_request_enabled',
+      label: 'Fitur Cuti Request',
+      description: 'Aktifkan fitur permintaan cuti untuk semua user',
+      icon: <CalendarDays className="h-4 w-4" />,
+      value: false
+    },
+    {
+      key: 'permission_request_enabled',
+      label: 'Fitur Ijin Request',
+      description: 'Aktifkan fitur permintaan ijin untuk semua user',
+      icon: <FileText className="h-4 w-4" />,
+      value: false
     }
   ]);
   const [isLoading, setIsLoading] = useState(true);
