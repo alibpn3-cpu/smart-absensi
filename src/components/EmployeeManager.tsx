@@ -874,7 +874,7 @@ const EmployeeManager = () => {
       });
 
       setIsBatchUpdateDialogOpen(false);
-      setBatchUpdateData({ position: '', work_area: '', division: '', employee_type: '' });
+      setBatchUpdateData({ position: '', work_area: '', division: '', employee_type: '', supervisor_uid: '', hcga_approver_uid: '' });
       setSelectedEmployees(new Set());
       fetchEmployees();
       fetchDropdownData();
