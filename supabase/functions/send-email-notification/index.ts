@@ -21,7 +21,7 @@ interface EmailPayload {
 }
 
 const generateEmailHTML = (payload: EmailPayload): string => {
-  const appLink = payload.app_url || 'https://digital-absensi.lovable.app';
+  const appLink = payload.app_url || 'https://absensi.petrolog.my.id';
   const requestsUrl = `${appLink}/requests`;
 
   let headerBg = '#3b82f6';
