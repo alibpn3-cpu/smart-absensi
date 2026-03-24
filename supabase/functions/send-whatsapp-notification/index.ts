@@ -24,7 +24,7 @@ const buildMessage = (payload: WhatsAppPayload): string => {
     status, approver_name, recipient_name, details, app_url
   } = payload;
 
-  const appLink = app_url || 'https://digital-absensi.lovable.app';
+  const appLink = app_url || 'https://absensi.petrolog.my.id';
   const requestsUrl = `${appLink}/requests`;
 
   switch (message_type) {
