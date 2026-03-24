@@ -155,7 +155,7 @@ serve(async (req: Request) => {
     });
 
     const info = await transporter.sendMail({
-      from: `"Digital Absensi" <${fromEmail}>`,
+      from: `"Digital Presensi" <${fromEmail}>`,
       to: payload.to_email,
       subject: payload.subject,
       html: emailHtml,

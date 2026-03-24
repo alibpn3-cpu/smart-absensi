@@ -226,15 +226,16 @@ const UserSidebar: React.FC = () => {
               )}
 
               {/* GPS Accuracy */}
-              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <div className="p-3 bg-muted/50 rounded-lg space-y-2">
                 <div className="flex items-center gap-2">
                   <Satellite className="h-4 w-4 text-primary" />
-                  <span className="text-sm">Akurasi GPS</span>
+                  <span className="text-sm font-medium">Akurasi GPS</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-medium ${gps.color}`}>{gps.label}</span>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={checkGps}>
-                    <RefreshCw className={`h-3 w-3 ${gpsLoading ? 'animate-spin' : ''}`} />
+                <div className="flex items-center justify-between">
+                  <span className={`text-sm ${gps.color}`}>{gps.label}</span>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={checkGps}>
+                    <RefreshCw className={`h-3 w-3 mr-1 ${gpsLoading ? 'animate-spin' : ''}`} />
+                    Refresh
                   </Button>
                 </div>
               </div>
