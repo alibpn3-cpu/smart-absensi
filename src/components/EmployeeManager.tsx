@@ -1546,6 +1546,9 @@ const EmployeeManager = () => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="photo">Photo (Optional)</Label>
                     <div className="flex items-center gap-4">
                       {photoPreview ? (
                         <div className="relative">
