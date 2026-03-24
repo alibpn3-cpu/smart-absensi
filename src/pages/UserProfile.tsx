@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, User, MapPin, Briefcase, Building2, LogOut, Lock, Shield } from 'lucide-react';
+import { ArrowLeft, User, MapPin, Briefcase, Building2, LogOut, Lock, Shield, FileText } from 'lucide-react';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
 
