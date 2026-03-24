@@ -2134,10 +2134,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       <div className="max-w-md mx-auto space-y-2 animate-fade-in">
         
         
-        {/* ========== SCORE CARD - Above Clock (USER MODE ONLY) ========== */}
-        {featureFlags.scoreEnabled && isUserLoggedIn && !sharedDeviceMode && selectedStaff && (
-          <ScoreCard staffUid={selectedStaff.uid} />
-        )}
+        {/* ScoreCard moved to UserSidebar */}
         
         {/* Kiosk Mode: Attendance Status List shows who has/hasn't checked in */}
         {sharedDeviceMode && featureFlags.attendanceStatusListEnabled && (
