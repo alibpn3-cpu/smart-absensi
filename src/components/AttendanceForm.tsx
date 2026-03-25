@@ -2583,12 +2583,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           />
         )}
 
-        {/* ========== USER MODE: Attendance Status List (only if admin enabled for this user) ========== */}
-        {isUserLoggedIn && !sharedDeviceMode && featureFlags.attendanceStatusListEnabled && (() => {
-          const sessionData = localStorage.getItem('userSession');
-          const showStatus = sessionData ? JSON.parse(sessionData).show_attendance_status : false;
-          return showStatus;
-        })() && (
+        {/* ========== USER MODE: Attendance Status List (real-time from DB, no logout needed) ========== */}
+        {isUserLoggedIn && !sharedDeviceMode && featureFlags.attendanceStatusListEnabled && showAttendanceStatus && (
           <AttendanceStatusList selectedWorkArea={selectedStaff?.work_area || 'all'} />
         )}
 
