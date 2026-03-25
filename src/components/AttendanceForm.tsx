@@ -200,6 +200,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   // Check if user is logged in (non-kiosk mode)
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
   const [isManager, setIsManager] = useState(false);
+  const [showAttendanceStatus, setShowAttendanceStatus] = useState(false);
   
   // Feature flags
   const featureFlags = useFeatureFlags();
@@ -266,6 +267,29 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       }
     }
   }, []);
+
+  // Fetch show_attendance_status from DB in real-time (not from localStorage)
+  useEffect(() => {
+    if (!selectedStaff?.uid) {
+      setShowAttendanceStatus(false);
+      return;
+    }
+
+    const fetchStatus = async () => {
+      const { data } = await supabase
+        .from('staff_users')
+        .select('show_attendance_status')
+        .eq('uid', selectedStaff.uid)
+        .maybeSingle();
+      
+      setShowAttendanceStatus(data?.show_attendance_status || false);
+    };
+
+    fetchStatus();
+    // Refresh every 2 minutes so admin changes take effect without logout
+    const interval = setInterval(fetchStatus, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [selectedStaff?.uid]);
 
   // Pre-fetch and cache geofence areas
   const fetchGeofences = useCallback(async (force = false) => {
@@ -2138,7 +2162,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         {/* ScoreCard moved to UserSidebar */}
         
         {/* Kiosk Mode: Attendance Status List shows who has/hasn't checked in (only if selected user has show_attendance_status) */}
-        {sharedDeviceMode && featureFlags.attendanceStatusListEnabled && selectedStaff?.show_attendance_status && (
+        {sharedDeviceMode && featureFlags.attendanceStatusListEnabled && showAttendanceStatus && (
           <AttendanceStatusList selectedWorkArea={selectedWorkArea} />
         )}
         
@@ -2559,12 +2583,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           />
         )}
 
-        {/* ========== USER MODE: Attendance Status List (only if admin enabled for this user) ========== */}
-        {isUserLoggedIn && !sharedDeviceMode && featureFlags.attendanceStatusListEnabled && (() => {
-          const sessionData = localStorage.getItem('userSession');
-          const showStatus = sessionData ? JSON.parse(sessionData).show_attendance_status : false;
-          return showStatus;
-        })() && (
+        {/* ========== USER MODE: Attendance Status List (real-time from DB, no logout needed) ========== */}
+        {isUserLoggedIn && !sharedDeviceMode && featureFlags.attendanceStatusListEnabled && showAttendanceStatus && (
           <AttendanceStatusList selectedWorkArea={selectedStaff?.work_area || 'all'} />
         )}
 
