@@ -18,7 +18,7 @@ export const useFeatureFlags = (): FeatureFlags => {
     loginRequired: false,
     betaMode: false,
     isDeveloper: false,
-    attendanceStatusListEnabled: true,
+    attendanceStatusListEnabled: false,
     leaveRequestEnabled: false,
     permissionRequestEnabled: false,
     isLoading: true
