@@ -108,10 +108,8 @@ serve(async (req: Request) => {
         console.warn(`⚠️ Error sending to ${staff.name}:`, e);
       }
 
-      // Small delay to avoid rate limiting
-      if (staffUsers.length > 10) {
-        await new Promise(r => setTimeout(r, 200));
-      }
+      // Delay 3 detik antar pesan untuk menghindari banned WhatsApp/Meta
+      await new Promise(r => setTimeout(r, 3000));
     }
 
     console.log(`📊 Reminder summary: ${sentCount} sent, ${failCount} failed, ${records.length} total not clocked out`);
