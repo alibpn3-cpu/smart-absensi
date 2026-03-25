@@ -268,6 +268,29 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     }
   }, []);
 
+  // Fetch show_attendance_status from DB in real-time (not from localStorage)
+  useEffect(() => {
+    if (!selectedStaff?.uid) {
+      setShowAttendanceStatus(false);
+      return;
+    }
+
+    const fetchStatus = async () => {
+      const { data } = await supabase
+        .from('staff_users')
+        .select('show_attendance_status')
+        .eq('uid', selectedStaff.uid)
+        .maybeSingle();
+      
+      setShowAttendanceStatus(data?.show_attendance_status || false);
+    };
+
+    fetchStatus();
+    // Refresh every 2 minutes so admin changes take effect without logout
+    const interval = setInterval(fetchStatus, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [selectedStaff?.uid]);
+
   // Pre-fetch and cache geofence areas
   const fetchGeofences = useCallback(async (force = false) => {
     // Check cache first
