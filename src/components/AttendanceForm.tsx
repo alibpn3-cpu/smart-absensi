@@ -200,6 +200,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   // Check if user is logged in (non-kiosk mode)
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
   const [isManager, setIsManager] = useState(false);
+  const [showAttendanceStatus, setShowAttendanceStatus] = useState(false);
   
   // Feature flags
   const featureFlags = useFeatureFlags();
