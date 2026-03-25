@@ -44,6 +44,7 @@ interface StaffUser {
   photo_url?: string;
   division?: string;
   employee_type?: string;
+  show_attendance_status?: boolean;
 }
 
 interface AttendanceRecord {
@@ -2136,8 +2137,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         
         {/* ScoreCard moved to UserSidebar */}
         
-        {/* Kiosk Mode: Attendance Status List shows who has/hasn't checked in */}
-        {sharedDeviceMode && featureFlags.attendanceStatusListEnabled && (
+        {/* Kiosk Mode: Attendance Status List shows who has/hasn't checked in (only if selected user has show_attendance_status) */}
+        {sharedDeviceMode && featureFlags.attendanceStatusListEnabled && selectedStaff?.show_attendance_status && (
           <AttendanceStatusList selectedWorkArea={selectedWorkArea} />
         )}
         
