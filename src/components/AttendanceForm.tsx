@@ -44,6 +44,7 @@ interface StaffUser {
   photo_url?: string;
   division?: string;
   employee_type?: string;
+  show_attendance_status?: boolean;
 }
 
 interface AttendanceRecord {
