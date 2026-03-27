@@ -437,6 +437,7 @@ const EmployeeManager = () => {
         photo_url: employee.photo_url || '',
         employee_type: employee.employee_type || 'staff',
         phone_number: (employee as any).phone_number || '',
+        email: (employee as any).email || '',
         supervisor_uid: (employee as any).supervisor_uid || '',
         hcga_approver_uid: (employee as any).hcga_approver_uid || '',
         join_date: (employee as any).join_date || ''
