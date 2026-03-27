@@ -122,6 +122,56 @@ const ComboboxField = ({
   );
 };
 
+const EmployeeSearchCombobox = ({ value, onChange, employees, placeholder }: {
+  value: string;
+  onChange: (value: string) => void;
+  employees: { uid: string; name: string }[];
+  placeholder: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const selected = employees.find(e => e.uid === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          {selected ? `${selected.name} (${selected.uid})` : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[350px] p-0">
+        <Command>
+          <CommandInput placeholder="Cari nama atau UID..." />
+          <CommandList>
+            <CommandEmpty>Tidak ditemukan</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value="none" onSelect={() => { onChange('none'); setOpen(false); }}>
+                <Check className={cn("mr-2 h-4 w-4", (!value || value === 'none') ? "opacity-100" : "opacity-0")} />
+                -- Tidak ada --
+              </CommandItem>
+              {employees.map(emp => (
+                <CommandItem
+                  key={emp.uid}
+                  value={`${emp.name} ${emp.uid}`}
+                  onSelect={() => { onChange(emp.uid); setOpen(false); }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", value === emp.uid ? "opacity-100" : "opacity-0")} />
+                  {emp.name} ({emp.uid})
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 const EmployeeManager = () => {
   const [employees, setEmployees] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(true);
