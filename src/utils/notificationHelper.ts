@@ -27,11 +27,11 @@ interface NotifySubmittedParams {
   details?: string;
 }
 
-// Get approver info (name, phone, email-placeholder) from staff_users
+// Get staff info (name, phone, email) from staff_users
 const getStaffInfo = async (uid: string) => {
   const { data } = await supabase
     .from('staff_users')
-    .select('name, phone_number, uid')
+    .select('name, phone_number, email, uid')
     .eq('uid', uid)
     .single();
   return data;
