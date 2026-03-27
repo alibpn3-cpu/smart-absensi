@@ -671,6 +671,7 @@ export type Database = {
         Row: {
           created_at: string
           division: string | null
+          email: string | null
           employee_type: string | null
           hcga_approver_uid: string | null
           id: string
@@ -693,6 +694,7 @@ export type Database = {
         Insert: {
           created_at?: string
           division?: string | null
+          email?: string | null
           employee_type?: string | null
           hcga_approver_uid?: string | null
           id?: string
@@ -715,6 +717,7 @@ export type Database = {
         Update: {
           created_at?: string
           division?: string | null
+          email?: string | null
           employee_type?: string | null
           hcga_approver_uid?: string | null
           id?: string
