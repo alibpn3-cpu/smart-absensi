@@ -1529,39 +1529,23 @@ const EmployeeManager = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="supervisor_uid">Atasan (Optional)</Label>
-                    <Select
+                    <Label>Atasan (Optional)</Label>
+                    <EmployeeSearchCombobox
                       value={formData.supervisor_uid}
-                      onValueChange={(value) => setFormData({...formData, supervisor_uid: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih atasan" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">-- Tidak ada --</SelectItem>
-                        {employees.filter(e => e.uid !== formData.uid).map(emp => (
-                          <SelectItem key={emp.uid} value={emp.uid}>{emp.name} ({emp.uid})</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(value) => setFormData({...formData, supervisor_uid: value})}
+                      employees={employees.filter(e => e.uid !== formData.uid)}
+                      placeholder="Cari nama atau UID atasan..."
+                    />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="hcga_approver_uid">HC&GA Site Approver (Optional)</Label>
-                    <Select
+                    <Label>HC&GA Site Approver (Optional)</Label>
+                    <EmployeeSearchCombobox
                       value={formData.hcga_approver_uid}
-                      onValueChange={(value) => setFormData({...formData, hcga_approver_uid: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih HC&GA Site" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">-- Tidak ada --</SelectItem>
-                        {employees.filter(e => e.uid !== formData.uid).map(emp => (
-                          <SelectItem key={emp.uid} value={emp.uid}>{emp.name} ({emp.uid})</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(value) => setFormData({...formData, hcga_approver_uid: value})}
+                      employees={employees.filter(e => e.uid !== formData.uid)}
+                      placeholder="Cari nama atau UID HC&GA..."
+                    />
                   </div>
 
                   <div className="space-y-2">
