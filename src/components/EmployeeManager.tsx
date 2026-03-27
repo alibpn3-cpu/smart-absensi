@@ -142,6 +142,7 @@ const EmployeeManager = () => {
     photo_url: '',
     employee_type: 'staff',
     phone_number: '',
+    email: '',
     supervisor_uid: '',
     hcga_approver_uid: '',
     join_date: ''
@@ -414,6 +415,7 @@ const EmployeeManager = () => {
       photo_url: '',
       employee_type: 'staff',
       phone_number: '',
+      email: '',
       supervisor_uid: '',
       hcga_approver_uid: '',
       join_date: ''
@@ -436,6 +438,7 @@ const EmployeeManager = () => {
         photo_url: employee.photo_url || '',
         employee_type: employee.employee_type || 'staff',
         phone_number: (employee as any).phone_number || '',
+        email: (employee as any).email || '',
         supervisor_uid: (employee as any).supervisor_uid || '',
         hcga_approver_uid: (employee as any).hcga_approver_uid || '',
         join_date: (employee as any).join_date || ''
@@ -515,6 +518,7 @@ const EmployeeManager = () => {
         photo_url: photoUrl,
         employee_type: formData.employee_type || 'staff',
         phone_number: formData.phone_number || null,
+        email: formData.email || null,
         supervisor_uid: formData.supervisor_uid && formData.supervisor_uid !== 'none' ? formData.supervisor_uid : null,
         hcga_approver_uid: formData.hcga_approver_uid && formData.hcga_approver_uid !== 'none' ? formData.hcga_approver_uid : null,
         join_date: formData.join_date || null
@@ -1500,6 +1504,17 @@ const EmployeeManager = () => {
                       value={formData.phone_number}
                       onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
                       placeholder="e.g., 6281234567890"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email (Optional)</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      placeholder="e.g., nama@email.com"
                     />
                   </div>
 
