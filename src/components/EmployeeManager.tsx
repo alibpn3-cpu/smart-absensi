@@ -517,6 +517,7 @@ const EmployeeManager = () => {
         photo_url: photoUrl,
         employee_type: formData.employee_type || 'staff',
         phone_number: formData.phone_number || null,
+        email: formData.email || null,
         supervisor_uid: formData.supervisor_uid && formData.supervisor_uid !== 'none' ? formData.supervisor_uid : null,
         hcga_approver_uid: formData.hcga_approver_uid && formData.hcga_approver_uid !== 'none' ? formData.hcga_approver_uid : null,
         join_date: formData.join_date || null
