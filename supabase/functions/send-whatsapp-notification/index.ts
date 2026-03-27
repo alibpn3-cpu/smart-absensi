@@ -10,7 +10,7 @@ interface WhatsAppPayload {
   recipient_name: string;
   message_type: 'request_submitted' | 'approval_needed' | 'status_update';
   request_number?: string;
-  request_type?: string; // 'Cuti' or 'Ijin'
+  request_type?: string;
   creator_name?: string;
   status?: string;
   approver_name?: string;
@@ -53,11 +53,13 @@ serve(async (req: Request) => {
   }
 
   try {
-    const FONNTE_TOKEN = Deno.env.get('FONNTE_TOKEN');
-    if (!FONNTE_TOKEN) {
-      console.warn('⚠️ FONNTE_TOKEN not configured');
+    const META_TOKEN = Deno.env.get('META_TOKEN');
+    const META_PHONE_ID = Deno.env.get('META_PHONE_ID');
+
+    if (!META_TOKEN || !META_PHONE_ID) {
+      console.warn('⚠️ META_TOKEN or META_PHONE_ID not configured');
       return new Response(
-        JSON.stringify({ success: false, reason: 'WhatsApp API Token not configured' }),
+        JSON.stringify({ success: false, reason: 'Meta WhatsApp API not configured' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
@@ -79,30 +81,31 @@ serve(async (req: Request) => {
 
     const message = buildMessage(payload);
 
-    const fonnteResponse = await fetch("https://api.fonnte.com/send", {
+    const metaResponse = await fetch(`https://graph.facebook.com/v21.0/${META_PHONE_ID}/messages`, {
       method: "POST",
       headers: {
-        "Authorization": FONNTE_TOKEN,
-        "Content-Type": "application/json"
+        "Authorization": `Bearer ${META_TOKEN}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        target: phone,
-        message: message,
-        countryCode: "62"
-      })
+        messaging_product: "whatsapp",
+        to: phone,
+        type: "text",
+        text: { body: message },
+      }),
     });
 
-    const result = await fonnteResponse.json();
+    const result = await metaResponse.json();
 
-    if (!result.status) {
-      console.error('❌ Fonnte API error:', result);
+    if (result.error) {
+      console.error('❌ Meta WhatsApp API error:', JSON.stringify(result.error));
       return new Response(
-        JSON.stringify({ success: false, error: result }),
+        JSON.stringify({ success: false, error: result.error }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
 
-    console.log(`✅ WhatsApp sent to ${phone}`);
+    console.log(`✅ WhatsApp sent to ${phone} via Meta API`);
     return new Response(
       JSON.stringify({ success: true, phone, detail: result }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }

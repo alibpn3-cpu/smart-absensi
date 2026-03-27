@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { notifyRequestSubmitted, notifyApproverNewRequest } from '@/utils/notificationHelper';
+import { generatePermissionRequestNumber } from '@/utils/requestNumberGenerator';
 
 interface UserSession {
   uid: string;
@@ -30,9 +31,10 @@ interface PermissionRequestFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmitted: () => void;
+  editData?: any;
 }
 
-const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, onClose, onSubmitted }) => {
+const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, onClose, onSubmitted, editData }) => {
   const [loading, setLoading] = useState(false);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [permissionDate, setPermissionDate] = useState<Date>();
@@ -43,6 +45,8 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
   const [supervisorName, setSupervisorName] = useState('');
   const [hcgaName, setHcgaName] = useState('');
 
+  const isEditMode = !!editData;
+
   useEffect(() => {
     if (!isOpen) return;
     const sessionData = localStorage.getItem('userSession');
@@ -52,7 +56,6 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
       setPhoneNumber(session.phone_number || '');
       setJoinDateStr(session.join_date || '');
 
-      // Always re-fetch from DB to get latest supervisor/hcga assignment
       const refreshUserData = async () => {
         const { data } = await supabase
           .from('staff_users')
@@ -78,9 +81,18 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
       };
       refreshUserData();
     }
-    setPermissionDate(undefined);
-    setDuration('');
-    setReason('');
+
+    // Pre-fill for edit mode
+    if (editData) {
+      setPermissionDate(editData.permission_date ? new Date(editData.permission_date) : undefined);
+      setDuration(editData.permission_duration || '');
+      setReason(editData.reason || '');
+      setPhoneNumber(editData.phone_number || '');
+    } else {
+      setPermissionDate(undefined);
+      setDuration('');
+      setReason('');
+    }
   }, [isOpen]);
 
   const fetchApproverNames = async (supervisorUid?: string, hcgaUid?: string) => {
@@ -102,43 +114,56 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
     setLoading(true);
 
     try {
-      const requestNumber = `IJN-${format(new Date(), 'yyyyMMdd')}-${Date.now().toString(36).toUpperCase()}`;
+      if (isEditMode) {
+        const { error } = await supabase.from('permission_requests').update({
+          permission_duration: duration.trim(),
+          permission_date: format(permissionDate, 'yyyy-MM-dd'),
+          phone_number: phoneNumber || null,
+          reason: reason.trim(),
+        }).eq('id', editData.id);
 
-      const { error } = await supabase.from('permission_requests').insert({
-        request_number: requestNumber,
-        staff_uid: userSession.uid,
-        staff_name: userSession.name,
-        department: userSession.division || null,
-        position: userSession.position,
-        join_date: joinDateStr || null,
-        permission_duration: duration.trim(),
-        permission_date: format(permissionDate, 'yyyy-MM-dd'),
-        phone_number: phoneNumber || null,
-        reason: reason.trim(),
-        supervisor_uid: userSession.supervisor_uid || null,
-        hcga_approver_uid: userSession.hcga_approver_uid || null,
-      });
+        if (error) throw error;
+        toast({ title: "Berhasil", description: "Permintaan ijin berhasil diperbarui" });
+      } else {
+        const requestNumber = await generatePermissionRequestNumber(
+          userSession.work_area,
+          userSession.division || ''
+        );
 
-      if (error) throw error;
+        const { error } = await supabase.from('permission_requests').insert({
+          request_number: requestNumber,
+          staff_uid: userSession.uid,
+          staff_name: userSession.name,
+          department: userSession.division || null,
+          position: userSession.position,
+          join_date: joinDateStr || null,
+          permission_duration: duration.trim(),
+          permission_date: format(permissionDate, 'yyyy-MM-dd'),
+          phone_number: phoneNumber || null,
+          reason: reason.trim(),
+          supervisor_uid: userSession.supervisor_uid || null,
+          hcga_approver_uid: userSession.hcga_approver_uid || null,
+        });
 
-      toast({ title: "Berhasil", description: "Permintaan ijin berhasil diajukan" });
+        if (error) throw error;
+        toast({ title: "Berhasil", description: "Permintaan ijin berhasil diajukan" });
 
-      // Send notifications
-      const detailStr = `⏱️ Durasi: ${duration.trim()}\n📅 Tanggal: ${format(permissionDate, 'dd MMM yyyy', { locale: idLocale })}\n📝 ${reason.trim()}`;
+        const detailStr = `⏱️ Durasi: ${duration.trim()}\n📅 Tanggal: ${format(permissionDate, 'dd MMM yyyy', { locale: idLocale })}\n📝 ${reason.trim()}`;
 
-      notifyRequestSubmitted({
-        requestNumber, requestType: 'Ijin',
-        staffUid: userSession.uid, staffName: userSession.name,
-        details: detailStr,
-      });
-
-      if (userSession.supervisor_uid) {
-        notifyApproverNewRequest({
-          requestId: '', requestNumber, requestType: 'Ijin',
-          creatorName: userSession.name,
-          approverUid: userSession.supervisor_uid,
+        notifyRequestSubmitted({
+          requestNumber, requestType: 'Ijin',
+          staffUid: userSession.uid, staffName: userSession.name,
           details: detailStr,
         });
+
+        if (userSession.supervisor_uid) {
+          notifyApproverNewRequest({
+            requestId: '', requestNumber, requestType: 'Ijin',
+            creatorName: userSession.name,
+            approverUid: userSession.supervisor_uid,
+            details: detailStr,
+          });
+        }
       }
 
       onSubmitted();
@@ -157,7 +182,7 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ClipboardList className="h-5 w-5 text-primary" />
-            Permintaan Ijin
+            {isEditMode ? 'Edit Permintaan Ijin' : 'Permintaan Ijin'}
           </DialogTitle>
         </DialogHeader>
 
@@ -219,7 +244,7 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
           <Button variant="outline" onClick={onClose} disabled={loading}>Batal</Button>
           <Button onClick={handleSubmit} disabled={!canSubmit || loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Ajukan Ijin
+            {isEditMode ? 'Simpan Perubahan' : 'Ajukan Ijin'}
           </Button>
         </DialogFooter>
       </DialogContent>

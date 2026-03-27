@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Plus, FileText, ClipboardList, Loader2, Eye } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ArrowLeft, Plus, FileText, ClipboardList, Loader2, Eye, Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
-import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import ApprovalProgressLine from '@/components/ApprovalProgressLine';
 import LeaveRequestForm from '@/components/LeaveRequestForm';
 import PermissionRequestForm from '@/components/PermissionRequestForm';
@@ -91,6 +91,10 @@ const RequestsPage = () => {
   const [approvalPermissions, setApprovalPermissions] = useState<PermissionRequest[]>([]);
   const [showLeaveForm, setShowLeaveForm] = useState(false);
   const [showPermissionForm, setShowPermissionForm] = useState(false);
+  const [editLeaveData, setEditLeaveData] = useState<any>(null);
+  const [editPermissionData, setEditPermissionData] = useState<any>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'leave' | 'permission'; number: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [approvalDialog, setApprovalDialog] = useState<{
     isOpen: boolean;
     requestId: string;
@@ -135,14 +139,12 @@ const RequestsPage = () => {
   const fetchData = async (session: UserSession) => {
     setLoading(true);
     try {
-      // My leave requests
       const { data: myLeaves } = await supabase
         .from('leave_requests')
         .select('*')
         .eq('staff_uid', session.uid)
         .order('created_at', { ascending: false });
 
-      // My permission requests
       const { data: myPermissions } = await supabase
         .from('permission_requests')
         .select('*')
@@ -152,7 +154,6 @@ const RequestsPage = () => {
       setLeaveRequests(myLeaves || []);
       setPermissionRequests(myPermissions || []);
 
-      // Approval requests (where I'm supervisor or hcga)
       const { data: appLeaves } = await supabase
         .from('leave_requests')
         .select('*')
@@ -168,9 +169,8 @@ const RequestsPage = () => {
       setApprovalLeaves(appLeaves || []);
       setApprovalPermissions(appPermissions || []);
 
-      // Fetch approver names
       const allUids = new Set<string>();
-      [...(myLeaves || []), ...(myPermissions || [])].forEach(r => {
+      [...(myLeaves || []), ...(myPermissions || []), ...(appLeaves || []), ...(appPermissions || [])].forEach(r => {
         if (r.supervisor_uid) allUids.add(r.supervisor_uid);
         if (r.hcga_approver_uid) allUids.add(r.hcga_approver_uid);
       });
@@ -196,11 +196,39 @@ const RequestsPage = () => {
 
   const canApprove = (request: LeaveRequest | PermissionRequest, uid: string): boolean => {
     const role = getApproverRole(request, uid);
-    if (role === 'supervisor') {
-      return request.supervisor_status === 'pending';
-    }
-    // HC&GA can only approve after supervisor approved
+    if (role === 'supervisor') return request.supervisor_status === 'pending';
     return request.supervisor_status === 'approved' && request.hcga_status === 'pending';
+  };
+
+  const isPending = (request: LeaveRequest | PermissionRequest): boolean => {
+    return request.supervisor_status === 'pending' && request.hcga_status === 'pending' && request.status === 'pending';
+  };
+
+  const handleEdit = (request: any, type: 'leave' | 'permission') => {
+    if (type === 'leave') {
+      setEditLeaveData(request);
+      setShowLeaveForm(true);
+    } else {
+      setEditPermissionData(request);
+      setShowPermissionForm(true);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    setDeleting(true);
+    try {
+      const table = deleteConfirm.type === 'leave' ? 'leave_requests' : 'permission_requests';
+      const { error } = await supabase.from(table).delete().eq('id', deleteConfirm.id);
+      if (error) throw error;
+      toast({ title: "Berhasil", description: `Permintaan ${deleteConfirm.number} berhasil dihapus` });
+      setDeleteConfirm(null);
+      if (userSession) fetchData(userSession);
+    } catch (error: any) {
+      toast({ title: "Gagal", description: error.message || "Gagal menghapus permintaan", variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const hasApprovalItems = approvalLeaves.length > 0 || approvalPermissions.length > 0;
@@ -208,6 +236,8 @@ const RequestsPage = () => {
   const renderRequestCard = (request: LeaveRequest | PermissionRequest, type: 'leave' | 'permission', isApproval: boolean = false) => {
     const isLeave = type === 'leave';
     const req = request as any;
+    const isOwner = request.staff_uid === userSession?.uid;
+    const canEditDelete = isOwner && isPending(request) && !isApproval;
 
     return (
       <Card key={request.id} className="border shadow-sm">
@@ -238,7 +268,6 @@ const RequestsPage = () => {
             <p className="text-[10px]">Diajukan: {request.created_at ? format(new Date(request.created_at), 'dd MMM yyyy HH:mm', { locale: idLocale }) : '-'}</p>
           </div>
 
-          {/* Approval Progress */}
           <ApprovalProgressLine
             supervisorStatus={request.supervisor_status || 'pending'}
             hcgaStatus={request.hcga_status || 'pending'}
@@ -246,10 +275,20 @@ const RequestsPage = () => {
             hcgaName={approverNames[request.hcga_approver_uid || '']}
           />
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button size="sm" variant="outline" className="flex-1" onClick={() => setDetailDialog({ isOpen: true, request, type })}>
               <Eye className="h-3 w-3 mr-1" /> Detail
             </Button>
+            {canEditDelete && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => handleEdit(request, type)}>
+                  <Pencil className="h-3 w-3 mr-1" /> Edit
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => setDeleteConfirm({ id: request.id, type, number: request.request_number })}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </>
+            )}
             {isApproval && userSession && canApprove(request, userSession.uid) && (
               <Button size="sm" className="flex-1" onClick={() => setApprovalDialog({
                 isOpen: true,
@@ -293,23 +332,20 @@ const RequestsPage = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* Tab: My Requests */}
           <TabsContent value="my-requests" className="space-y-4">
-            {/* Action Buttons */}
             <div className="flex gap-2">
               {leaveEnabled && (
-                <Button onClick={() => setShowLeaveForm(true)} className="flex-1" size="sm">
+                <Button onClick={() => { setEditLeaveData(null); setShowLeaveForm(true); }} className="flex-1" size="sm">
                   <Plus className="h-4 w-4 mr-1" /> Cuti
                 </Button>
               )}
               {permissionEnabled && (
-                <Button onClick={() => setShowPermissionForm(true)} variant="outline" className="flex-1" size="sm">
+                <Button onClick={() => { setEditPermissionData(null); setShowPermissionForm(true); }} variant="outline" className="flex-1" size="sm">
                   <Plus className="h-4 w-4 mr-1" /> Ijin
                 </Button>
               )}
             </div>
 
-            {/* Leave Requests */}
             {leaveRequests.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold flex items-center gap-1"><FileText className="h-4 w-4" /> Cuti</h3>
@@ -317,7 +353,6 @@ const RequestsPage = () => {
               </div>
             )}
 
-            {/* Permission Requests */}
             {permissionRequests.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold flex items-center gap-1"><ClipboardList className="h-4 w-4" /> Ijin</h3>
@@ -333,7 +368,6 @@ const RequestsPage = () => {
             )}
           </TabsContent>
 
-          {/* Tab: Approvals */}
           <TabsContent value="approvals" className="space-y-4">
             {approvalLeaves.length > 0 && (
               <div className="space-y-2">
@@ -352,8 +386,18 @@ const RequestsPage = () => {
       </div>
 
       {/* Forms */}
-      <LeaveRequestForm isOpen={showLeaveForm} onClose={() => setShowLeaveForm(false)} onSubmitted={() => userSession && fetchData(userSession)} />
-      <PermissionRequestForm isOpen={showPermissionForm} onClose={() => setShowPermissionForm(false)} onSubmitted={() => userSession && fetchData(userSession)} />
+      <LeaveRequestForm
+        isOpen={showLeaveForm}
+        onClose={() => { setShowLeaveForm(false); setEditLeaveData(null); }}
+        onSubmitted={() => userSession && fetchData(userSession)}
+        editData={editLeaveData}
+      />
+      <PermissionRequestForm
+        isOpen={showPermissionForm}
+        onClose={() => { setShowPermissionForm(false); setEditPermissionData(null); }}
+        onSubmitted={() => userSession && fetchData(userSession)}
+        editData={editPermissionData}
+      />
 
       {/* Approval Dialog */}
       {approvalDialog && (
@@ -374,6 +418,25 @@ const RequestsPage = () => {
           approverNames={approverNames}
         />
       )}
+
+      {/* Delete Confirmation */}
+      <Dialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Hapus Permintaan</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Apakah Anda yakin ingin menghapus permintaan <strong>{deleteConfirm?.number}</strong>? Tindakan ini tidak dapat dibatalkan.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteConfirm(null)} disabled={deleting}>Batal</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Hapus
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
