@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ArrowLeft, Plus, FileText, ClipboardList, Loader2, Eye, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, ClipboardList, Loader2, Eye, Pencil, Trash2, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -15,6 +15,8 @@ import LeaveRequestForm from '@/components/LeaveRequestForm';
 import PermissionRequestForm from '@/components/PermissionRequestForm';
 import RequestApprovalDialog from '@/components/RequestApprovalDialog';
 import RequestDetailDialog from '@/components/RequestDetailDialog';
+import { generateLeaveRequestPDF, generatePermissionRequestPDF } from '@/utils/pdfExportRequest';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface UserSession {
   uid: string;
@@ -233,6 +235,18 @@ const RequestsPage = () => {
 
   const hasApprovalItems = approvalLeaves.length > 0 || approvalPermissions.length > 0;
 
+  const handleDownloadPDF = (request: LeaveRequest | PermissionRequest, type: 'leave' | 'permission') => {
+    const approverInfo = {
+      supervisorName: approverNames[request.supervisor_uid || ''],
+      hcgaName: approverNames[request.hcga_approver_uid || ''],
+    };
+    if (type === 'leave') {
+      generateLeaveRequestPDF(request, approverInfo);
+    } else {
+      generatePermissionRequestPDF(request, approverInfo);
+    }
+  };
+
   const renderRequestCard = (request: LeaveRequest | PermissionRequest, type: 'leave' | 'permission', isApproval: boolean = false) => {
     const isLeave = type === 'leave';
     const req = request as any;
@@ -279,6 +293,9 @@ const RequestsPage = () => {
             <Button size="sm" variant="outline" className="flex-1" onClick={() => setDetailDialog({ isOpen: true, request, type })}>
               <Eye className="h-3 w-3 mr-1" /> Detail
             </Button>
+            <Button size="sm" variant="outline" onClick={() => handleDownloadPDF(request, type)}>
+              <Download className="h-3 w-3 mr-1" /> PDF
+            </Button>
             {canEditDelete && (
               <>
                 <Button size="sm" variant="outline" onClick={() => handleEdit(request, type)}>
@@ -304,6 +321,78 @@ const RequestsPage = () => {
           </div>
         </CardContent>
       </Card>
+    );
+  };
+
+  const renderApprovalTable = (requests: (LeaveRequest | PermissionRequest)[], type: 'leave' | 'permission') => {
+    if (requests.length === 0) return null;
+    const isLeave = type === 'leave';
+
+    return (
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold flex items-center gap-1">
+          {isLeave ? <FileText className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
+          {isLeave ? 'Cuti' : 'Ijin'}
+          <Badge variant="secondary" className="ml-1">{requests.length}</Badge>
+        </h3>
+        <div className="border rounded-lg overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">No. Surat</TableHead>
+                <TableHead className="text-xs">Nama Staff</TableHead>
+                <TableHead className="text-xs">{isLeave ? 'Tanggal Cuti' : 'Tanggal Ijin'}</TableHead>
+                <TableHead className="text-xs">Atasan</TableHead>
+                <TableHead className="text-xs">HC&GA</TableHead>
+                <TableHead className="text-xs">Status</TableHead>
+                <TableHead className="text-xs text-center">Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {requests.map((request) => {
+                const req = request as any;
+                return (
+                  <TableRow key={request.id}>
+                    <TableCell className="text-xs font-mono whitespace-nowrap">{request.request_number}</TableCell>
+                    <TableCell className="text-xs">{request.staff_name}</TableCell>
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {isLeave
+                        ? (Array.isArray(req.leave_dates) ? `${(req.leave_dates as string[]).length} hari` : `${req.days_requested} hari`)
+                        : (req.permission_date ? format(new Date(req.permission_date), 'dd MMM yyyy', { locale: idLocale }) : '-')
+                      }
+                    </TableCell>
+                    <TableCell className="text-xs">{statusBadge(request.supervisor_status)}</TableCell>
+                    <TableCell className="text-xs">{statusBadge(request.hcga_status)}</TableCell>
+                    <TableCell className="text-xs">{statusBadge(request.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1 justify-center">
+                        <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setDetailDialog({ isOpen: true, request, type })}>
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => handleDownloadPDF(request, type)}>
+                          <Download className="h-3 w-3" />
+                        </Button>
+                        {userSession && canApprove(request, userSession.uid) && (
+                          <Button size="sm" className="h-7 px-2" onClick={() => setApprovalDialog({
+                            isOpen: true,
+                            requestId: request.id,
+                            requestNumber: request.request_number,
+                            requestType: type,
+                            approverRole: getApproverRole(request, userSession.uid),
+                            staffName: request.staff_name,
+                          })}>
+                            Review
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
     );
   };
 
@@ -369,16 +458,12 @@ const RequestsPage = () => {
           </TabsContent>
 
           <TabsContent value="approvals" className="space-y-4">
-            {approvalLeaves.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold flex items-center gap-1"><FileText className="h-4 w-4" /> Cuti</h3>
-                {approvalLeaves.map(r => renderRequestCard(r, 'leave', true))}
-              </div>
-            )}
-            {approvalPermissions.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold flex items-center gap-1"><ClipboardList className="h-4 w-4" /> Ijin</h3>
-                {approvalPermissions.map(r => renderRequestCard(r, 'permission', true))}
+            {renderApprovalTable(approvalLeaves, 'leave')}
+            {renderApprovalTable(approvalPermissions, 'permission')}
+            {approvalLeaves.length === 0 && approvalPermissions.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <ClipboardList className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p>Tidak ada permintaan untuk di-approve</p>
               </div>
             )}
           </TabsContent>
