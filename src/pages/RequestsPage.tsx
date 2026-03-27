@@ -15,6 +15,8 @@ import LeaveRequestForm from '@/components/LeaveRequestForm';
 import PermissionRequestForm from '@/components/PermissionRequestForm';
 import RequestApprovalDialog from '@/components/RequestApprovalDialog';
 import RequestDetailDialog from '@/components/RequestDetailDialog';
+import { generateLeaveRequestPDF, generatePermissionRequestPDF } from '@/utils/pdfExportRequest';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface UserSession {
   uid: string;
