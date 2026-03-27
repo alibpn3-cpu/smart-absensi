@@ -12,10 +12,12 @@ serve(async (req: Request) => {
   }
 
   try {
-    const FONNTE_TOKEN = Deno.env.get('FONNTE_TOKEN');
-    if (!FONNTE_TOKEN) {
-      console.warn('⚠️ FONNTE_TOKEN not configured, skipping reminders');
-      return new Response(JSON.stringify({ success: false, reason: 'FONNTE_TOKEN not set' }), {
+    const META_TOKEN = Deno.env.get('META_TOKEN');
+    const META_PHONE_ID = Deno.env.get('META_PHONE_ID');
+
+    if (!META_TOKEN || !META_PHONE_ID) {
+      console.warn('⚠️ META_TOKEN or META_PHONE_ID not configured, skipping reminders');
+      return new Response(JSON.stringify({ success: false, reason: 'Meta WhatsApp API not configured' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -32,7 +34,6 @@ serve(async (req: Request) => {
 
     console.log(`🔍 Checking for users who haven't clocked out on ${todayStr}`);
 
-    // Find users who clocked in but haven't clocked out today
     const { data: records, error } = await supabase
       .from('attendance_records')
       .select('staff_uid, staff_name')
@@ -54,7 +55,6 @@ serve(async (req: Request) => {
       });
     }
 
-    // Get phone numbers for these users
     const staffUids = records.map(r => r.staff_uid);
     const { data: staffUsers } = await supabase
       .from('staff_users')
@@ -73,7 +73,6 @@ serve(async (req: Request) => {
     let failCount = 0;
 
     for (const staff of staffUsers) {
-      // Normalize phone number
       let phone = staff.phone_number!.replace(/[\s\-\+]/g, '');
       if (phone.startsWith('0')) {
         phone = '62' + phone.substring(1);
@@ -82,33 +81,34 @@ serve(async (req: Request) => {
       const message = `⏰ *Reminder Clock Out*\n\nHalo ${staff.name},\n\nAnda belum melakukan clock out hari ini.\nSilakan segera clock out melalui aplikasi:\nhttps://absensi.petrolog.my.id\n\n_Pesan otomatis dari Digital Presensi_`;
 
       try {
-        const resp = await fetch("https://api.fonnte.com/send", {
+        const resp = await fetch(`https://graph.facebook.com/v21.0/${META_PHONE_ID}/messages`, {
           method: "POST",
           headers: {
-            "Authorization": FONNTE_TOKEN,
+            "Authorization": `Bearer ${META_TOKEN}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            target: phone,
-            message,
-            countryCode: "62",
+            messaging_product: "whatsapp",
+            to: phone,
+            type: "text",
+            text: { body: message },
           }),
         });
 
         const result = await resp.json();
-        if (result.status) {
+        if (result.messages && result.messages.length > 0) {
           sentCount++;
           console.log(`✅ Reminder sent to ${staff.name} (${phone})`);
         } else {
           failCount++;
-          console.warn(`⚠️ Failed for ${staff.name}:`, result);
+          console.warn(`⚠️ Failed for ${staff.name}:`, JSON.stringify(result));
         }
       } catch (e) {
         failCount++;
         console.warn(`⚠️ Error sending to ${staff.name}:`, e);
       }
 
-      // Delay 3 detik antar pesan untuk menghindari banned WhatsApp/Meta
+      // Delay 3 detik antar pesan
       await new Promise(r => setTimeout(r, 3000));
     }
 

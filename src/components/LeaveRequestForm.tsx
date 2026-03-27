@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -12,6 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { notifyRequestSubmitted, notifyApproverNewRequest } from '@/utils/notificationHelper';
+import { generateLeaveRequestNumber } from '@/utils/requestNumberGenerator';
 
 interface UserSession {
   uid: string;
@@ -35,9 +35,10 @@ interface LeaveRequestFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmitted: () => void;
+  editData?: any;
 }
 
-const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, onSubmitted }) => {
+const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, onSubmitted, editData }) => {
   const [loading, setLoading] = useState(false);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
@@ -45,6 +46,8 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [supervisorName, setSupervisorName] = useState('');
   const [hcgaName, setHcgaName] = useState('');
+
+  const isEditMode = !!editData;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -54,7 +57,6 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
       setUserSession(session);
       fetchBalances(session.uid);
 
-      // Always re-fetch from DB to get latest supervisor/hcga assignment
       const refreshUserData = async () => {
         const { data } = await supabase
           .from('staff_users')
@@ -70,7 +72,6 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
             division: data.division || session.division,
           };
           setUserSession(updatedSession);
-          // Update localStorage too
           localStorage.setItem('userSession', JSON.stringify({ ...JSON.parse(sessionData), ...updatedSession }));
           fetchApproverNames(data.supervisor_uid || undefined, data.hcga_approver_uid || undefined);
         } else {
@@ -78,6 +79,16 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
         }
       };
       refreshUserData();
+    }
+
+    // Pre-fill for edit mode
+    if (editData) {
+      if (editData.leave_year) setSelectedYear(String(editData.leave_year));
+      if (Array.isArray(editData.leave_dates)) {
+        setSelectedDates(editData.leave_dates.map((d: string) => new Date(d)));
+      }
+    } else {
+      setSelectedDates([]);
     }
   }, [isOpen]);
 
@@ -97,7 +108,11 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
     for (const yr of years) {
       const existing = data?.find(d => d.year === yr);
       if (existing) {
-        const remaining = existing.total_days - existing.used_days;
+        let remaining = existing.total_days - existing.used_days;
+        // If editing, add back the current request's days to the available balance
+        if (isEditMode && editData.leave_year === yr) {
+          remaining += editData.days_requested || 0;
+        }
         if (yr < currentYear && (currentMonth > 6 || remaining <= 0)) continue;
         result.push({ year: yr, total_days: existing.total_days, used_days: existing.used_days, remaining });
       } else if (yr === currentYear) {
@@ -107,8 +122,10 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
     }
 
     setBalances(result);
-    if (result.length === 1) setSelectedYear(String(result[0].year));
-    else if (result.length > 0) setSelectedYear(String(result[result.length - 1].year));
+    if (!isEditMode) {
+      if (result.length === 1) setSelectedYear(String(result[0].year));
+      else if (result.length > 0) setSelectedYear(String(result[result.length - 1].year));
+    }
   };
 
   const fetchApproverNames = async (supervisorUid?: string, hcgaUid?: string) => {
@@ -131,45 +148,63 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
     setLoading(true);
 
     try {
-      const requestNumber = `CUT-${format(new Date(), 'yyyyMMdd')}-${Date.now().toString(36).toUpperCase()}`;
       const leaveDates = selectedDates.map(d => format(d, 'yyyy-MM-dd')).sort();
 
-      const { error } = await supabase.from('leave_requests').insert({
-        request_number: requestNumber,
-        staff_uid: userSession.uid,
-        staff_name: userSession.name,
-        department: userSession.division || null,
-        position: userSession.position,
-        join_date: userSession.join_date || null,
-        leave_year: Number(selectedYear),
-        days_requested: selectedDates.length,
-        leave_dates: leaveDates,
-        remaining_balance: selectedBalance.remaining - selectedDates.length,
-        previous_year_balance: Number(selectedYear) < new Date().getFullYear() ? selectedBalance.remaining : null,
-        supervisor_uid: userSession.supervisor_uid || null,
-        hcga_approver_uid: userSession.hcga_approver_uid || null,
-      });
+      if (isEditMode) {
+        // Update existing request
+        const { error } = await supabase.from('leave_requests').update({
+          leave_year: Number(selectedYear),
+          days_requested: selectedDates.length,
+          leave_dates: leaveDates,
+          remaining_balance: selectedBalance.remaining - selectedDates.length,
+          previous_year_balance: Number(selectedYear) < new Date().getFullYear() ? selectedBalance.remaining : null,
+        }).eq('id', editData.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        toast({ title: "Berhasil", description: "Permintaan cuti berhasil diperbarui" });
+      } else {
+        // Generate new request number
+        const requestNumber = await generateLeaveRequestNumber(
+          userSession.work_area,
+          userSession.division || ''
+        );
 
-      toast({ title: "Berhasil", description: "Permintaan cuti berhasil diajukan" });
+        const { error } = await supabase.from('leave_requests').insert({
+          request_number: requestNumber,
+          staff_uid: userSession.uid,
+          staff_name: userSession.name,
+          department: userSession.division || null,
+          position: userSession.position,
+          join_date: userSession.join_date || null,
+          leave_year: Number(selectedYear),
+          days_requested: selectedDates.length,
+          leave_dates: leaveDates,
+          remaining_balance: selectedBalance.remaining - selectedDates.length,
+          previous_year_balance: Number(selectedYear) < new Date().getFullYear() ? selectedBalance.remaining : null,
+          supervisor_uid: userSession.supervisor_uid || null,
+          hcga_approver_uid: userSession.hcga_approver_uid || null,
+        });
 
-      // Send notifications (fire-and-forget)
-      const detailStr = `📅 ${selectedDates.length} hari cuti - Tahun ${selectedYear}\n📆 ${leaveDates.map(d => format(new Date(d), 'dd MMM', { locale: idLocale })).join(', ')}`;
+        if (error) throw error;
+        toast({ title: "Berhasil", description: "Permintaan cuti berhasil diajukan" });
 
-      notifyRequestSubmitted({
-        requestNumber, requestType: 'Cuti',
-        staffUid: userSession.uid, staffName: userSession.name,
-        details: detailStr,
-      });
+        // Send notifications
+        const detailStr = `📅 ${selectedDates.length} hari cuti - Tahun ${selectedYear}\n📆 ${leaveDates.map(d => format(new Date(d), 'dd MMM', { locale: idLocale })).join(', ')}`;
 
-      if (userSession.supervisor_uid) {
-        notifyApproverNewRequest({
-          requestId: '', requestNumber, requestType: 'Cuti',
-          creatorName: userSession.name,
-          approverUid: userSession.supervisor_uid,
+        notifyRequestSubmitted({
+          requestNumber, requestType: 'Cuti',
+          staffUid: userSession.uid, staffName: userSession.name,
           details: detailStr,
         });
+
+        if (userSession.supervisor_uid) {
+          notifyApproverNewRequest({
+            requestId: '', requestNumber, requestType: 'Cuti',
+            creatorName: userSession.name,
+            approverUid: userSession.supervisor_uid,
+            details: detailStr,
+          });
+        }
       }
 
       setSelectedDates([]);
@@ -189,7 +224,7 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
-            Permintaan Cuti
+            {isEditMode ? 'Edit Permintaan Cuti' : 'Permintaan Cuti'}
           </DialogTitle>
         </DialogHeader>
 
@@ -258,7 +293,7 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
           <Button variant="outline" onClick={onClose} disabled={loading}>Batal</Button>
           <Button onClick={handleSubmit} disabled={!canSubmit || loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Ajukan Cuti
+            {isEditMode ? 'Simpan Perubahan' : 'Ajukan Cuti'}
           </Button>
         </DialogFooter>
       </DialogContent>
