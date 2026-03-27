@@ -1507,6 +1507,17 @@ const EmployeeManager = () => {
                   </div>
 
                   <div className="space-y-2">
+                    <Label htmlFor="email">Email (Optional)</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      placeholder="e.g., nama@email.com"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="join_date">Tanggal Mulai Kerja (Optional)</Label>
                     <Input
                       id="join_date"
