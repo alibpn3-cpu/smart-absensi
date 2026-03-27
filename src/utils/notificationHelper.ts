@@ -76,8 +76,19 @@ export const notifyApproverNewRequest = async (params: NotifyApproverParams) => 
     });
   }
 
-  // Email - we don't have email field yet, so skip for now
-  // Could be added when email field is added to staff_users
+  // Email
+  if (approver.email) {
+    await sendEmail({
+      to_email: approver.email,
+      to_name: approver.name,
+      subject: `Approval Diperlukan - ${params.requestType} ${params.requestNumber}`,
+      message_type: 'approval_needed',
+      request_number: params.requestNumber,
+      request_type: params.requestType,
+      creator_name: params.creatorName,
+      details: params.details,
+    });
+  }
 };
 
 // Notify staff that their request status changed
@@ -96,6 +107,21 @@ export const notifyStatusUpdate = async (params: NotifyStatusParams) => {
       details: params.notes,
     });
   }
+
+  if (staff.email) {
+    const statusLabel = params.status === 'approved' ? 'Disetujui' : 'Ditolak';
+    await sendEmail({
+      to_email: staff.email,
+      to_name: staff.name,
+      subject: `${params.requestType} ${params.requestNumber} - ${statusLabel}`,
+      message_type: 'status_update',
+      request_number: params.requestNumber,
+      request_type: params.requestType,
+      status: params.status,
+      approver_name: params.approverName,
+      details: params.notes,
+    });
+  }
 };
 
 // Notify staff that their request was submitted
@@ -106,6 +132,18 @@ export const notifyRequestSubmitted = async (params: NotifySubmittedParams) => {
   if (staff.phone_number) {
     await sendWhatsApp(staff.phone_number, {
       recipient_name: staff.name,
+      message_type: 'request_submitted',
+      request_number: params.requestNumber,
+      request_type: params.requestType,
+      details: params.details,
+    });
+  }
+
+  if (staff.email) {
+    await sendEmail({
+      to_email: staff.email,
+      to_name: staff.name,
+      subject: `Permintaan ${params.requestType} ${params.requestNumber} Diajukan`,
       message_type: 'request_submitted',
       request_number: params.requestNumber,
       request_type: params.requestType,
