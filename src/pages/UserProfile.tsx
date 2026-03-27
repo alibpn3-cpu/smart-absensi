@@ -4,8 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, User, MapPin, Briefcase, Building2, LogOut, Lock, Shield, FileText } from 'lucide-react';
+import { ArrowLeft, User, MapPin, Briefcase, Building2, LogOut, Lock, Shield, FileText, Phone, Mail, Save, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
 
@@ -23,6 +25,10 @@ const UserProfile = () => {
   const navigate = useNavigate();
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const sessionData = localStorage.getItem('userSession');
@@ -34,11 +40,45 @@ const UserProfile = () => {
     try {
       const session = JSON.parse(sessionData) as UserSession;
       setUserSession(session);
+      fetchContactInfo(session.uid);
     } catch (error) {
       console.error('Error parsing session:', error);
       navigate('/user-login');
     }
   }, [navigate]);
+
+  const fetchContactInfo = async (uid: string) => {
+    setIsLoading(true);
+    const { data } = await supabase
+      .from('staff_users')
+      .select('phone_number, email')
+      .eq('uid', uid)
+      .maybeSingle();
+
+    if (data) {
+      setPhoneNumber(data.phone_number || '');
+      setEmail((data as any).email || '');
+    }
+    setIsLoading(false);
+  };
+
+  const handleSaveContact = async () => {
+    if (!userSession) return;
+    setIsSaving(true);
+
+    const { error } = await supabase
+      .from('staff_users')
+      .update({ phone_number: phoneNumber || null, email: email || null } as any)
+      .eq('uid', userSession.uid);
+
+    setIsSaving(false);
+
+    if (error) {
+      toast({ title: "Gagal", description: "Gagal menyimpan data kontak", variant: "destructive" });
+    } else {
+      toast({ title: "Berhasil", description: "Data kontak berhasil disimpan" });
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('userSession');
@@ -138,6 +178,46 @@ const UserProfile = () => {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Contact Info - Editable */}
+            <div className="space-y-3 pt-4 border-t">
+              <p className="text-sm font-semibold text-muted-foreground">Informasi Kontak</p>
+              
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Input
+                    placeholder="Nomor WhatsApp (cth: 6281234567890)"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Input
+                    type="email"
+                    placeholder="Alamat Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <Button
+                  onClick={handleSaveContact}
+                  disabled={isSaving || isLoading}
+                  className="w-full"
+                  size="sm"
+                >
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Simpan Kontak
+                </Button>
+              </div>
             </div>
 
             {/* Actions */}
