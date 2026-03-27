@@ -458,16 +458,12 @@ const RequestsPage = () => {
           </TabsContent>
 
           <TabsContent value="approvals" className="space-y-4">
-            {approvalLeaves.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold flex items-center gap-1"><FileText className="h-4 w-4" /> Cuti</h3>
-                {approvalLeaves.map(r => renderRequestCard(r, 'leave', true))}
-              </div>
-            )}
-            {approvalPermissions.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold flex items-center gap-1"><ClipboardList className="h-4 w-4" /> Ijin</h3>
-                {approvalPermissions.map(r => renderRequestCard(r, 'permission', true))}
+            {renderApprovalTable(approvalLeaves, 'leave')}
+            {renderApprovalTable(approvalPermissions, 'permission')}
+            {approvalLeaves.length === 0 && approvalPermissions.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <ClipboardList className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p>Tidak ada permintaan untuk di-approve</p>
               </div>
             )}
           </TabsContent>
