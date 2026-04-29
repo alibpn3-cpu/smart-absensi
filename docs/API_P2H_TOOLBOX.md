@@ -67,6 +67,8 @@ Request tanpa header / dengan key salah → `401 Unauthorized`.
       "checklist_date": "2026-03-15",
       "staff_uid": "EMP001",
       "staff_name": "Budi Santoso",
+      "work_area": "Site A",
+      "position": "Operator",
       "created_at": "2026-03-15T00:12:34.000Z",
       "p2h_checked": true,
       "p2h_photo_url": "https://.../p2h-photos/EMP001/2026-03-15-p2h.jpg",
@@ -77,6 +79,7 @@ Request tanpa header / dengan key salah → `401 Unauthorized`.
 }
 ```
 
+Field `work_area` & `position` selalu disertakan (di-enrich dari tabel `staff_users`).
 Bila `activity=p2h` → field `toolbox_*` tidak disertakan (vice versa).
 
 ## Response — CSV
