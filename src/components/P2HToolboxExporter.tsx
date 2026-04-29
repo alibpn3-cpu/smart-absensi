@@ -127,11 +127,14 @@ const P2HToolboxExporter: React.FC = () => {
       ws.columns = cols;
 
       filtered.forEach((r, i) => {
+        const s = staffMap.get(r.staff_uid) || {};
         const rowData: any = {
           no: i + 1,
           date: r.checklist_date,
           uid: r.staff_uid,
           name: r.staff_name,
+          work_area: s.work_area || '',
+          position: s.position || '',
           created: r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : '',
         };
         if (activity === 'both' || activity === 'p2h') {
