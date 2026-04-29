@@ -74,14 +74,19 @@ const P2HToolboxExporter: React.FC = () => {
 
       let filtered = rows ?? [];
 
-      if (workArea !== 'all' && filtered.length > 0) {
+      // Always fetch staff info for work_area & position columns
+      const staffMap = new Map<string, { work_area?: string; position?: string }>();
+      if (filtered.length > 0) {
         const uids = Array.from(new Set(filtered.map(r => r.staff_uid)));
         const { data: staffs } = await supabase
           .from('staff_users')
-          .select('uid, work_area')
+          .select('uid, work_area, position')
           .in('uid', uids);
-        const allowed = new Set((staffs ?? []).filter(s => s.work_area === workArea).map(s => s.uid));
-        filtered = filtered.filter(r => allowed.has(r.staff_uid));
+        (staffs ?? []).forEach(s => staffMap.set(s.uid, { work_area: s.work_area, position: s.position }));
+
+        if (workArea !== 'all') {
+          filtered = filtered.filter(r => staffMap.get(r.staff_uid)?.work_area === workArea);
+        }
       }
 
       if (filtered.length === 0) {
@@ -100,6 +105,8 @@ const P2HToolboxExporter: React.FC = () => {
         { header: 'Tanggal', key: 'date', width: 14 },
         { header: 'UID', key: 'uid', width: 14 },
         { header: 'Nama', key: 'name', width: 26 },
+        { header: 'Work Area', key: 'work_area', width: 20 },
+        { header: 'Position', key: 'position', width: 22 },
       ];
       const p2hCols: any[] = [
         { header: 'P2H Checked', key: 'p2h', width: 14 },
@@ -120,11 +127,14 @@ const P2HToolboxExporter: React.FC = () => {
       ws.columns = cols;
 
       filtered.forEach((r, i) => {
+        const s = staffMap.get(r.staff_uid) || {};
         const rowData: any = {
           no: i + 1,
           date: r.checklist_date,
           uid: r.staff_uid,
           name: r.staff_name,
+          work_area: s.work_area || '',
+          position: s.position || '',
           created: r.created_at ? new Date(r.created_at).toLocaleString('id-ID') : '',
         };
         if (activity === 'both' || activity === 'p2h') {
