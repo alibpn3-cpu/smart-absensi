@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.remind-clock-out]
 verify_jwt = false
+
+[functions.p2h-toolbox-export]
+verify_jwt = false

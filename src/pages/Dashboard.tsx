@@ -32,6 +32,7 @@ const PolygonGeofenceManager = React.lazy(() => import('../components/PolygonGeo
 import EmployeeManager from '../components/EmployeeManager';
 import AdminManager from '../components/AdminManager';
 import AttendanceExporter from '../components/AttendanceExporter';
+import P2HToolboxExporter from '../components/P2HToolboxExporter';
 import AppSettings from '../components/AppSettings';
 import BirthdayImporter from '../components/BirthdayImporter';
 const AdManager = React.lazy(() => import('../components/AdManager'));
@@ -799,8 +800,9 @@ const Dashboard = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="export">
+          <TabsContent value="export" className="space-y-6">
             <AttendanceExporter />
+            <P2HToolboxExporter />
           </TabsContent>
 
           <TabsContent value="geofence">
