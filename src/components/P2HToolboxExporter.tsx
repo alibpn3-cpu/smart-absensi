@@ -105,6 +105,8 @@ const P2HToolboxExporter: React.FC = () => {
         { header: 'Tanggal', key: 'date', width: 14 },
         { header: 'UID', key: 'uid', width: 14 },
         { header: 'Nama', key: 'name', width: 26 },
+        { header: 'Work Area', key: 'work_area', width: 20 },
+        { header: 'Position', key: 'position', width: 22 },
       ];
       const p2hCols: any[] = [
         { header: 'P2H Checked', key: 'p2h', width: 14 },
