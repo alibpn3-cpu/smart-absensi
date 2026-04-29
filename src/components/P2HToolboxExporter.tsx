@@ -74,14 +74,19 @@ const P2HToolboxExporter: React.FC = () => {
 
       let filtered = rows ?? [];
 
-      if (workArea !== 'all' && filtered.length > 0) {
+      // Always fetch staff info for work_area & position columns
+      const staffMap = new Map<string, { work_area?: string; position?: string }>();
+      if (filtered.length > 0) {
         const uids = Array.from(new Set(filtered.map(r => r.staff_uid)));
         const { data: staffs } = await supabase
           .from('staff_users')
-          .select('uid, work_area')
+          .select('uid, work_area, position')
           .in('uid', uids);
-        const allowed = new Set((staffs ?? []).filter(s => s.work_area === workArea).map(s => s.uid));
-        filtered = filtered.filter(r => allowed.has(r.staff_uid));
+        (staffs ?? []).forEach(s => staffMap.set(s.uid, { work_area: s.work_area, position: s.position }));
+
+        if (workArea !== 'all') {
+          filtered = filtered.filter(r => staffMap.get(r.staff_uid)?.work_area === workArea);
+        }
       }
 
       if (filtered.length === 0) {
