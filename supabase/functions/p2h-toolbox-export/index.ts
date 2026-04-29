@@ -106,23 +106,31 @@ Deno.serve(async (req) => {
 
   let rows = data ?? [];
 
-  if (workArea && rows.length > 0) {
+  // Always enrich with staff work_area & position
+  const staffMap = new Map<string, { work_area?: string; position?: string }>();
+  if (rows.length > 0) {
     const uids = Array.from(new Set(rows.map(r => r.staff_uid)));
     const { data: staffs } = await supabase
       .from('staff_users')
-      .select('uid, work_area')
+      .select('uid, work_area, position')
       .in('uid', uids);
-    const allowed = new Set((staffs ?? []).filter(s => s.work_area === workArea).map(s => s.uid));
-    rows = rows.filter(r => allowed.has(r.staff_uid));
+    (staffs ?? []).forEach(s => staffMap.set(s.uid, { work_area: s.work_area, position: s.position }));
+
+    if (workArea) {
+      rows = rows.filter(r => staffMap.get(r.staff_uid)?.work_area === workArea);
+    }
   }
 
   // Project columns based on activity
   const projected = rows.map(r => {
+    const s = staffMap.get(r.staff_uid) || {};
     const base: any = {
       id: r.id,
       checklist_date: r.checklist_date,
       staff_uid: r.staff_uid,
       staff_name: r.staff_name,
+      work_area: s.work_area ?? null,
+      position: s.position ?? null,
       created_at: r.created_at,
     };
     if (activity === 'both' || activity === 'p2h') {
@@ -137,7 +145,7 @@ Deno.serve(async (req) => {
   });
 
   if (format === 'csv') {
-    const headers = ['id','checklist_date','staff_uid','staff_name'];
+    const headers = ['id','checklist_date','staff_uid','staff_name','work_area','position'];
     if (activity === 'both' || activity === 'p2h') headers.push('p2h_checked','p2h_photo_url');
     if (activity === 'both' || activity === 'toolbox') headers.push('toolbox_checked','toolbox_photo_url');
     headers.push('created_at');
