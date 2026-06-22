@@ -35,6 +35,7 @@ import { getEnhancedLocation, getAccuracyLevel, clearLocationCache } from '@/uti
 import { isPointInPolygon, PolygonCoordinate } from '@/utils/polygonValidator';
 import { validateGPSPosition, clearPositionHistory } from '@/utils/gpsValidator';
 import { calculateAdaptiveTolerance, GEOFENCE_CONSTANTS } from '@/utils/geofenceConstants';
+import { getAttendanceContext } from '@/utils/attendanceContext';
 
 interface StaffUser {
   uid: string;
