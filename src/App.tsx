@@ -14,6 +14,8 @@ import UserProfile from "./pages/UserProfile";
 import Dashboard from "./pages/Dashboard";
 import RequestsPage from "./pages/RequestsPage";
 import NotFound from "./pages/NotFound";
+import SubAdminReports from "./pages/SubAdminReports";
+import SubAdminGuard from "@/components/SubAdminGuard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,6 +50,7 @@ const AppContent = () => {
         <Route path="/user-login" element={<UserLogin />} />
         <Route path="/user-profile" element={<UserProfile />} />
         <Route path="/requests" element={<RequestsPage />} />
+        <Route path="/reports" element={<SubAdminGuard><SubAdminReports /></SubAdminGuard>} />
         <Route path="/dashboard" element={
           <ProtectedRoute>
             <Dashboard />
