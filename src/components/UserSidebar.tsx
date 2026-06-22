@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   Menu, User, FileText, RefreshCw, Bug, MapPin, Camera, Satellite, Star,
-  LogOut, Info, Lock, Shield, ChevronRight
+  LogOut, Info, Lock, Shield, ChevronRight, BarChart3
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -38,6 +38,7 @@ const UserSidebar: React.FC = () => {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [monthlyScore, setMonthlyScore] = useState<number | null>(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [isSubAdmin, setIsSubAdmin] = useState(false);
   const featureFlags = useFeatureFlags();
 
   useEffect(() => {
@@ -65,6 +66,14 @@ const UserSidebar: React.FC = () => {
 
     getMonthlyAccumulatedScore(userSession.uid).then(setMonthlyScore);
     checkGps();
+
+    // Check sub-admin status from DB
+    supabase
+      .from('staff_users')
+      .select('show_attendance_status')
+      .eq('uid', userSession.uid)
+      .maybeSingle()
+      .then(({ data }) => setIsSubAdmin(!!data?.show_attendance_status));
   }, [open, userSession?.uid]);
 
   const checkGps = async () => {
@@ -272,6 +281,20 @@ const UserSidebar: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <FileText className="h-4 w-4 text-primary" />
                       <span>Permintaan Cuti & Ijin</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                )}
+
+                {isSubAdmin && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between h-11"
+                    onClick={() => { setOpen(false); navigate('/reports'); }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      <span>Laporan Sub-Admin</span>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </Button>
