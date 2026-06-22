@@ -133,8 +133,12 @@ export type Database = {
           checkout_location_lng: number | null
           checkout_reason: string | null
           checkout_status: string | null
+          client_ip: string | null
           created_at: string
           date: string
+          device_flag: string | null
+          device_id: string | null
+          device_label: string | null
           extend_reason: string | null
           hours_worked: number | null
           id: string
@@ -146,6 +150,7 @@ export type Database = {
           staff_uid: string
           status: string
           updated_at: string
+          user_agent: string | null
         }
         Insert: {
           attendance_type?: string | null
@@ -160,8 +165,12 @@ export type Database = {
           checkout_location_lng?: number | null
           checkout_reason?: string | null
           checkout_status?: string | null
+          client_ip?: string | null
           created_at?: string
           date?: string
+          device_flag?: string | null
+          device_id?: string | null
+          device_label?: string | null
           extend_reason?: string | null
           hours_worked?: number | null
           id?: string
@@ -173,6 +182,7 @@ export type Database = {
           staff_uid: string
           status: string
           updated_at?: string
+          user_agent?: string | null
         }
         Update: {
           attendance_type?: string | null
@@ -187,8 +197,12 @@ export type Database = {
           checkout_location_lng?: number | null
           checkout_reason?: string | null
           checkout_status?: string | null
+          client_ip?: string | null
           created_at?: string
           date?: string
+          device_flag?: string | null
+          device_id?: string | null
+          device_label?: string | null
           extend_reason?: string | null
           hours_worked?: number | null
           id?: string
@@ -200,6 +214,7 @@ export type Database = {
           staff_uid?: string
           status?: string
           updated_at?: string
+          user_agent?: string | null
         }
         Relationships: [
           {
