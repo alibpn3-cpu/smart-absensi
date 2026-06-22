@@ -643,7 +643,11 @@ const AttendanceExporter = () => {
         { header: 'Alasan Clock In', key: 'alasanIn', width: 25 },
         { header: 'Alasan Clock Out', key: 'alasanOut', width: 25 },
         { header: 'Alasan Extend In', key: 'alasanExtendIn', width: 25 },
-        { header: 'Alasan Extend Out', key: 'alasanExtendOut', width: 25 }
+        { header: 'Alasan Extend Out', key: 'alasanExtendOut', width: 25 },
+        { header: 'IP Address', key: 'ipAddress', width: 14 },
+        { header: 'Device', key: 'device', width: 30 },
+        { header: 'Device ID', key: 'deviceId', width: 22 },
+        { header: 'Flag Audit', key: 'flag', width: 22 }
       ];
 
       // Add data rows
@@ -705,8 +709,24 @@ const AttendanceExporter = () => {
           alasanIn: record.checkin_reason || record.reason || '-',
           alasanOut: record.checkout_reason || '-',
           alasanExtendIn: record.extend_reason || '-',
-          alasanExtendOut: record.extend_reason || '-'
+          alasanExtendOut: record.extend_reason || '-',
+          ipAddress: record.client_ip || '-',
+          device: record.device_label || '-',
+          deviceId: record.device_id || '-',
+          flag: record.device_flag
+            ? (record.device_flag === 'new_device' ? 'Perangkat Baru'
+              : record.device_flag === 'device_shared_with_other_user' ? 'Perangkat Dipakai User Lain'
+              : record.device_flag === 'user_on_other_device' ? 'User Pindah Perangkat'
+              : record.device_flag)
+            : '-'
         });
+
+        // Highlight flagged rows
+        if (record.device_flag) {
+          row.eachCell((cell) => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3CD' } };
+          });
+        }
 
         // Add hyperlinks for coordinates
         if (record.checkin_location_lat && record.checkin_location_lng) {

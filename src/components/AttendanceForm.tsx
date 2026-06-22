@@ -35,6 +35,7 @@ import { getEnhancedLocation, getAccuracyLevel, clearLocationCache } from '@/uti
 import { isPointInPolygon, PolygonCoordinate } from '@/utils/polygonValidator';
 import { validateGPSPosition, clearPositionHistory } from '@/utils/gpsValidator';
 import { calculateAdaptiveTolerance, GEOFENCE_CONSTANTS } from '@/utils/geofenceConstants';
+import { getAttendanceContext } from '@/utils/attendanceContext';
 
 interface StaffUser {
   uid: string;
@@ -1103,6 +1104,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
       
       if (action.action === 'check-in') {
+        const ctx = await getAttendanceContext(staff.uid, 'check_in');
         const { error } = await supabase
           .from('attendance_records')
           .insert({
@@ -1114,7 +1116,12 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             check_in_time: formattedTime,
             checkin_location_address: locationAddress,
             checkin_location_lat: locationLat,
-            checkin_location_lng: locationLng
+            checkin_location_lng: locationLng,
+            client_ip: ctx.client_ip,
+            user_agent: ctx.user_agent,
+            device_id: ctx.device_id,
+            device_label: ctx.device_label,
+            device_flag: ctx.device_flag,
           });
         
         if (error) throw error;
@@ -1127,7 +1134,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         const hoursWorked = existingAttendance?.check_in_time 
           ? calculateHoursWorked(existingAttendance.check_in_time, formattedTime)
           : undefined;
-        
+        const ctx = await getAttendanceContext(staff.uid, 'check_out');
         const { error } = await supabase
           .from('attendance_records')
           .update({
@@ -1135,7 +1142,12 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             checkout_location_address: locationAddress,
             checkout_location_lat: locationLat,
             checkout_location_lng: locationLng,
-            hours_worked: hoursWorked
+            hours_worked: hoursWorked,
+            client_ip: ctx.client_ip,
+            user_agent: ctx.user_agent,
+            device_id: ctx.device_id,
+            device_label: ctx.device_label,
+            device_flag: ctx.device_flag,
           })
           .eq('id', existingAttendance.id);
         
@@ -1312,6 +1324,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         const checkOutFormatted = formatTimestamp(now);
         const hoursWorked = calculateHoursWorked(checkInFormatted, checkOutFormatted);
         
+        const ctxFc = await getAttendanceContext(selectedStaff!.uid, 'check_out');
         const { error } = await supabase
           .from('attendance_records')
           .insert({
@@ -1330,7 +1343,12 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             checkout_location_lng: usedLocation.lng,
             selfie_checkout_url: photoPath,
             checkout_reason: dinasFastCheckoutReason,
-            hours_worked: hoursWorked
+            hours_worked: hoursWorked,
+            client_ip: ctxFc.client_ip,
+            user_agent: ctxFc.user_agent,
+            device_id: ctxFc.device_id,
+            device_label: ctxFc.device_label,
+            device_flag: ctxFc.device_flag,
           });
         
         if (error) throw error;
@@ -1447,11 +1465,17 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       if (todayAttendance && isCheckOut) {
         // Update existing record for check-out
         console.log('📝 Updating check-out for record:', todayAttendance.id);
+        const ctxOut = await getAttendanceContext(selectedStaff.uid, 'check_out');
         const updateData: any = {
           check_out_time: formattedTime,
           checkout_location_lat: usedLocation.lat,
           checkout_location_lng: usedLocation.lng,
-          checkout_location_address: locationAddress
+          checkout_location_address: locationAddress,
+          client_ip: ctxOut.client_ip,
+          user_agent: ctxOut.user_agent,
+          device_id: ctxOut.device_id,
+          device_label: ctxOut.device_label,
+          device_flag: ctxOut.device_flag,
         };
         
         // Only update photo for WFH/Dinas and save to checkout column
@@ -1482,9 +1506,18 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       } else if (!todayAttendance) {
         // Create new record for check-in
         console.log('📝 Creating new check-in record');
+        const ctxIn = await getAttendanceContext(selectedStaff.uid, 'check_in');
+        const insertData = {
+          ...attendanceData,
+          client_ip: ctxIn.client_ip,
+          user_agent: ctxIn.user_agent,
+          device_id: ctxIn.device_id,
+          device_label: ctxIn.device_label,
+          device_flag: ctxIn.device_flag,
+        };
         const { error, data } = await supabase
           .from('attendance_records')
-          .insert([attendanceData])
+          .insert([insertData])
           .select();
 
         if (error) {
@@ -1644,6 +1677,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       
       if (!isCheckOut) {
         // Overtime Check-In
+        const ctxOi = await getAttendanceContext(selectedStaff!.uid, 'check_in');
         const { error } = await supabase
           .from('attendance_records')
           .insert({
@@ -1655,7 +1689,12 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             check_in_time: formattedTime,
             checkin_location_address: location.address,
             checkin_location_lat: location.lat,
-            checkin_location_lng: location.lng
+            checkin_location_lng: location.lng,
+            client_ip: ctxOi.client_ip,
+            user_agent: ctxOi.user_agent,
+            device_id: ctxOi.device_id,
+            device_label: ctxOi.device_label,
+            device_flag: ctxOi.device_flag,
           });
         
         if (error) throw error;
@@ -1667,7 +1706,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           overtimeAttendance!.check_in_time!,
           formattedTime
         );
-        
+        const ctxOo = await getAttendanceContext(selectedStaff!.uid, 'check_out');
         const { error } = await supabase
           .from('attendance_records')
           .update({
@@ -1675,7 +1714,12 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             checkout_location_address: location.address,
             checkout_location_lat: location.lat,
             checkout_location_lng: location.lng,
-            hours_worked: hoursWorked
+            hours_worked: hoursWorked,
+            client_ip: ctxOo.client_ip,
+            user_agent: ctxOo.user_agent,
+            device_id: ctxOo.device_id,
+            device_label: ctxOo.device_label,
+            device_flag: ctxOo.device_flag,
           })
           .eq('id', overtimeAttendance!.id);
         
@@ -1755,6 +1799,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const checkOutFormatted = formatTimestamp(now);
       const hoursWorked = calculateHoursWorked(checkInFormatted, checkOutFormatted);
       
+      const ctxWf = await getAttendanceContext(selectedStaff!.uid, 'check_out');
       const { error } = await supabase
         .from('attendance_records')
         .insert({
@@ -1772,7 +1817,12 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           checkout_location_lat: location.lat,
           checkout_location_lng: location.lng,
           reason: wfoFastCheckoutReason,
-          hours_worked: hoursWorked
+          hours_worked: hoursWorked,
+          client_ip: ctxWf.client_ip,
+          user_agent: ctxWf.user_agent,
+          device_id: ctxWf.device_id,
+          device_label: ctxWf.device_label,
+          device_flag: ctxWf.device_flag,
         });
       
       if (error) throw error;
