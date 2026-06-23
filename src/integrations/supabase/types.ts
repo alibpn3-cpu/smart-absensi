@@ -377,6 +377,7 @@ export type Database = {
         Row: {
           center_lat: number | null
           center_lng: number | null
+          company_id: number | null
           coordinates: Json | null
           created_at: string
           id: string
@@ -389,6 +390,7 @@ export type Database = {
         Insert: {
           center_lat?: number | null
           center_lng?: number | null
+          company_id?: number | null
           coordinates?: Json | null
           created_at?: string
           id?: string
@@ -401,6 +403,7 @@ export type Database = {
         Update: {
           center_lat?: number | null
           center_lng?: number | null
+          company_id?: number | null
           coordinates?: Json | null
           created_at?: string
           id?: string
@@ -684,6 +687,7 @@ export type Database = {
       }
       staff_users: {
         Row: {
+          company_id: number | null
           created_at: string
           division: string | null
           email: string | null
@@ -707,6 +711,7 @@ export type Database = {
           work_area: string
         }
         Insert: {
+          company_id?: number | null
           created_at?: string
           division?: string | null
           email?: string | null
@@ -730,6 +735,7 @@ export type Database = {
           work_area: string
         }
         Update: {
+          company_id?: number | null
           created_at?: string
           division?: string | null
           email?: string | null
@@ -758,6 +764,7 @@ export type Database = {
         Row: {
           clock_in_time: string
           clock_out_time: string
+          company_id: number | null
           created_at: string
           employee_type: string
           id: string
@@ -767,6 +774,7 @@ export type Database = {
         Insert: {
           clock_in_time?: string
           clock_out_time?: string
+          company_id?: number | null
           created_at?: string
           employee_type?: string
           id?: string
@@ -776,6 +784,7 @@ export type Database = {
         Update: {
           clock_in_time?: string
           clock_out_time?: string
+          company_id?: number | null
           created_at?: string
           employee_type?: string
           id?: string
