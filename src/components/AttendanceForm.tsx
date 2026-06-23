@@ -36,6 +36,8 @@ import { isPointInPolygon, PolygonCoordinate } from '@/utils/polygonValidator';
 import { validateGPSPosition, clearPositionHistory } from '@/utils/gpsValidator';
 import { calculateAdaptiveTolerance, GEOFENCE_CONSTANTS } from '@/utils/geofenceConstants';
 import { getAttendanceContext, showClockWarning } from '@/utils/attendanceContext';
+import { useClockSkewGuard } from '@/hooks/useClockSkewGuard';
+import ClockInvalidDialog from './ClockInvalidDialog';
 
 interface StaffUser {
   uid: string;
