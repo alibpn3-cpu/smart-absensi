@@ -1825,6 +1825,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const hoursWorked = calculateHoursWorked(checkInFormatted, checkOutFormatted);
       
       const ctxWf = await getAttendanceContext(selectedStaff!.uid, 'check_out');
+      showClockWarning(ctxWf, toast);
       const { error } = await supabase
         .from('attendance_records')
         .insert({
@@ -1848,7 +1849,10 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           device_id: ctxWf.device_id,
           device_label: ctxWf.device_label,
           device_flag: ctxWf.device_flag,
+          client_timestamp: ctxWf.client_timestamp,
+          clock_skew_seconds: ctxWf.clock_skew_seconds,
         });
+
       
       if (error) throw error;
       
