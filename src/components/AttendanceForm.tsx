@@ -2247,7 +2247,21 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
 
   return (
     <div className="min-h-screen bg-background p-4 pt-2">
+      <ClockInvalidDialog
+        open={showClockInvalidDialog && clockGuard.isClockInvalid}
+        skewSeconds={clockGuard.skewSeconds}
+        checking={clockGuard.checking}
+        onRecheck={async () => {
+          const stillInvalid = await clockGuard.recheck();
+          if (!stillInvalid) {
+            setShowClockInvalidDialog(false);
+            toast({ title: '✅ Jam perangkat sudah sinkron', description: 'Anda dapat melanjutkan presensi.' });
+          }
+        }}
+        onDismiss={() => setShowClockInvalidDialog(false)}
+      />
       <div className="max-w-md mx-auto space-y-2 animate-fade-in">
+
         
         
         {/* ScoreCard moved to UserSidebar */}
