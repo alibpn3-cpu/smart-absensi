@@ -1,133 +1,52 @@
+
 ## Tujuan
+Tutup celah deteksi "joki via shared device" di layer **export Excel**. Saat ini flag `device_shared_with_other_user` hanya dihitung saat insert — kalau User A absen pagi & User B pakai device sama sore hari, record User A pagi tetap tak terflag. Solusi: scan dataset di export, mark merah semua record yang terlibat sharing.
 
-1. **Halaman Sub-Admin `/reports`** — user dengan `show_attendance_status=true` bisa lihat & export laporan kehadiran karyawan di **work_area + division yang sama**, read-only.
-2. **Anti-joki capture** — saat clock in/out, sistem menangkap `ip_address`, `user_agent`, dan `device_id` (persisten). Data tersembunyi dari user biasa, hanya tampil di **export Excel sub-admin & admin** dan **viewer admin AttendanceExporter**. Sistem otomatis menandai (flag) baris yang mencurigakan.
+## Yang berubah
 
----
+### 1. `src/components/AttendanceExporter.tsx` (admin export)
+Sebelum loop bikin baris:
+- Build map `deviceUsersMap: Record<device_id, Set<staff_uid>>` dari semua records di dataset
+- Identifikasi `sharedDeviceIds = Set<device_id>` dengan `users.size > 1`
 
-## Bagian A — Sub-Admin Reports
+Saat render baris:
+- Kalau `record.device_id` ada di `sharedDeviceIds`:
+  - Set `record._jokiSuspect = true`
+  - Set `record._sharedWith = [staff_uid lain]` (untuk label)
+- Kolom **Flag** sekarang menampilkan:
+  - Kalau `_jokiSuspect`: `'⚠ JOKI SUSPECT: device juga dipakai oleh ' + sharedWith.join(', ')`
+  - Else: label existing (Perangkat Baru / dst)
+- Highlight baris:
+  - `_jokiSuspect` → fill **merah muda** (`FFFFCDD2`) — prioritas tertinggi
+  - `device_flag` ada (non-suspect) → fill **kuning** existing (`FFFFF3CD`)
+  - Tidak ada → no fill
 
-### A1. Halaman baru `src/pages/SubAdminReports.tsx` (route `/reports`)
+### 2. `src/pages/SubAdminReports.tsx` (sub-admin export & tabel)
+Logic identik:
+- Build `sharedDeviceIds` dari dataset yang sudah di-fetch
+- Excel export: kolom Flag & highlight merah sama persis
+- Tabel UI: tambah badge merah "JOKI SUSPECT" di kolom Flag kalau device shared (visual immediate sebelum export)
 
-- Header: nama user + chip "Sub-Admin" + scope info ("Area: X • Divisi: Y")
-- Filter bar: combobox nama (auto-close, hanya nama di area+divisi yang sama, termasuk inactive), date-range / month picker, status, btn Terapkan/Reset
-- Tabel kehadiran read-only:
-  - Kolom: Tanggal, Nama, Status, Clock In, Clock Out, Lokasi In, Lokasi Out, Foto In, Foto Out, **IP**, **Device**, **Flag**
-  - Foto = thumbnail → dialog lightbox (selfie + alamat)
-  - Alamat → buka Google Maps
-  - Baris ber-flag diberi border/warning subtle
-  - Pagination 50/halaman
-- Tombol **Export Excel** — file `Laporan_<Area>_<Divisi>_<periode>.xlsx`, include kolom anti-joki + kolom flag
+### 3. Tidak ada perubahan DB
+Tidak ada migration, tidak ada perubahan edge function, tidak ubah `attendance_records`. Pure presentational logic di sisi export. Kalau dataset diperluas (filter beda), perhitungan otomatis update.
 
-### A2. Guard `src/components/SubAdminGuard.tsx`
+## Edge case yang ditangani
+- `device_id IS NULL` → tidak masuk perhitungan (tidak false-flag user dengan stale bundle)
+- 1 user pakai device sama berkali-kali → tidak shared (set.size = 1), tidak flag
+- 3+ user pakai 1 device → semua di-mark, label list semua staff_uid lain
+- Dataset 1 hari vs 1 bulan → cross-check otomatis ikut scope filter
 
-- Cek session user → fetch `staff_users` row-nya
-- `show_attendance_status !== true` → redirect `/dashboard` + toast
-- Tidak login → redirect `/login`
+## Verifikasi
+1. Export Excel periode yang mencakup device `212ef1a9-...` (sudah confirmed shared antara `01092301` & `18102101`) → kedua baris merah, label "JOKI SUSPECT: device juga dipakai oleh [uid lain]"
+2. Export periode 1 hari di mana hanya 1 user pakai device → tidak ada flag merah
+3. Sub-admin reports tabel → badge merah muncul di kolom Flag untuk shared device
+4. Record dengan `device_id = NULL` → tidak terpengaruh, tetap '-'
+5. Record dengan flag lama (`new_device`, `user_on_other_device`) tapi device tidak shared → tetap kuning
 
-### A3. Entry point
+## File yang diubah
+- `src/components/AttendanceExporter.tsx` — tambah pre-scan + override flag/fill
+- `src/pages/SubAdminReports.tsx` — sama + badge di tabel
 
-- Banner conditional di `/dashboard` (hanya kalau user sub-admin) → klik ke `/reports`
-- Tidak menyentuh menu/route admin lain
-
-### A4. Logika query
-
-1. Ambil `work_area` + `division` user login
-2. Fetch `staff_users` filter area+divisi (semua, termasuk inactive)
-3. Fetch `attendance_records` pakai pagination internal + tiebreaker `id` (cegah miss data)
-4. Filter status/staff_uid di-server, sisanya client-side bila kecil
-
----
-
-## Bagian B — Anti-Joki Capture
-
-### B1. Skema database (migration)
-
-Tambah kolom **nullable** ke `attendance_records` (additive, tidak break data lama):
-- `client_ip text`
-- `user_agent text`
-- `device_id text`
-- `device_label text` — hasil parse UA jadi "Samsung A53 • Chrome 120 • Android 14" (readable)
-- `device_flag text` — null / `'new_device'` / `'device_shared_with_other_user'` / `'user_on_other_device'`
-
-Index tambahan: `(staff_uid, device_id)` untuk lookup cepat.
-
-### B2. Edge function baru `attendance-context` (`verify_jwt=false`)
-
-- Method: POST, body: `{ staff_uid, action: 'check_in'|'check_out', device_id, user_agent }`
-- Ambil IP dari header `x-forwarded-for` (atau `cf-connecting-ip` fallback) — **server-side, tidak bisa dipalsukan client**
-- Parse `user_agent` jadi `device_label` (pakai regex sederhana inline, tidak perlu lib)
-- Cek riwayat:
-  - `staff_uid` belum punya `device_id` ini sebelumnya → `flag='new_device'`
-  - `device_id` ini sudah pernah dipakai `staff_uid` lain dalam 30 hari → `flag='device_shared_with_other_user'`
-  - `staff_uid` ini dalam 7 hari terakhir absen dengan `device_id` lain → `flag='user_on_other_device'`
-  - Tidak ada anomali → `flag=null`
-- Response: `{ client_ip, device_label, device_flag }`
-- CORS standar; auth validation via existing `staff_uid` lookup
-
-### B3. Client-side device_id generator `src/utils/deviceId.ts`
-
-- Generate UUID v4 → simpan ke `localStorage['attendance_device_id']` & IndexedDB (dual-store, lebih sulit dihapus)
-- Helper `getOrCreateDeviceId()` dipanggil saat init app
-- Catatan tradeoff: user bisa clear storage → device_id baru → akan ter-flag `new_device` (justru bagus, audit trail)
-
-### B4. Integrasi ke alur clock in/out
-
-Di komponen yang melakukan submit attendance (Clock In/Out handlers):
-1. Sebelum insert `attendance_records`, panggil edge `attendance-context`
-2. Sertakan `client_ip`, `user_agent`, `device_id`, `device_label`, `device_flag` di payload insert
-3. **Tidak menampilkan apapun ke user** — silent capture
-4. Kalau edge function error → tetap lanjutkan insert tanpa kolom anti-joki (additive, jangan ganggu UX)
-
-### B5. Tampilan di Admin & Sub-Admin
-
-- **Sub-Admin export Excel**: tambah kolom IP, Device, Flag (dgn warna kuning utk row ber-flag)
-- **Admin `AttendanceExporter.tsx`**: tambah kolom yang sama di export Excel + opsional kolom Flag di tabel viewer
-- **Dashboard user biasa**: TIDAK ada perubahan visual — kolom ini tersembunyi
-
-### B6. Privacy notice
-
-Tambah satu baris kecil di dashboard footer (atau di dialog clock-in): _"Aktivitas clock in/out direkam (IP, perangkat) untuk audit keamanan."_ → kepatuhan PII dasar.
-
----
-
-## File yang berubah
-
-**Baru:**
-- `src/pages/SubAdminReports.tsx`
-- `src/components/SubAdminGuard.tsx`
-- `src/utils/deviceId.ts`
-- `supabase/functions/attendance-context/index.ts`
-- Migration: 5 kolom + index di `attendance_records`
-
-**Edit:**
-- `src/App.tsx` — route `/reports`
-- `src/pages/Dashboard.tsx` — banner sub-admin + privacy notice
-- Handler clock-in & clock-out (cari `check_in_time` insert paths) — panggil edge function & simpan kolom anti-joki
-- `src/components/admin/AttendanceExporter.tsx` — kolom export tambahan + viewer flag
-- `supabase/config.toml` — tidak perlu (verify_jwt default ok via in-code validation)
-
-**Tidak diubah:**
-- Skema/RLS tabel lain
-- Halaman admin lain
-- Alur user biasa secara visual
-
----
-
-## Verifikasi setelah implementasi
-
-1. Login user `show_attendance_status=true` → `/reports` muncul, hanya data area+divisi sendiri
-2. Login user biasa → `/reports` ditolak
-3. Clock in → cek di DB: `client_ip`, `device_id`, `device_label` ter-isi
-4. Clear localStorage → clock in lagi → `device_flag='new_device'`
-5. Coba simulasi 2 user pakai device_id sama → flag `device_shared_with_other_user`
-6. Export Excel sub-admin & admin → kolom anti-joki muncul, baris flag berwarna
-7. UI user biasa tidak berubah, tidak ada kolom IP/device terlihat
-
----
-
-## Risiko yang sudah saya akui (jangan kaget di kemudian hari)
-
-- **Office NAT**: semua user di 1 IP → kolom IP cuma berguna utk WFH/Dinas, bukan utk pembanding antar user WFO.
-- **device_id bisa di-reset**: user bisa clear storage → flag `new_device` muncul terus. Itu sengaja — bikin joki ribet & meninggalkan jejak.
-- **Tidak menggantikan face recognition**: ini hanya pengganggu, bukan pencegah absolut. Joki pintar (login user A di HP teman, biarkan teman absen) tetap lolos kalau device baru itu diterima. Solusi penuh tetap butuh liveness — fitur ini hanya jembatan.
+## Yang TIDAK dibangun (sesuai keputusan)
+- ❌ Tidak ada nightly backfill — flag DB tetap as-is, hanya export yang akurat
+- ❌ Tidak ada force version bump — stale bundle dibiarkan sembuh natural
