@@ -253,7 +253,9 @@ const SubAdminReports: React.FC = () => {
       { header: 'IP', key: 'ip', width: 14 },
       { header: 'Device', key: 'device', width: 30 },
       { header: 'Device ID', key: 'devId', width: 22 },
-      { header: 'Flag Audit', key: 'flag', width: 22 },
+      { header: 'Skew Jam (detik)', key: 'skew', width: 16 },
+      { header: 'Flag Audit', key: 'flag', width: 30 },
+
     ];
 
     filtered.forEach((r, i) => {
@@ -279,8 +281,10 @@ const SubAdminReports: React.FC = () => {
         ip: r.client_ip || '-',
         device: r.device_label || '-',
         devId: r.device_id || '-',
+        skew: r.clock_skew_seconds == null ? '-' : r.clock_skew_seconds,
         flag: flagText,
       });
+
       if (signed[i].checkin) {
         const c = row.getCell('fIn');
         c.value = { text: 'Lihat Foto', hyperlink: signed[i].checkin! };
