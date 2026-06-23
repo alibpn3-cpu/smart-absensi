@@ -12,7 +12,11 @@ interface ReqBody {
   action?: 'check_in' | 'check_out';
   device_id?: string;
   user_agent?: string;
+  client_timestamp?: string;
 }
+
+const CLOCK_SKEW_THRESHOLD_SECONDS = 120;
+
 
 function getClientIp(req: Request): string | null {
   const xff = req.headers.get('x-forwarded-for');
@@ -87,6 +91,7 @@ Deno.serve(async (req) => {
   const staff_uid = (body.staff_uid || '').toString().trim();
   const device_id = (body.device_id || '').toString().trim();
   const user_agent = (body.user_agent || '').toString();
+  const client_timestamp_raw = (body.client_timestamp || '').toString();
 
   if (!staff_uid || !device_id) {
     return new Response(
@@ -101,12 +106,23 @@ Deno.serve(async (req) => {
   const client_ip = getClientIp(req);
   const device_label = parseUserAgent(user_agent);
 
+  // Compute clock skew (server vs client device time)
+  let clock_skew_seconds: number | null = null;
+  let clock_warning = false;
+  if (client_timestamp_raw) {
+    const clientMs = Date.parse(client_timestamp_raw);
+    if (!isNaN(clientMs)) {
+      clock_skew_seconds = Math.round(Math.abs(Date.now() - clientMs) / 1000);
+      if (clock_skew_seconds > CLOCK_SKEW_THRESHOLD_SECONDS) clock_warning = true;
+    }
+  }
+
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
 
-  let device_flag: string | null = null;
+  const flags: string[] = [];
 
   try {
     // 1) Has this staff used this device_id before?
@@ -118,10 +134,6 @@ Deno.serve(async (req) => {
       .limit(1);
 
     const isNewForUser = !sameUserDevice || sameUserDevice.length === 0;
-
-    if (isNewForUser) {
-      device_flag = 'new_device';
-    }
 
     // 2) Has another staff used this same device_id in last 30 days?
     const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
@@ -136,11 +148,9 @@ Deno.serve(async (req) => {
       .limit(1);
 
     if (otherUsers && otherUsers.length > 0) {
-      device_flag = 'device_shared_with_other_user';
-    }
-
-    // 3) Has THIS staff used a DIFFERENT device in last 7 days?
-    if (!device_flag || device_flag === 'new_device') {
+      flags.push('device_shared_with_other_user');
+    } else if (isNewForUser) {
+      // 3) Has THIS staff used a DIFFERENT device in last 7 days?
       const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
         .toISOString()
         .slice(0, 10);
@@ -154,19 +164,25 @@ Deno.serve(async (req) => {
         .limit(1);
 
       if (recentDevices && recentDevices.length > 0) {
-        // user-on-other-device is stronger signal than new_device
-        device_flag = 'user_on_other_device';
+        flags.push('user_on_other_device');
+      } else {
+        flags.push('new_device');
       }
     }
+
+    if (clock_warning) flags.push('clock_manipulated');
   } catch (e) {
     console.error('flag computation failed:', e);
   }
 
+  const device_flag = flags.length > 0 ? flags.join(',') : null;
+
   return new Response(
-    JSON.stringify({ client_ip, device_label, device_flag }),
+    JSON.stringify({ client_ip, device_label, device_flag, clock_skew_seconds, clock_warning }),
     {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     }
   );
 });
+

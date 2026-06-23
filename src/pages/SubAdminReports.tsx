@@ -44,19 +44,27 @@ interface AttendanceRow {
   device_id: string | null;
   device_label: string | null;
   device_flag: string | null;
+  clock_skew_seconds: number | null;
 }
 
 const PAGE_SIZE = 50;
 const BATCH = 1000;
 
-const flagLabel = (f: string | null) => {
-  switch (f) {
-    case 'new_device': return 'Perangkat Baru';
-    case 'device_shared_with_other_user': return 'Perangkat Dipakai User Lain';
-    case 'user_on_other_device': return 'User Pindah Perangkat';
-    default: return '-';
-  }
+const FLAG_MAP: Record<string, string> = {
+  new_device: 'Perangkat Baru',
+  device_shared_with_other_user: 'Perangkat Dipakai User Lain',
+  user_on_other_device: 'User Pindah Perangkat',
+  clock_manipulated: 'Jam Manipulasi',
 };
+
+const flagLabel = (f: string | null) => {
+  if (!f) return '-';
+  return f
+    .split(',')
+    .map((x) => FLAG_MAP[x.trim()] || x.trim())
+    .join(' + ');
+};
+
 
 const fmtTime = (s: string | null) => {
   if (!s) return '-';
@@ -134,7 +142,7 @@ const SubAdminReports: React.FC = () => {
       while (more) {
         let q = supabase
           .from('attendance_records')
-          .select('id, staff_uid, staff_name, date, status, attendance_type, check_in_time, check_out_time, checkin_location_address, checkout_location_address, checkin_location_lat, checkin_location_lng, checkout_location_lat, checkout_location_lng, selfie_checkin_url, selfie_checkout_url, client_ip, user_agent, device_id, device_label, device_flag')
+          .select('id, staff_uid, staff_name, date, status, attendance_type, check_in_time, check_out_time, checkin_location_address, checkout_location_address, checkin_location_lat, checkin_location_lng, checkout_location_lat, checkout_location_lng, selfie_checkin_url, selfie_checkout_url, client_ip, user_agent, device_id, device_label, device_flag, clock_skew_seconds')
           .in('staff_uid', uids)
           .gte('date', startDate)
           .lte('date', endDate)
@@ -245,7 +253,9 @@ const SubAdminReports: React.FC = () => {
       { header: 'IP', key: 'ip', width: 14 },
       { header: 'Device', key: 'device', width: 30 },
       { header: 'Device ID', key: 'devId', width: 22 },
-      { header: 'Flag Audit', key: 'flag', width: 22 },
+      { header: 'Skew Jam (detik)', key: 'skew', width: 16 },
+      { header: 'Flag Audit', key: 'flag', width: 30 },
+
     ];
 
     filtered.forEach((r, i) => {
@@ -271,8 +281,10 @@ const SubAdminReports: React.FC = () => {
         ip: r.client_ip || '-',
         device: r.device_label || '-',
         devId: r.device_id || '-',
+        skew: r.clock_skew_seconds == null ? '-' : r.clock_skew_seconds,
         flag: flagText,
       });
+
       if (signed[i].checkin) {
         const c = row.getCell('fIn');
         c.value = { text: 'Lihat Foto', hyperlink: signed[i].checkin! };

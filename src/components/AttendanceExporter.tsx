@@ -647,7 +647,9 @@ const AttendanceExporter = () => {
         { header: 'IP Address', key: 'ipAddress', width: 14 },
         { header: 'Device', key: 'device', width: 30 },
         { header: 'Device ID', key: 'deviceId', width: 22 },
-        { header: 'Flag Audit', key: 'flag', width: 22 }
+        { header: 'Skew Jam (detik)', key: 'skew', width: 16 },
+        { header: 'Flag Audit', key: 'flag', width: 30 }
+
       ];
 
       // Pre-scan: detect device_ids shared across multiple staff_uids in the dataset
@@ -686,14 +688,19 @@ const AttendanceExporter = () => {
           ? Array.from(sharedUsers!).filter((u) => u !== record.staff_uid)
           : [];
 
+        const FLAG_MAP: Record<string, string> = {
+          new_device: 'Perangkat Baru',
+          device_shared_with_other_user: 'Perangkat Dipakai User Lain',
+          user_on_other_device: 'User Pindah Perangkat',
+          clock_manipulated: 'Jam Manipulasi',
+        };
+        const labelFlag = (f: string | null | undefined) =>
+          !f ? '-' : f.split(',').map((x) => FLAG_MAP[x.trim()] || x.trim()).join(' + ');
+
         const flagText = isJokiSuspect
-          ? `⚠ JOKI SUSPECT: device juga dipakai oleh ${otherUsers.join(', ')}`
-          : (record.device_flag
-              ? (record.device_flag === 'new_device' ? 'Perangkat Baru'
-                : record.device_flag === 'device_shared_with_other_user' ? 'Perangkat Dipakai User Lain'
-                : record.device_flag === 'user_on_other_device' ? 'User Pindah Perangkat'
-                : record.device_flag)
-              : '-');
+          ? `⚠ JOKI SUSPECT: device juga dipakai oleh ${otherUsers.join(', ')}${record.device_flag ? ' • ' + labelFlag(record.device_flag) : ''}`
+          : labelFlag(record.device_flag);
+
         
         const row = worksheet.addRow({
           no: index + 1,
@@ -737,8 +744,10 @@ const AttendanceExporter = () => {
           ipAddress: record.client_ip || '-',
           device: record.device_label || '-',
           deviceId: record.device_id || '-',
+          skew: record.clock_skew_seconds == null ? '-' : record.clock_skew_seconds,
           flag: flagText
         });
+
 
         // Highlight: red for joki suspect (priority), yellow for other flags
         if (isJokiSuspect) {

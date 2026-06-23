@@ -35,7 +35,7 @@ import { getEnhancedLocation, getAccuracyLevel, clearLocationCache } from '@/uti
 import { isPointInPolygon, PolygonCoordinate } from '@/utils/polygonValidator';
 import { validateGPSPosition, clearPositionHistory } from '@/utils/gpsValidator';
 import { calculateAdaptiveTolerance, GEOFENCE_CONSTANTS } from '@/utils/geofenceConstants';
-import { getAttendanceContext } from '@/utils/attendanceContext';
+import { getAttendanceContext, showClockWarning } from '@/utils/attendanceContext';
 
 interface StaffUser {
   uid: string;
@@ -1105,6 +1105,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       
       if (action.action === 'check-in') {
         const ctx = await getAttendanceContext(staff.uid, 'check_in');
+        showClockWarning(ctx, toast);
         const { error } = await supabase
           .from('attendance_records')
           .insert({
@@ -1122,6 +1123,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             device_id: ctx.device_id,
             device_label: ctx.device_label,
             device_flag: ctx.device_flag,
+            client_timestamp: ctx.client_timestamp,
+            clock_skew_seconds: ctx.clock_skew_seconds,
           });
         
         if (error) throw error;
@@ -1135,6 +1138,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           ? calculateHoursWorked(existingAttendance.check_in_time, formattedTime)
           : undefined;
         const ctx = await getAttendanceContext(staff.uid, 'check_out');
+        showClockWarning(ctx, toast);
         const { error } = await supabase
           .from('attendance_records')
           .update({
@@ -1148,6 +1152,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             device_id: ctx.device_id,
             device_label: ctx.device_label,
             device_flag: ctx.device_flag,
+            client_timestamp: ctx.client_timestamp,
+            clock_skew_seconds: ctx.clock_skew_seconds,
           })
           .eq('id', existingAttendance.id);
         
@@ -1158,6 +1164,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           description: `${staff.name} - ${locationAddress}`
         });
       }
+
       
       // Reset for next user
       setTimeout(() => {
@@ -1325,6 +1332,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         const hoursWorked = calculateHoursWorked(checkInFormatted, checkOutFormatted);
         
         const ctxFc = await getAttendanceContext(selectedStaff!.uid, 'check_out');
+        showClockWarning(ctxFc, toast);
         const { error } = await supabase
           .from('attendance_records')
           .insert({
@@ -1349,7 +1357,10 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             device_id: ctxFc.device_id,
             device_label: ctxFc.device_label,
             device_flag: ctxFc.device_flag,
+            client_timestamp: ctxFc.client_timestamp,
+            clock_skew_seconds: ctxFc.clock_skew_seconds,
           });
+
         
         if (error) throw error;
         
@@ -1466,6 +1477,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         // Update existing record for check-out
         console.log('📝 Updating check-out for record:', todayAttendance.id);
         const ctxOut = await getAttendanceContext(selectedStaff.uid, 'check_out');
+        showClockWarning(ctxOut, toast);
         const updateData: any = {
           check_out_time: formattedTime,
           checkout_location_lat: usedLocation.lat,
@@ -1476,6 +1488,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           device_id: ctxOut.device_id,
           device_label: ctxOut.device_label,
           device_flag: ctxOut.device_flag,
+          client_timestamp: ctxOut.client_timestamp,
+          clock_skew_seconds: ctxOut.clock_skew_seconds,
         };
         
         // Only update photo for WFH/Dinas and save to checkout column
@@ -1507,6 +1521,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         // Create new record for check-in
         console.log('📝 Creating new check-in record');
         const ctxIn = await getAttendanceContext(selectedStaff.uid, 'check_in');
+        showClockWarning(ctxIn, toast);
         const insertData = {
           ...attendanceData,
           client_ip: ctxIn.client_ip,
@@ -1514,11 +1529,14 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           device_id: ctxIn.device_id,
           device_label: ctxIn.device_label,
           device_flag: ctxIn.device_flag,
+          client_timestamp: ctxIn.client_timestamp,
+          clock_skew_seconds: ctxIn.clock_skew_seconds,
         };
         const { error, data } = await supabase
           .from('attendance_records')
           .insert([insertData])
           .select();
+
 
         if (error) {
           console.error('❌ Check-in insert error:', error);
@@ -1678,6 +1696,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       if (!isCheckOut) {
         // Overtime Check-In
         const ctxOi = await getAttendanceContext(selectedStaff!.uid, 'check_in');
+        showClockWarning(ctxOi, toast);
         const { error } = await supabase
           .from('attendance_records')
           .insert({
@@ -1695,6 +1714,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             device_id: ctxOi.device_id,
             device_label: ctxOi.device_label,
             device_flag: ctxOi.device_flag,
+            client_timestamp: ctxOi.client_timestamp,
+            clock_skew_seconds: ctxOi.clock_skew_seconds,
           });
         
         if (error) throw error;
@@ -1707,6 +1728,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           formattedTime
         );
         const ctxOo = await getAttendanceContext(selectedStaff!.uid, 'check_out');
+        showClockWarning(ctxOo, toast);
         const { error } = await supabase
           .from('attendance_records')
           .update({
@@ -1720,6 +1742,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             device_id: ctxOo.device_id,
             device_label: ctxOo.device_label,
             device_flag: ctxOo.device_flag,
+            client_timestamp: ctxOo.client_timestamp,
+            clock_skew_seconds: ctxOo.clock_skew_seconds,
           })
           .eq('id', overtimeAttendance!.id);
         
@@ -1730,6 +1754,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           description: `Total jam lembur: ${hoursWorked} jam`
         });
       }
+
       
       await fetchTodayAttendance();
     } catch (error) {
@@ -1800,6 +1825,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const hoursWorked = calculateHoursWorked(checkInFormatted, checkOutFormatted);
       
       const ctxWf = await getAttendanceContext(selectedStaff!.uid, 'check_out');
+      showClockWarning(ctxWf, toast);
       const { error } = await supabase
         .from('attendance_records')
         .insert({
@@ -1823,7 +1849,10 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           device_id: ctxWf.device_id,
           device_label: ctxWf.device_label,
           device_flag: ctxWf.device_flag,
+          client_timestamp: ctxWf.client_timestamp,
+          clock_skew_seconds: ctxWf.clock_skew_seconds,
         });
+
       
       if (error) throw error;
       
