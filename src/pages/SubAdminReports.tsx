@@ -249,6 +249,12 @@ const SubAdminReports: React.FC = () => {
     ];
 
     filtered.forEach((r, i) => {
+      const suspect = isJokiSuspect(r);
+      const others = jokiOtherUsers(r);
+      const flagText = suspect
+        ? `⚠ JOKI SUSPECT: device juga dipakai oleh ${others.join(', ')}`
+        : flagLabel(r.device_flag);
+
       const row = ws.addRow({
         no: i + 1,
         tanggal: new Date(r.date).toLocaleDateString('id-ID'),
@@ -265,7 +271,7 @@ const SubAdminReports: React.FC = () => {
         ip: r.client_ip || '-',
         device: r.device_label || '-',
         devId: r.device_id || '-',
-        flag: flagLabel(r.device_flag),
+        flag: flagText,
       });
       if (signed[i].checkin) {
         const c = row.getCell('fIn');
@@ -277,12 +283,17 @@ const SubAdminReports: React.FC = () => {
         c.value = { text: 'Lihat Foto', hyperlink: signed[i].checkout! };
         c.font = { color: { argb: 'FF0000FF' }, underline: true };
       }
-      if (r.device_flag) {
+      if (suspect) {
+        row.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCDD2' } };
+        });
+      } else if (r.device_flag) {
         row.eachCell((cell) => {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3CD' } };
         });
       }
     });
+
 
     const header = ws.getRow(1);
     header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
