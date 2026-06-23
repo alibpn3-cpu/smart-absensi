@@ -407,8 +407,11 @@ const SubAdminReports: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paged.map((r) => (
-                    <tr key={r.id} className={`border-b ${r.device_flag ? 'bg-yellow-500/10' : ''}`}>
+                  {paged.map((r) => {
+                    const suspect = isJokiSuspect(r);
+                    const others = jokiOtherUsers(r);
+                    return (
+                    <tr key={r.id} className={`border-b ${suspect ? 'bg-red-500/15' : r.device_flag ? 'bg-yellow-500/10' : ''}`}>
                       <td className="p-2 whitespace-nowrap">{new Date(r.date).toLocaleDateString('id-ID')}</td>
                       <td className="p-2">{r.staff_name}</td>
                       <td className="p-2 uppercase">{r.status || '-'}</td>
@@ -438,14 +441,20 @@ const SubAdminReports: React.FC = () => {
                         {!r.selfie_checkin_url && !r.selfie_checkout_url && '-'}
                       </td>
                       <td className="p-2 whitespace-nowrap">
-                        {r.device_flag ? (
+                        {suspect ? (
+                          <Badge variant="outline" className="border-red-500 text-red-600" title={`Device juga dipakai: ${others.join(', ')}`}>
+                            <AlertTriangle className="h-3 w-3 mr-1" />JOKI SUSPECT
+                          </Badge>
+                        ) : r.device_flag ? (
                           <Badge variant="outline" className="border-yellow-500 text-yellow-600">
                             <AlertTriangle className="h-3 w-3 mr-1" />{flagLabel(r.device_flag)}
                           </Badge>
                         ) : '-'}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
+
                   {paged.length === 0 && (
                     <tr><td colSpan={9} className="p-6 text-center opacity-60">Tidak ada data.</td></tr>
                   )}
