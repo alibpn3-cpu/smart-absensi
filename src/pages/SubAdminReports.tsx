@@ -173,11 +173,34 @@ const SubAdminReports: React.FC = () => {
     return records.filter((r) => (r.staff_name || '').toLowerCase().includes(q));
   }, [records, nameSearch]);
 
+  // Detect device_ids shared by >1 staff_uid in the filtered dataset (joki suspect)
+  const sharedDeviceMap = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    filtered.forEach((r) => {
+      if (!r.device_id) return;
+      if (!m.has(r.device_id)) m.set(r.device_id, new Set());
+      m.get(r.device_id)!.add(r.staff_uid);
+    });
+    const shared = new Map<string, string[]>();
+    m.forEach((users, devId) => {
+      if (users.size > 1) shared.set(devId, Array.from(users));
+    });
+    return shared;
+  }, [filtered]);
+
+  const isJokiSuspect = (r: AttendanceRow) =>
+    !!(r.device_id && sharedDeviceMap.has(r.device_id));
+  const jokiOtherUsers = (r: AttendanceRow) =>
+    r.device_id && sharedDeviceMap.has(r.device_id)
+      ? sharedDeviceMap.get(r.device_id)!.filter((u) => u !== r.staff_uid)
+      : [];
+
   const paged = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
     return filtered.slice(start, start + PAGE_SIZE);
   }, [filtered, page]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+
 
   const openPhoto = async (path: string | null) => {
     if (!path) return;
@@ -226,6 +249,12 @@ const SubAdminReports: React.FC = () => {
     ];
 
     filtered.forEach((r, i) => {
+      const suspect = isJokiSuspect(r);
+      const others = jokiOtherUsers(r);
+      const flagText = suspect
+        ? `⚠ JOKI SUSPECT: device juga dipakai oleh ${others.join(', ')}`
+        : flagLabel(r.device_flag);
+
       const row = ws.addRow({
         no: i + 1,
         tanggal: new Date(r.date).toLocaleDateString('id-ID'),
@@ -242,7 +271,7 @@ const SubAdminReports: React.FC = () => {
         ip: r.client_ip || '-',
         device: r.device_label || '-',
         devId: r.device_id || '-',
-        flag: flagLabel(r.device_flag),
+        flag: flagText,
       });
       if (signed[i].checkin) {
         const c = row.getCell('fIn');
@@ -254,12 +283,17 @@ const SubAdminReports: React.FC = () => {
         c.value = { text: 'Lihat Foto', hyperlink: signed[i].checkout! };
         c.font = { color: { argb: 'FF0000FF' }, underline: true };
       }
-      if (r.device_flag) {
+      if (suspect) {
+        row.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCDD2' } };
+        });
+      } else if (r.device_flag) {
         row.eachCell((cell) => {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3CD' } };
         });
       }
     });
+
 
     const header = ws.getRow(1);
     header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -373,8 +407,11 @@ const SubAdminReports: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paged.map((r) => (
-                    <tr key={r.id} className={`border-b ${r.device_flag ? 'bg-yellow-500/10' : ''}`}>
+                  {paged.map((r) => {
+                    const suspect = isJokiSuspect(r);
+                    const others = jokiOtherUsers(r);
+                    return (
+                    <tr key={r.id} className={`border-b ${suspect ? 'bg-red-500/15' : r.device_flag ? 'bg-yellow-500/10' : ''}`}>
                       <td className="p-2 whitespace-nowrap">{new Date(r.date).toLocaleDateString('id-ID')}</td>
                       <td className="p-2">{r.staff_name}</td>
                       <td className="p-2 uppercase">{r.status || '-'}</td>
@@ -404,14 +441,20 @@ const SubAdminReports: React.FC = () => {
                         {!r.selfie_checkin_url && !r.selfie_checkout_url && '-'}
                       </td>
                       <td className="p-2 whitespace-nowrap">
-                        {r.device_flag ? (
+                        {suspect ? (
+                          <Badge variant="outline" className="border-red-500 text-red-600" title={`Device juga dipakai: ${others.join(', ')}`}>
+                            <AlertTriangle className="h-3 w-3 mr-1" />JOKI SUSPECT
+                          </Badge>
+                        ) : r.device_flag ? (
                           <Badge variant="outline" className="border-yellow-500 text-yellow-600">
                             <AlertTriangle className="h-3 w-3 mr-1" />{flagLabel(r.device_flag)}
                           </Badge>
                         ) : '-'}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
+
                   {paged.length === 0 && (
                     <tr><td colSpan={9} className="p-6 text-center opacity-60">Tidak ada data.</td></tr>
                   )}
