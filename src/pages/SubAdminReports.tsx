@@ -44,19 +44,27 @@ interface AttendanceRow {
   device_id: string | null;
   device_label: string | null;
   device_flag: string | null;
+  clock_skew_seconds: number | null;
 }
 
 const PAGE_SIZE = 50;
 const BATCH = 1000;
 
-const flagLabel = (f: string | null) => {
-  switch (f) {
-    case 'new_device': return 'Perangkat Baru';
-    case 'device_shared_with_other_user': return 'Perangkat Dipakai User Lain';
-    case 'user_on_other_device': return 'User Pindah Perangkat';
-    default: return '-';
-  }
+const FLAG_MAP: Record<string, string> = {
+  new_device: 'Perangkat Baru',
+  device_shared_with_other_user: 'Perangkat Dipakai User Lain',
+  user_on_other_device: 'User Pindah Perangkat',
+  clock_manipulated: 'Jam Manipulasi',
 };
+
+const flagLabel = (f: string | null) => {
+  if (!f) return '-';
+  return f
+    .split(',')
+    .map((x) => FLAG_MAP[x.trim()] || x.trim())
+    .join(' + ');
+};
+
 
 const fmtTime = (s: string | null) => {
   if (!s) return '-';
