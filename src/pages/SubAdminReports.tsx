@@ -142,7 +142,7 @@ const SubAdminReports: React.FC = () => {
       while (more) {
         let q = supabase
           .from('attendance_records')
-          .select('id, staff_uid, staff_name, date, status, attendance_type, check_in_time, check_out_time, checkin_location_address, checkout_location_address, checkin_location_lat, checkin_location_lng, checkout_location_lat, checkout_location_lng, selfie_checkin_url, selfie_checkout_url, client_ip, user_agent, device_id, device_label, device_flag')
+          .select('id, staff_uid, staff_name, date, status, attendance_type, check_in_time, check_out_time, checkin_location_address, checkout_location_address, checkin_location_lat, checkin_location_lng, checkout_location_lat, checkout_location_lng, selfie_checkin_url, selfie_checkout_url, client_ip, user_agent, device_id, device_label, device_flag, clock_skew_seconds')
           .in('staff_uid', uids)
           .gte('date', startDate)
           .lte('date', endDate)
