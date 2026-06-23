@@ -1934,11 +1934,19 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   };
 
   // Handler for button clicks - User Login Mode uses StatusPresensiDialog
-  const handleAttendanceButtonClick = (
+  const handleAttendanceButtonClick = async (
     attendanceType: 'regular' | 'overtime',
     action: 'check-in' | 'check-out'
   ) => {
     if (isButtonProcessing) return;
+
+    // Clock skew hard-block: re-check fresh before any action.
+    const invalid = await clockGuard.recheck();
+    if (invalid) {
+      setShowClockInvalidDialog(true);
+      return;
+    }
+
     
     playClickSound();
     
