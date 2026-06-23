@@ -89,6 +89,9 @@ interface GeofenceArea {
 const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   const clockGuard = useClockSkewGuard();
   const [showClockInvalidDialog, setShowClockInvalidDialog] = useState(false);
+  useEffect(() => {
+    if (clockGuard.isClockInvalid) setShowClockInvalidDialog(true);
+  }, [clockGuard.isClockInvalid]);
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [filteredStaffUsers, setFilteredStaffUsers] = useState<StaffUser[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<StaffUser | null>(null);
