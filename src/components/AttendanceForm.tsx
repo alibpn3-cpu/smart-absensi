@@ -35,7 +35,7 @@ import { getEnhancedLocation, getAccuracyLevel, clearLocationCache } from '@/uti
 import { isPointInPolygon, PolygonCoordinate } from '@/utils/polygonValidator';
 import { validateGPSPosition, clearPositionHistory } from '@/utils/gpsValidator';
 import { calculateAdaptiveTolerance, GEOFENCE_CONSTANTS } from '@/utils/geofenceConstants';
-import { getAttendanceContext } from '@/utils/attendanceContext';
+import { getAttendanceContext, showClockWarning } from '@/utils/attendanceContext';
 
 interface StaffUser {
   uid: string;
@@ -1105,6 +1105,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       
       if (action.action === 'check-in') {
         const ctx = await getAttendanceContext(staff.uid, 'check_in');
+        showClockWarning(ctx, toast);
         const { error } = await supabase
           .from('attendance_records')
           .insert({
@@ -1122,6 +1123,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             device_id: ctx.device_id,
             device_label: ctx.device_label,
             device_flag: ctx.device_flag,
+            client_timestamp: ctx.client_timestamp,
+            clock_skew_seconds: ctx.clock_skew_seconds,
           });
         
         if (error) throw error;
@@ -1135,6 +1138,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           ? calculateHoursWorked(existingAttendance.check_in_time, formattedTime)
           : undefined;
         const ctx = await getAttendanceContext(staff.uid, 'check_out');
+        showClockWarning(ctx, toast);
         const { error } = await supabase
           .from('attendance_records')
           .update({
@@ -1148,6 +1152,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             device_id: ctx.device_id,
             device_label: ctx.device_label,
             device_flag: ctx.device_flag,
+            client_timestamp: ctx.client_timestamp,
+            clock_skew_seconds: ctx.clock_skew_seconds,
           })
           .eq('id', existingAttendance.id);
         
@@ -1158,6 +1164,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           description: `${staff.name} - ${locationAddress}`
         });
       }
+
       
       // Reset for next user
       setTimeout(() => {
