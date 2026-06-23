@@ -650,6 +650,14 @@ const AttendanceExporter = () => {
         { header: 'Flag Audit', key: 'flag', width: 22 }
       ];
 
+      // Pre-scan: detect device_ids shared across multiple staff_uids in the dataset
+      const deviceUsersMap = new Map<string, Set<string>>();
+      attendanceData.forEach((rec: any) => {
+        if (!rec.device_id) return;
+        if (!deviceUsersMap.has(rec.device_id)) deviceUsersMap.set(rec.device_id, new Set());
+        deviceUsersMap.get(rec.device_id)!.add(rec.staff_uid);
+      });
+
       // Add data rows
       attendanceData.forEach((record: any, index: number) => {
         const checkinGeofenceName = record.checkin_location_lat && record.checkin_location_lng
@@ -670,6 +678,22 @@ const AttendanceExporter = () => {
         
         const onDuty = getOnDuty(emp?.work_area, emp?.employee_type);
         const offDuty = getOffDuty(emp?.work_area, emp?.employee_type);
+
+        // Joki suspect: same device_id used by >1 staff_uid in dataset
+        const sharedUsers = record.device_id ? deviceUsersMap.get(record.device_id) : null;
+        const isJokiSuspect = !!(sharedUsers && sharedUsers.size > 1);
+        const otherUsers = isJokiSuspect
+          ? Array.from(sharedUsers!).filter((u) => u !== record.staff_uid)
+          : [];
+
+        const flagText = isJokiSuspect
+          ? `⚠ JOKI SUSPECT: device juga dipakai oleh ${otherUsers.join(', ')}`
+          : (record.device_flag
+              ? (record.device_flag === 'new_device' ? 'Perangkat Baru'
+                : record.device_flag === 'device_shared_with_other_user' ? 'Perangkat Dipakai User Lain'
+                : record.device_flag === 'user_on_other_device' ? 'User Pindah Perangkat'
+                : record.device_flag)
+              : '-');
         
         const row = worksheet.addRow({
           no: index + 1,
@@ -713,20 +737,20 @@ const AttendanceExporter = () => {
           ipAddress: record.client_ip || '-',
           device: record.device_label || '-',
           deviceId: record.device_id || '-',
-          flag: record.device_flag
-            ? (record.device_flag === 'new_device' ? 'Perangkat Baru'
-              : record.device_flag === 'device_shared_with_other_user' ? 'Perangkat Dipakai User Lain'
-              : record.device_flag === 'user_on_other_device' ? 'User Pindah Perangkat'
-              : record.device_flag)
-            : '-'
+          flag: flagText
         });
 
-        // Highlight flagged rows
-        if (record.device_flag) {
+        // Highlight: red for joki suspect (priority), yellow for other flags
+        if (isJokiSuspect) {
+          row.eachCell((cell) => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCDD2' } };
+          });
+        } else if (record.device_flag) {
           row.eachCell((cell) => {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3CD' } };
           });
         }
+
 
         // Add hyperlinks for coordinates
         if (record.checkin_location_lat && record.checkin_location_lng) {

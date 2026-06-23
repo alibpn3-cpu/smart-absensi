@@ -173,11 +173,34 @@ const SubAdminReports: React.FC = () => {
     return records.filter((r) => (r.staff_name || '').toLowerCase().includes(q));
   }, [records, nameSearch]);
 
+  // Detect device_ids shared by >1 staff_uid in the filtered dataset (joki suspect)
+  const sharedDeviceMap = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    filtered.forEach((r) => {
+      if (!r.device_id) return;
+      if (!m.has(r.device_id)) m.set(r.device_id, new Set());
+      m.get(r.device_id)!.add(r.staff_uid);
+    });
+    const shared = new Map<string, string[]>();
+    m.forEach((users, devId) => {
+      if (users.size > 1) shared.set(devId, Array.from(users));
+    });
+    return shared;
+  }, [filtered]);
+
+  const isJokiSuspect = (r: AttendanceRow) =>
+    !!(r.device_id && sharedDeviceMap.has(r.device_id));
+  const jokiOtherUsers = (r: AttendanceRow) =>
+    r.device_id && sharedDeviceMap.has(r.device_id)
+      ? sharedDeviceMap.get(r.device_id)!.filter((u) => u !== r.staff_uid)
+      : [];
+
   const paged = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
     return filtered.slice(start, start + PAGE_SIZE);
   }, [filtered, page]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+
 
   const openPhoto = async (path: string | null) => {
     if (!path) return;
