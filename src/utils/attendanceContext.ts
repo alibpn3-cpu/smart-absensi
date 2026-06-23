@@ -91,7 +91,7 @@ function parseUserAgentFallback(ua: string): string {
  */
 export function showClockWarning(
   ctx: AttendanceContext,
-  toastFn: (opts: { title: string; description: string; variant?: string; duration?: number }) => void
+  toastFn: (opts: any) => any
 ) {
   if (!ctx.clock_warning || ctx.clock_skew_seconds == null) return;
   const mins = Math.round(ctx.clock_skew_seconds / 60);
@@ -102,3 +102,4 @@ export function showClockWarning(
     duration: 7000,
   });
 }
+
