@@ -134,6 +134,8 @@ export type Database = {
           checkout_reason: string | null
           checkout_status: string | null
           client_ip: string | null
+          client_timestamp: string | null
+          clock_skew_seconds: number | null
           created_at: string
           date: string
           device_flag: string | null
@@ -166,6 +168,8 @@ export type Database = {
           checkout_reason?: string | null
           checkout_status?: string | null
           client_ip?: string | null
+          client_timestamp?: string | null
+          clock_skew_seconds?: number | null
           created_at?: string
           date?: string
           device_flag?: string | null
@@ -198,6 +202,8 @@ export type Database = {
           checkout_reason?: string | null
           checkout_status?: string | null
           client_ip?: string | null
+          client_timestamp?: string | null
+          clock_skew_seconds?: number | null
           created_at?: string
           date?: string
           device_flag?: string | null
