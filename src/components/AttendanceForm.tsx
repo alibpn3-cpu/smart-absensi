@@ -36,6 +36,8 @@ import { isPointInPolygon, PolygonCoordinate } from '@/utils/polygonValidator';
 import { validateGPSPosition, clearPositionHistory } from '@/utils/gpsValidator';
 import { calculateAdaptiveTolerance, GEOFENCE_CONSTANTS } from '@/utils/geofenceConstants';
 import { getAttendanceContext, showClockWarning } from '@/utils/attendanceContext';
+import { useClockSkewGuard } from '@/hooks/useClockSkewGuard';
+import ClockInvalidDialog from './ClockInvalidDialog';
 
 interface StaffUser {
   uid: string;
@@ -85,6 +87,11 @@ interface GeofenceArea {
 }
 
 const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
+  const clockGuard = useClockSkewGuard();
+  const [showClockInvalidDialog, setShowClockInvalidDialog] = useState(false);
+  useEffect(() => {
+    if (clockGuard.isClockInvalid) setShowClockInvalidDialog(true);
+  }, [clockGuard.isClockInvalid]);
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [filteredStaffUsers, setFilteredStaffUsers] = useState<StaffUser[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<StaffUser | null>(null);
@@ -1930,11 +1937,19 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   };
 
   // Handler for button clicks - User Login Mode uses StatusPresensiDialog
-  const handleAttendanceButtonClick = (
+  const handleAttendanceButtonClick = async (
     attendanceType: 'regular' | 'overtime',
     action: 'check-in' | 'check-out'
   ) => {
     if (isButtonProcessing) return;
+
+    // Clock skew hard-block: re-check fresh before any action.
+    const invalid = await clockGuard.recheck();
+    if (invalid) {
+      setShowClockInvalidDialog(true);
+      return;
+    }
+
     
     playClickSound();
     
@@ -2235,7 +2250,21 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
 
   return (
     <div className="min-h-screen bg-background p-4 pt-2">
+      <ClockInvalidDialog
+        open={showClockInvalidDialog && clockGuard.isClockInvalid}
+        skewSeconds={clockGuard.skewSeconds}
+        checking={clockGuard.checking}
+        onRecheck={async () => {
+          const stillInvalid = await clockGuard.recheck();
+          if (!stillInvalid) {
+            setShowClockInvalidDialog(false);
+            toast({ title: '✅ Jam perangkat sudah sinkron', description: 'Anda dapat melanjutkan presensi.' });
+          }
+        }}
+        onDismiss={() => setShowClockInvalidDialog(false)}
+      />
       <div className="max-w-md mx-auto space-y-2 animate-fade-in">
+
         
         
         {/* ScoreCard moved to UserSidebar */}

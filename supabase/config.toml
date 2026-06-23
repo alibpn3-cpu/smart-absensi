@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.p2h-toolbox-export]
 verify_jwt = false
+
+[functions.time-sync]
+verify_jwt = false
