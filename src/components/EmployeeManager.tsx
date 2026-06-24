@@ -754,9 +754,14 @@ const EmployeeManager = () => {
   const toggleAdminStatus = async (employee: StaffUser) => {
     try {
       const newAdminStatus = !employee.is_admin;
+      // Staff Admin and Site Admin are mutually exclusive
+      const updatePayload: any = { is_admin: newAdminStatus };
+      if (newAdminStatus && employee.is_site_admin) {
+        updatePayload.is_site_admin = false;
+      }
       const { error } = await supabase
         .from('staff_users')
-        .update({ is_admin: newAdminStatus })
+        .update(updatePayload)
         .eq('id', employee.id);
 
       if (error) throw error;
@@ -772,6 +777,45 @@ const EmployeeManager = () => {
       toast({
         title: "Gagal",
         description: "Gagal mengubah status admin",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const toggleSiteAdminStatus = async (employee: StaffUser) => {
+    try {
+      const newStatus = !employee.is_site_admin;
+      if (newStatus && !employee.work_area) {
+        toast({
+          title: "Gagal",
+          description: "Karyawan harus memiliki Work Area terlebih dulu sebelum dijadikan Site Admin.",
+          variant: "destructive"
+        });
+        return;
+      }
+      const updatePayload: any = { is_site_admin: newStatus };
+      // Site Admin and Staff Admin are mutually exclusive
+      if (newStatus && employee.is_admin) {
+        updatePayload.is_admin = false;
+      }
+      const { error } = await supabase
+        .from('staff_users')
+        .update(updatePayload)
+        .eq('id', employee.id);
+
+      if (error) throw error;
+
+      await logActivity(newStatus ? 'grant_site_admin' : 'revoke_site_admin', employee.name, { uid: employee.uid, work_area: employee.work_area });
+
+      toast({
+        title: "Berhasil",
+        description: `${employee.name} ${newStatus ? `dijadikan Site Admin untuk area ${employee.work_area}` : 'dicabut status Site Admin-nya'}`
+      });
+      fetchEmployees();
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: "Gagal mengubah status Site Admin",
         variant: "destructive"
       });
     }
