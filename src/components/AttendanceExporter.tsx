@@ -1171,20 +1171,23 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
               <Select 
                 value={filters.workArea} 
                 onValueChange={(value) => setFilters({...filters, workArea: value})}
-                disabled={loadingEmployees}
+                disabled={loadingEmployees || !!forcedWorkArea}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Semua Area</SelectItem>
-                  {workAreas.filter(Boolean).map((area) => (
+                  {!forcedWorkArea && <SelectItem value="all">Semua Area</SelectItem>}
+                  {(forcedWorkArea ? [forcedWorkArea] : workAreas.filter(Boolean)).map((area) => (
                     <SelectItem key={area} value={area}>
                       {area}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {forcedWorkArea && (
+                <p className="text-xs text-muted-foreground">Dikunci ke area Anda sebagai Site Admin.</p>
+              )}
             </div>
 
             {/* Employee Filter with Search */}
