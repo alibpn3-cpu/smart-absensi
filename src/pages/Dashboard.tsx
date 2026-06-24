@@ -96,10 +96,13 @@ const Dashboard = () => {
   
   const [loading, setLoading] = useState(true);
   
-  // Check if user is superadmin (from admin_accounts) or staff admin
+  // Check if user is superadmin (from admin_accounts), staff admin, or site admin
   const isSuperAdmin = !!localStorage.getItem('adminSession');
   const userSessionData = localStorage.getItem('userSession');
-  const isStaffAdmin = userSessionData ? JSON.parse(userSessionData).is_admin : false;
+  const parsedSession = userSessionData ? JSON.parse(userSessionData) : null;
+  const isSiteAdmin = !!parsedSession?.is_site_admin && !isSuperAdmin && !parsedSession?.is_admin;
+  const isStaffAdmin = !!parsedSession?.is_admin && !isSuperAdmin;
+  const siteAdminArea: string | null = isSiteAdmin ? (parsedSession?.work_area || null) : null;
 
   // Apply filters to attendance records
   useEffect(() => {
