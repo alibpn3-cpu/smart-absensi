@@ -463,33 +463,37 @@ const Dashboard = () => {
                 </TabsTrigger>
               </>
             )}
-            <TabsTrigger value="scores" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Scores</span>
-              <span className="sm:hidden">Score</span>
-            </TabsTrigger>
+            {!isSiteAdmin && (
+              <TabsTrigger value="scores" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Scores</span>
+                <span className="sm:hidden">Score</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="export" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Export</span>
               <span className="sm:hidden">Data</span>
             </TabsTrigger>
-            <TabsTrigger value="geofence" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <MapPin className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Geofence</span>
-              <span className="sm:hidden">Lokasi</span>
-            </TabsTrigger>
-            {/* Kiosk - accessible to all admins */}
-            <TabsTrigger value="kiosk" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Kiosk</span>
-              <span className="sm:hidden">Kiosk</span>
-            </TabsTrigger>
-            {/* Ads - accessible to all admins */}
-            <TabsTrigger value="ads" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Ads</span>
-              <span className="sm:hidden">Iklan</span>
-            </TabsTrigger>
+            {!isSiteAdmin && (
+              <>
+                <TabsTrigger value="geofence" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <MapPin className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Geofence</span>
+                  <span className="sm:hidden">Lokasi</span>
+                </TabsTrigger>
+                <TabsTrigger value="kiosk" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Kiosk</span>
+                  <span className="sm:hidden">Kiosk</span>
+                </TabsTrigger>
+                <TabsTrigger value="ads" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Ads</span>
+                  <span className="sm:hidden">Iklan</span>
+                </TabsTrigger>
+              </>
+            )}
             {/* Settings - superadmin only */}
             {isSuperAdmin && (
               <TabsTrigger value="settings" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
