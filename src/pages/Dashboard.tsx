@@ -599,7 +599,7 @@ const Dashboard = () => {
                       onClick={() => {
                         setFilterName('');
                         setFilterStatus('all');
-                        setFilterLocation('all');
+                        setFilterLocation(isSiteAdmin && siteAdminArea ? siteAdminArea : 'all');
                       }}
                       className="text-xs h-6"
                     >
