@@ -2006,6 +2006,17 @@ const EmployeeManager = () => {
                         <Shield className="h-4 w-4 text-muted-foreground" />
                       )}
                     </Button>
+
+                    {/* Toggle Site Admin Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleSiteAdminStatus(employee)}
+                      title={employee.is_site_admin ? `Cabut Site Admin (${employee.work_area})` : "Jadikan Site Admin (akses terbatas ke area kerjanya)"}
+                    >
+                      <MapPinned className={`h-4 w-4 ${employee.is_site_admin ? 'text-emerald-600' : 'text-muted-foreground'}`} />
+                    </Button>
+                    
                     
                     {/* Toggle Manager Button */}
                     <Button
