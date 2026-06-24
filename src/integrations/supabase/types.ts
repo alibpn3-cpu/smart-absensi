@@ -704,6 +704,7 @@ export type Database = {
           is_admin: boolean | null
           is_first_login: boolean | null
           is_manager: boolean | null
+          is_site_admin: boolean
           join_date: string | null
           name: string
           password_hash: string | null
@@ -728,6 +729,7 @@ export type Database = {
           is_admin?: boolean | null
           is_first_login?: boolean | null
           is_manager?: boolean | null
+          is_site_admin?: boolean
           join_date?: string | null
           name: string
           password_hash?: string | null
@@ -752,6 +754,7 @@ export type Database = {
           is_admin?: boolean | null
           is_first_login?: boolean | null
           is_manager?: boolean | null
+          is_site_admin?: boolean
           join_date?: string | null
           name?: string
           password_hash?: string | null
