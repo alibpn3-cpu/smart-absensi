@@ -91,12 +91,17 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         variant: "destructive"
       });
     } else {
-      const staff = data || [];
+      const allStaff = data || [];
+      const staff = forcedWorkArea
+        ? allStaff.filter((s: any) => s.work_area === forcedWorkArea)
+        : allStaff;
       setEmployees(staff);
       setAllEmployees(staff);
       
-      // Extract unique work areas
-      const areas = [...new Set(staff.map((s: any) => s.work_area))].sort();
+      // Extract unique work areas (only show forcedWorkArea if locked)
+      const areas = forcedWorkArea
+        ? [forcedWorkArea]
+        : [...new Set(allStaff.map((s: any) => s.work_area))].sort();
       setWorkAreas(areas);
     }
     setLoadingEmployees(false);
