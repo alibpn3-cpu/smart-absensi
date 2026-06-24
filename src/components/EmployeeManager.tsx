@@ -1927,6 +1927,12 @@ const EmployeeManager = () => {
                         Admin
                       </Badge>
                     )}
+                    {employee.is_site_admin && (
+                      <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border-emerald-300">
+                        <MapPinned className="h-3 w-3 mr-1" />
+                        Site Admin
+                      </Badge>
+                    )}
                     {employee.is_manager && (
                       <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-300">
                         <Crown className="h-3 w-3 mr-1" />
