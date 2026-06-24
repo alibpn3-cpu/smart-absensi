@@ -38,13 +38,17 @@ interface WorkAreaSchedule {
   clock_out_time: string;
 }
 
-const AttendanceExporter = () => {
+interface AttendanceExporterProps {
+  forcedWorkArea?: string | null;
+}
+
+const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea }) => {
   const [filters, setFilters] = useState<ExportFilters>({
     startDate: '',
     endDate: '',
     status: 'all',
     employeeUid: 'all',
-    workArea: 'all'
+    workArea: forcedWorkArea || 'all'
   });
   const [employees, setEmployees] = useState<StaffUser[]>([]);
   const [allEmployees, setAllEmployees] = useState<StaffUser[]>([]);
@@ -87,12 +91,17 @@ const AttendanceExporter = () => {
         variant: "destructive"
       });
     } else {
-      const staff = data || [];
+      const allStaff = data || [];
+      const staff = forcedWorkArea
+        ? allStaff.filter((s: any) => s.work_area === forcedWorkArea)
+        : allStaff;
       setEmployees(staff);
       setAllEmployees(staff);
       
-      // Extract unique work areas
-      const areas = [...new Set(staff.map((s: any) => s.work_area))].sort();
+      // Extract unique work areas (only show forcedWorkArea if locked)
+      const areas = forcedWorkArea
+        ? [forcedWorkArea]
+        : [...new Set(allStaff.map((s: any) => s.work_area))].sort();
       setWorkAreas(areas);
     }
     setLoadingEmployees(false);
@@ -1167,20 +1176,23 @@ const AttendanceExporter = () => {
               <Select 
                 value={filters.workArea} 
                 onValueChange={(value) => setFilters({...filters, workArea: value})}
-                disabled={loadingEmployees}
+                disabled={loadingEmployees || !!forcedWorkArea}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Semua Area</SelectItem>
-                  {workAreas.filter(Boolean).map((area) => (
+                  {!forcedWorkArea && <SelectItem value="all">Semua Area</SelectItem>}
+                  {(forcedWorkArea ? [forcedWorkArea] : workAreas.filter(Boolean)).map((area) => (
                     <SelectItem key={area} value={area}>
                       {area}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {forcedWorkArea && (
+                <p className="text-xs text-muted-foreground">Dikunci ke area Anda sebagai Site Admin.</p>
+              )}
             </div>
 
             {/* Employee Filter with Search */}

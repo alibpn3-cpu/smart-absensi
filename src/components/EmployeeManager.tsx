@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera, CheckSquare, Square, ChevronsUpDown, Check, KeyRound, Shield, ShieldOff, QrCode, Crown, Eye, EyeOff } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, UserCheck, UserX, Upload, Download, FileSpreadsheet, User, Camera, CheckSquare, Square, ChevronsUpDown, Check, KeyRound, Shield, ShieldOff, QrCode, Crown, Eye, EyeOff, MapPinned } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -30,6 +30,7 @@ interface StaffUser {
   created_at: string;
   photo_url?: string;
   is_admin?: boolean;
+  is_site_admin?: boolean;
   is_manager?: boolean;
   employee_type?: string;
   show_attendance_status?: boolean;
@@ -753,9 +754,14 @@ const EmployeeManager = () => {
   const toggleAdminStatus = async (employee: StaffUser) => {
     try {
       const newAdminStatus = !employee.is_admin;
+      // Staff Admin and Site Admin are mutually exclusive
+      const updatePayload: any = { is_admin: newAdminStatus };
+      if (newAdminStatus && employee.is_site_admin) {
+        updatePayload.is_site_admin = false;
+      }
       const { error } = await supabase
         .from('staff_users')
-        .update({ is_admin: newAdminStatus })
+        .update(updatePayload)
         .eq('id', employee.id);
 
       if (error) throw error;
@@ -771,6 +777,45 @@ const EmployeeManager = () => {
       toast({
         title: "Gagal",
         description: "Gagal mengubah status admin",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const toggleSiteAdminStatus = async (employee: StaffUser) => {
+    try {
+      const newStatus = !employee.is_site_admin;
+      if (newStatus && !employee.work_area) {
+        toast({
+          title: "Gagal",
+          description: "Karyawan harus memiliki Work Area terlebih dulu sebelum dijadikan Site Admin.",
+          variant: "destructive"
+        });
+        return;
+      }
+      const updatePayload: any = { is_site_admin: newStatus };
+      // Site Admin and Staff Admin are mutually exclusive
+      if (newStatus && employee.is_admin) {
+        updatePayload.is_admin = false;
+      }
+      const { error } = await supabase
+        .from('staff_users')
+        .update(updatePayload)
+        .eq('id', employee.id);
+
+      if (error) throw error;
+
+      await logActivity(newStatus ? 'grant_site_admin' : 'revoke_site_admin', employee.name, { uid: employee.uid, work_area: employee.work_area });
+
+      toast({
+        title: "Berhasil",
+        description: `${employee.name} ${newStatus ? `dijadikan Site Admin untuk area ${employee.work_area}` : 'dicabut status Site Admin-nya'}`
+      });
+      fetchEmployees();
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: "Gagal mengubah status Site Admin",
         variant: "destructive"
       });
     }
@@ -1882,6 +1927,12 @@ const EmployeeManager = () => {
                         Admin
                       </Badge>
                     )}
+                    {employee.is_site_admin && (
+                      <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border-emerald-300">
+                        <MapPinned className="h-3 w-3 mr-1" />
+                        Site Admin
+                      </Badge>
+                    )}
                     {employee.is_manager && (
                       <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-300">
                         <Crown className="h-3 w-3 mr-1" />
@@ -1955,6 +2006,17 @@ const EmployeeManager = () => {
                         <Shield className="h-4 w-4 text-muted-foreground" />
                       )}
                     </Button>
+
+                    {/* Toggle Site Admin Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleSiteAdminStatus(employee)}
+                      title={employee.is_site_admin ? `Cabut Site Admin (${employee.work_area})` : "Jadikan Site Admin (akses terbatas ke area kerjanya)"}
+                    >
+                      <MapPinned className={`h-4 w-4 ${employee.is_site_admin ? 'text-emerald-600' : 'text-muted-foreground'}`} />
+                    </Button>
+                    
                     
                     {/* Toggle Manager Button */}
                     <Button

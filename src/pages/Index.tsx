@@ -17,6 +17,7 @@ interface UserSession {
   division?: string;
   photo_url?: string;
   is_admin: boolean;
+  is_site_admin?: boolean;
 }
 
 const Index = () => {
@@ -272,8 +273,8 @@ const Index = () => {
                 </Button>
               )}
 
-              {/* Admin Dashboard button - show for superadmin or staff with is_admin=true */}
-              {(userSession?.is_admin || localStorage.getItem('adminSession')) && (
+              {/* Admin Dashboard button - show for superadmin, staff admin, or site admin */}
+              {(userSession?.is_admin || userSession?.is_site_admin || localStorage.getItem('adminSession')) && (
                 <Button
                   variant="outline" 
                   size="sm"

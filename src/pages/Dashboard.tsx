@@ -91,15 +91,26 @@ const Dashboard = () => {
   // Filter states
   const [filterName, setFilterName] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterLocation, setFilterLocation] = useState<string>('all');
+  const initialSiteArea = (() => {
+    try {
+      const s = localStorage.getItem('userSession');
+      if (!s) return 'all';
+      const p = JSON.parse(s);
+      return (p?.is_site_admin && !p?.is_admin && p?.work_area) ? p.work_area : 'all';
+    } catch { return 'all'; }
+  })();
+  const [filterLocation, setFilterLocation] = useState<string>(initialSiteArea);
   const [locations, setLocations] = useState<string[]>([]);
   
   const [loading, setLoading] = useState(true);
   
-  // Check if user is superadmin (from admin_accounts) or staff admin
+  // Check if user is superadmin (from admin_accounts), staff admin, or site admin
   const isSuperAdmin = !!localStorage.getItem('adminSession');
   const userSessionData = localStorage.getItem('userSession');
-  const isStaffAdmin = userSessionData ? JSON.parse(userSessionData).is_admin : false;
+  const parsedSession = userSessionData ? JSON.parse(userSessionData) : null;
+  const isSiteAdmin = !!parsedSession?.is_site_admin && !isSuperAdmin && !parsedSession?.is_admin;
+  const isStaffAdmin = !!parsedSession?.is_admin && !isSuperAdmin;
+  const siteAdminArea: string | null = isSiteAdmin ? (parsedSession?.work_area || null) : null;
 
   // Apply filters to attendance records
   useEffect(() => {
@@ -144,31 +155,49 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // Fetch attendance records for selected date
-      const { data: attendance, error: attendanceError } = await supabase
+      // Fetch staff list (scoped to site admin area if applicable)
+      let staffQuery = supabase
+        .from('staff_users')
+        .select('*')
+        .eq('is_active', true);
+      if (isSiteAdmin && siteAdminArea) {
+        staffQuery = staffQuery.eq('work_area', siteAdminArea);
+      }
+      const { data: staffData, error: staffError } = await staffQuery;
+      if (staffError) throw staffError;
+
+      // Fetch attendance records for selected date (scoped via staff_uid for site admin)
+      let attendanceQuery = supabase
         .from('attendance_records')
         .select('*')
         .eq('date', selectedDate)
         .order('check_in_time', { ascending: false });
-
+      if (isSiteAdmin && siteAdminArea) {
+        const scopedUids = (staffData || []).map((s: any) => s.uid);
+        if (scopedUids.length === 0) {
+          setAttendanceRecords([]);
+          setFilteredRecords([]);
+          setSummary({ totalStaff: 0, presentToday: 0, wfoCount: 0, wfhCount: 0, dinasCount: 0 });
+          setLocations(siteAdminArea ? [siteAdminArea] : []);
+          setLoading(false);
+          return;
+        }
+        attendanceQuery = attendanceQuery.in('staff_uid', scopedUids);
+      }
+      const { data: attendance, error: attendanceError } = await attendanceQuery;
       if (attendanceError) throw attendanceError;
 
-      // Fetch total staff count
-      const { data: staffData, error: staffError } = await supabase
-        .from('staff_users')
-        .select('*')
-        .eq('is_active', true);
-
-      if (staffError) throw staffError;
-
-      // Fetch geofence areas for location filter
-      const { data: geofences } = await supabase
-        .from('geofence_areas')
-        .select('name')
-        .eq('is_active', true);
-
-      if (geofences) {
-        setLocations(geofences.map(g => g.name));
+      // Fetch geofence areas for location filter (lock to site admin area)
+      if (isSiteAdmin && siteAdminArea) {
+        setLocations([siteAdminArea]);
+      } else {
+        const { data: geofences } = await supabase
+          .from('geofence_areas')
+          .select('name')
+          .eq('is_active', true);
+        if (geofences) {
+          setLocations(geofences.map(g => g.name));
+        }
       }
 
       setAttendanceRecords((attendance || []) as AttendanceRecord[]);
@@ -385,7 +414,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
-          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSuperAdmin ? 'grid-cols-3 sm:grid-cols-14' : 'grid-cols-3 sm:grid-cols-10'}`}>
+          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSiteAdmin ? 'grid-cols-3' : (isSuperAdmin ? 'grid-cols-3 sm:grid-cols-14' : 'grid-cols-3 sm:grid-cols-10')}`}>
             <TabsTrigger value="attendance" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Attendance</span>
               <span className="sm:hidden">Absen</span>
@@ -395,21 +424,25 @@ const Dashboard = () => {
               <span className="hidden sm:inline">In/Out Status</span>
               <span className="sm:hidden">I/O</span>
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Analytics</span>
-              <span className="sm:hidden">Stats</span>
-            </TabsTrigger>
-            <TabsTrigger value="employees" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Employees</span>
-              <span className="sm:hidden">Staff</span>
-            </TabsTrigger>
-            <TabsTrigger value="birthdays" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <Cake className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Birthdays</span>
-              <span className="sm:hidden">Ultah</span>
-            </TabsTrigger>
+            {!isSiteAdmin && (
+              <>
+                <TabsTrigger value="analytics" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Analytics</span>
+                  <span className="sm:hidden">Stats</span>
+                </TabsTrigger>
+                <TabsTrigger value="employees" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Employees</span>
+                  <span className="sm:hidden">Staff</span>
+                </TabsTrigger>
+                <TabsTrigger value="birthdays" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <Cake className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Birthdays</span>
+                  <span className="sm:hidden">Ultah</span>
+                </TabsTrigger>
+              </>
+            )}
             {/* Superadmin only tabs */}
             {isSuperAdmin && (
               <>
@@ -430,33 +463,37 @@ const Dashboard = () => {
                 </TabsTrigger>
               </>
             )}
-            <TabsTrigger value="scores" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Scores</span>
-              <span className="sm:hidden">Score</span>
-            </TabsTrigger>
+            {!isSiteAdmin && (
+              <TabsTrigger value="scores" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Scores</span>
+                <span className="sm:hidden">Score</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="export" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Export</span>
               <span className="sm:hidden">Data</span>
             </TabsTrigger>
-            <TabsTrigger value="geofence" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <MapPin className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Geofence</span>
-              <span className="sm:hidden">Lokasi</span>
-            </TabsTrigger>
-            {/* Kiosk - accessible to all admins */}
-            <TabsTrigger value="kiosk" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Kiosk</span>
-              <span className="sm:hidden">Kiosk</span>
-            </TabsTrigger>
-            {/* Ads - accessible to all admins */}
-            <TabsTrigger value="ads" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Ads</span>
-              <span className="sm:hidden">Iklan</span>
-            </TabsTrigger>
+            {!isSiteAdmin && (
+              <>
+                <TabsTrigger value="geofence" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <MapPin className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Geofence</span>
+                  <span className="sm:hidden">Lokasi</span>
+                </TabsTrigger>
+                <TabsTrigger value="kiosk" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <Settings className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Kiosk</span>
+                  <span className="sm:hidden">Kiosk</span>
+                </TabsTrigger>
+                <TabsTrigger value="ads" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Ads</span>
+                  <span className="sm:hidden">Iklan</span>
+                </TabsTrigger>
+              </>
+            )}
             {/* Settings - superadmin only */}
             {isSuperAdmin && (
               <TabsTrigger value="settings" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
@@ -522,12 +559,12 @@ const Dashboard = () => {
                   {/* Location Filter */}
                   <div className="space-y-2">
                     <Label htmlFor="filterLocation" className="text-foreground">Lokasi</Label>
-                    <Select value={filterLocation} onValueChange={setFilterLocation}>
+                    <Select value={filterLocation} onValueChange={setFilterLocation} disabled={isSiteAdmin}>
                       <SelectTrigger className="bg-background border-border text-foreground">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Semua Lokasi</SelectItem>
+                        {!isSiteAdmin && <SelectItem value="all">Semua Lokasi</SelectItem>}
                         {locations.map((loc) => (
                           <SelectItem key={loc} value={loc}>{loc}</SelectItem>
                         ))}
@@ -562,7 +599,7 @@ const Dashboard = () => {
                       onClick={() => {
                         setFilterName('');
                         setFilterStatus('all');
-                        setFilterLocation('all');
+                        setFilterLocation(isSiteAdmin && siteAdminArea ? siteAdminArea : 'all');
                       }}
                       className="text-xs h-6"
                     >
@@ -759,7 +796,7 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="notcheckedin">
-            <NotCheckedInList />
+            <NotCheckedInList scopeWorkArea={siteAdminArea} />
           </TabsContent>
 
           <TabsContent value="analytics">
@@ -801,8 +838,8 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="export" className="space-y-6">
-            <AttendanceExporter />
-            <P2HToolboxExporter />
+            <AttendanceExporter forcedWorkArea={siteAdminArea} />
+            {!isSiteAdmin && <P2HToolboxExporter />}
           </TabsContent>
 
           <TabsContent value="geofence">

@@ -1,83 +1,46 @@
+## Tujuan
+Tambahkan tier baru **Site Admin** di atas user biasa tapi di bawah Staff Admin / Superadmin. Site Admin hanya melihat 3 tab: **Attendance**, **In/Out Status**, **Export** — dan semua datanya dipaksa ter-filter ke `work_area` user tersebut. Tidak ada akses ke Employees, Birthdays, Scores, Geofence, Kiosk, Ads, Analytics, Admins, Logs, Settings.
 
-# Hard-Block "Pengaturan Waktu Tidak Valid" (Talenta-style)
+## Pressure-test singkat
+- **Asumsi terlemah**: bahwa `staff_users.work_area` selalu match dengan teks pada `geofence_areas.name` / `attendance_records.checkin_location_address`. Saat ini filter location di Dashboard pakai `includes()` string — fragile. Saya akan tetap pakai pola yang sama agar konsisten, tapi tambah catatan agar Superadmin memastikan penamaan area konsisten.
+- **Risiko**: Karena auth pakai localStorage (bukan Supabase auth.uid), scoping ini **UI-side only** — user yang manipulasi browser bisa bypass. Sama dengan flag `is_admin` existing. Tidak menambah kerentanan baru, tapi bukan true security boundary.
+- **Yang diverifikasi**: Tidak akan menyentuh logic clock-in/out, Tidak mengubah perilaku Staff Admin atau Superadmin.
 
-## 1. Konsep yang dipakai Talenta (dan aplikasi sejenis)
-Mereka **tidak** mengecek timezone. Yang dicek hanya **selisih UTC absolut** antara `Date.now()` device dengan server time. Caranya:
+## Perubahan
 
-- Saat app dibuka / sebelum aksi presensi, app **ping server** (HEAD ke endpoint sendiri, atau call edge function ringan) → ambil header `Date:` atau body `{ server_now }`.
-- Hitung `skew = |server_utc - device_utc|`.
-- Jika `skew > threshold` → tampilkan **modal blocking** (bukan toast). Tombol "Atur waktu sekarang" + "Kembali ke dasbor".
-- Modal ini **mencegah** klik Clock In / Clock Out sampai user perbaiki jam device-nya (atau app re-check ulang dan skew kembali normal).
+### 1. Database (migration)
+Tambah kolom `is_site_admin boolean default false` di `staff_users`. Tidak menyentuh `is_admin`. Aturan: jika `is_site_admin=true`, abaikan `is_admin` (Site Admin lebih rendah).
 
-Timezone device dibiarkan apa adanya (WIB/WITA/WIT/UTC) karena perbandingan dilakukan dalam **epoch UTC** — zona tampilan tidak mempengaruhi epoch.
+### 2. Dashboard.tsx
+- Baca `is_site_admin` dari `userSession` (di-set saat login).
+- Tambah state `siteAdminArea = userSession.work_area` saat `isSiteAdmin`.
+- **Tab visibility**: jika `isSiteAdmin`, hanya render tab `attendance`, `notcheckedin`, `export`. Tab lain (termasuk Birthdays, Employees, Scores, Geofence, Kiosk, Ads, Analytics) tidak dirender. Superadmin/Staff Admin tetap seperti sekarang.
+- **Query scoping**: Saat `isSiteAdmin`, semua `supabase.from('attendance_records').select()` dan `staff_users` di-filter `.eq('work_area', siteAdminArea)`. Filter location di UI di-lock ke area tersebut (dropdown hanya 1 pilihan, disabled).
+- Summary card (Total Staff, Hadir, WFO/WFH/Dinas) dihitung ulang berdasarkan staff di area itu saja.
 
-## 2. Kenapa pakai modal blocking, bukan toast saja?
-Strategi sebelumnya (soft warning + flag) tetap meloloskan absen. User dengan niat curang tidak peduli toast. Modal blocking memaksa user fix jam-nya, sehingga semua data turunan (UI tampilan jam, log lokal, IndexedDB offline cache, P2H timestamp) jadi konsisten dengan server. Server `now()` tetap jadi sumber kebenaran final, modal ini lapisan pencegahan di depan.
+### 3. UserLogin.tsx
+Saat sukses login, sertakan `is_site_admin` & `work_area` di `userSession` payload localStorage (saat ini sudah simpan `is_admin`).
 
-## 3. Yang akan dibangun
+### 4. Employees tab (Superadmin only)
+Tambah toggle/switch "Site Admin" di form edit employee. Validasi: jika dicentang, `work_area` wajib terisi. Tidak boleh sekaligus `is_admin=true` & `is_site_admin=true` — jika user toggle Site Admin saat is_admin true, set is_admin=false otomatis (atau tampilkan warning).
 
-### A. Edge function `time-sync` (baru, sangat ringan)
-- `GET /time-sync` → return `{ server_time: <ISO>, server_epoch_ms: <number> }`.
-- Tanpa auth (public), tanpa DB query. Tujuan: latency rendah agar perbandingan skew akurat.
-- Set header `Cache-Control: no-store`.
+### 5. Export (AttendanceExporter.tsx)
+- Terima prop `forcedWorkArea?: string`.
+- Saat prop terisi: filter area di UI hilang/disabled, query di-paksa `.eq('work_area', forcedWorkArea)` (atau filter address `includes` sesuai pola existing), dan join `staff_users` di-scope.
+- Dipanggil dengan `forcedWorkArea={siteAdminArea}` saat `isSiteAdmin`.
 
-### B. Hook `useClockSkewGuard` (baru, `src/hooks/useClockSkewGuard.ts`)
-- Panggil `time-sync` saat:
-  - mount halaman utama,
-  - setiap **5 menit** sekali (interval),
-  - manual via `recheck()` (dipanggil sebelum aksi presensi).
-- Hitung RTT round-trip; `skew = |server_epoch_ms - (device_epoch_ms - rtt/2)|`.
-- Threshold: **120 detik** (konsisten dengan yang sudah ada).
-- Expose: `{ isClockInvalid, skewSeconds, recheck, lastCheckedAt }`.
-- Graceful: jika network gagal → `isClockInvalid = false` (jangan blokir user offline).
+### 6. In/Out Status (komponen `notcheckedin`)
+Cari komponen yang render tab ini, terima prop `scopeWorkArea` dan filter list staff serta status.
 
-### C. Komponen `ClockInvalidDialog` (baru)
-- Modal dialog (shadcn `Dialog`, `closeOnOverlayClick={false}`, tanpa tombol X jika `isClockInvalid` masih true).
-- Konten meniru screenshot Talenta:
-  - Ikon jam + warning.
-  - Judul: "Pengaturan waktu tidak valid".
-  - Body: "Aktifkan waktu otomatis pada perangkat Anda agar dapat disinkronkan dengan server Digital Presensi."
-  - Info: tampilkan `Selisih: X menit Y detik`.
-  - Tombol primary "Cek ulang sekarang" → panggil `recheck()`. (Web app tidak bisa buka Settings Android secara langsung — beda dengan native app Talenta. Kita kasih instruksi + tombol re-check.)
-  - Tombol sekunder "Kembali ke dasbor" → tutup modal, **tapi tombol Clock In/Out tetap di-disable** selama `isClockInvalid` true.
-- Konsisten dengan dark theme + neon (sesuai memory project).
+### 7. SubAdminGuard (no change)
+Halaman `/reports` tetap untuk Sub-Admin existing (`show_attendance_status`). Tidak terkait fitur ini.
 
-### D. Integrasi di `AttendanceForm.tsx`
-- Konsumsi `useClockSkewGuard` di top level form.
-- Render `<ClockInvalidDialog open={isClockInvalid} ... />`.
-- **Disable** tombol Clock In, Clock Out, Fast Checkout, Overtime Extend ketika `isClockInvalid === true`. Tooltip / helper text: "Perbaiki jam perangkat dulu".
-- Saat user tekan tombol presensi → call `await recheck()` dulu; jika `isClockInvalid` setelah recheck → tetap blokir + buka dialog. Jika lolos → lanjutkan flow existing (yang sudah menulis `clock_skew_seconds` & flag).
+## Catatan teknis
+- Tidak ada perubahan RLS karena project pakai plaintext custom auth (sudah pola existing).
+- Backward compatible: user existing dengan `is_admin=true` tidak terpengaruh.
+- Site Admin tidak bisa lihat data area lain — termasuk Total Staff card di-recompute.
+- Tidak menambah halaman/route baru; semua tetap di `/dashboard`.
 
-### E. Hal-hal yang TIDAK dirubah
-- Logika `attendance-context` existing (soft warning + flag) **tetap ada** sebagai lapisan kedua untuk case di mana skew < 120s tapi tetap janggal, atau user manipulasi `client_timestamp` di payload. Modal blocking adalah UX layer, server flag adalah audit layer.
-- `created_at`, `check_in_time`, `check_out_time` tetap pakai server `now()`.
-- Tidak ada pengecekan timezone (sesuai keputusan sebelumnya).
-- Tidak ada perubahan schema DB.
-- Tidak menyentuh kiosk mode (kiosk biasanya jam-nya stabil; tapi guard ini ikut aktif di sana — itu konsisten, bukan side-effect berbahaya).
-
-## 4. Tantangan jujur (pushback)
-
-**Weakest assumption**: Web app tidak bisa membuka Settings > Date & Time perangkat (tidak ada API browser-nya, beda dengan native Talenta yang punya `ACTION_DATE_SETTINGS` intent). Jadi tombol "Atur waktu sekarang" hanya **instruksi text**, bukan deep-link. UX-nya sedikit lebih lemah dari Talenta, user harus keluar app manual.
-
-**Yang bisa gagal**:
-- Jaringan lambat → RTT > 5 detik bisa salah hitung skew. Mitigasi: jangan blokir kalau RTT > 3s, anggap measurement invalid, retry.
-- User di pesawat / offline → `time-sync` gagal → kita pilih **tidak blokir** (false negative dapat ditoleransi karena server tetap pakai `now()` saat sync nanti).
-- Browser di-throttle background → interval 5 menit bisa molor; itu OK, recheck wajib dilakukan tepat sebelum aksi presensi.
-
-**Yang harus diverifikasi**:
-- Cobalah ubah jam HP mundur 5 menit → buka app → modal muncul → tombol Clock In disabled.
-- Aktifkan auto-time → tekan "Cek ulang" di modal → modal tertutup → tombol enabled.
-- Matikan jaringan → tidak ada modal palsu (tidak boleh blokir karena server unreachable).
-- Skew 90 detik (di bawah threshold) → tidak blokir, tetap masuk soft-warning + flag.
-
-**Versi yang lebih baik**: Threshold bisa kita bikin dua tingkat:
-- `< 120s` → tidak ada apa-apa,
-- `120s–600s` → modal soft (boleh ditutup, tombol tetap enable + soft warning toast),
-- `> 600s` → modal hard blocking.
-
-Saya **tidak rekomendasikan** dua tingkat untuk sekarang — over-engineering. Mulai dengan satu threshold 120s + hard block. Naikkan ke 2 tingkat hanya jika ada keluhan false positive dari user.
-
-## 5. Final recommendation
-Build: edge function `time-sync` + hook `useClockSkewGuard` + komponen `ClockInvalidDialog` + integrasi disable tombol di `AttendanceForm`. Pertahankan layer soft-warning + flag yang sudah ada sebagai audit trail. Threshold 120s, behavior fail-open jika network gagal.
-
-Setuju lanjut implementasi?
+## Pertanyaan terbuka untuk konfirmasi setelah implementasi
+- Apakah Site Admin boleh export PDF/Excel keduanya? (Asumsi: ya, sama seperti Staff Admin.)
+- Apakah Site Admin boleh lihat foto absensi staff areanya? (Asumsi: ya.)
