@@ -559,12 +559,12 @@ const Dashboard = () => {
                   {/* Location Filter */}
                   <div className="space-y-2">
                     <Label htmlFor="filterLocation" className="text-foreground">Lokasi</Label>
-                    <Select value={filterLocation} onValueChange={setFilterLocation}>
+                    <Select value={filterLocation} onValueChange={setFilterLocation} disabled={isSiteAdmin}>
                       <SelectTrigger className="bg-background border-border text-foreground">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Semua Lokasi</SelectItem>
+                        {!isSiteAdmin && <SelectItem value="all">Semua Lokasi</SelectItem>}
                         {locations.map((loc) => (
                           <SelectItem key={loc} value={loc}>{loc}</SelectItem>
                         ))}
