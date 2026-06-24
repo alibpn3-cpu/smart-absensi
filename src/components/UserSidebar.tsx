@@ -227,9 +227,9 @@ const UserSidebar: React.FC = () => {
                   <p className="text-xs text-muted-foreground">{userSession.position}</p>
                 </div>
                 {hasAdminDashboardAccess && (
-                  <Badge variant="secondary" className={`${userSession.is_site_admin && !userSession.is_admin ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-300'} text-[10px]`}>
-                    {userSession.is_site_admin && !userSession.is_admin ? <MapPinned className="h-3 w-3 mr-0.5" /> : <Shield className="h-3 w-3 mr-0.5" />}
-                    {userSession.is_site_admin && !userSession.is_admin ? 'Site Admin' : 'Admin'}
+                  <Badge variant="secondary" className={`${userSession.is_site_admin ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-300'} text-[10px]`}>
+                    {userSession.is_site_admin ? <MapPinned className="h-3 w-3 mr-0.5" /> : <Shield className="h-3 w-3 mr-0.5" />}
+                    {userSession.is_site_admin ? 'Site Admin' : 'Admin'}
                   </Badge>
                 )}
               </div>
@@ -323,12 +323,12 @@ const UserSidebar: React.FC = () => {
                     onClick={() => { setOpen(false); navigate('/dashboard'); }}
                   >
                     <div className="flex items-center gap-3">
-                      {userSession.is_site_admin && !userSession.is_admin ? (
+                      {userSession.is_site_admin ? (
                         <MapPinned className="h-4 w-4 text-primary" />
                       ) : (
                         <Shield className="h-4 w-4 text-primary" />
                       )}
-                      <span>{userSession.is_site_admin && !userSession.is_admin ? 'Menu Site Admin' : 'Menu Admin'}</span>
+                      <span>{userSession.is_site_admin ? 'Menu Site Admin' : 'Menu Admin'}</span>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </Button>

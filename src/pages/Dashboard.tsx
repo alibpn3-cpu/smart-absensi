@@ -108,8 +108,8 @@ const Dashboard = () => {
   const isSuperAdmin = !!localStorage.getItem('adminSession');
   const userSessionData = localStorage.getItem('userSession');
   const parsedSession = userSessionData ? JSON.parse(userSessionData) : null;
-  const isSiteAdmin = !!parsedSession?.is_site_admin && !isSuperAdmin && !parsedSession?.is_admin;
-  const isStaffAdmin = !!parsedSession?.is_admin && !isSuperAdmin;
+  const isSiteAdmin = !!parsedSession?.is_site_admin && !isSuperAdmin;
+  const isStaffAdmin = !!parsedSession?.is_admin && !isSuperAdmin && !isSiteAdmin;
   const siteAdminArea: string | null = isSiteAdmin ? (parsedSession?.work_area || null) : null;
 
   // Apply filters to attendance records
