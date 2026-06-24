@@ -796,7 +796,7 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="notcheckedin">
-            <NotCheckedInList />
+            <NotCheckedInList scopeWorkArea={siteAdminArea} />
           </TabsContent>
 
           <TabsContent value="analytics">
