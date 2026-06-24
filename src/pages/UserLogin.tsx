@@ -145,6 +145,7 @@ const UserLogin = () => {
         division: staff.division || undefined,
         photo_url: staff.photo_url || undefined,
         is_admin: staff.is_admin || false,
+        is_site_admin: (staff as any).is_site_admin || false,
         is_manager: staff.is_manager || false,
         employee_type: staff.employee_type || 'staff',
         show_attendance_status: staff.show_attendance_status || false,
