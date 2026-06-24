@@ -424,21 +424,25 @@ const Dashboard = () => {
               <span className="hidden sm:inline">In/Out Status</span>
               <span className="sm:hidden">I/O</span>
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Analytics</span>
-              <span className="sm:hidden">Stats</span>
-            </TabsTrigger>
-            <TabsTrigger value="employees" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Employees</span>
-              <span className="sm:hidden">Staff</span>
-            </TabsTrigger>
-            <TabsTrigger value="birthdays" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
-              <Cake className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Birthdays</span>
-              <span className="sm:hidden">Ultah</span>
-            </TabsTrigger>
+            {!isSiteAdmin && (
+              <>
+                <TabsTrigger value="analytics" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Analytics</span>
+                  <span className="sm:hidden">Stats</span>
+                </TabsTrigger>
+                <TabsTrigger value="employees" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Employees</span>
+                  <span className="sm:hidden">Staff</span>
+                </TabsTrigger>
+                <TabsTrigger value="birthdays" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <Cake className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Birthdays</span>
+                  <span className="sm:hidden">Ultah</span>
+                </TabsTrigger>
+              </>
+            )}
             {/* Superadmin only tabs */}
             {isSuperAdmin && (
               <>
