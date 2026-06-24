@@ -96,7 +96,7 @@ const Dashboard = () => {
       const s = localStorage.getItem('userSession');
       if (!s) return 'all';
       const p = JSON.parse(s);
-      return (p?.is_site_admin && !p?.is_admin && p?.work_area) ? p.work_area : 'all';
+      return (p?.is_site_admin && p?.work_area) ? p.work_area : 'all';
     } catch { return 'all'; }
   })();
   const [filterLocation, setFilterLocation] = useState<string>(initialSiteArea);
