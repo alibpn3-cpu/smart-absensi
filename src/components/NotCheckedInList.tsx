@@ -18,7 +18,11 @@ interface GroupedByArea {
   [area: string]: StaffNotCheckedIn[];
 }
 
-const NotCheckedInList = () => {
+interface NotCheckedInListProps {
+  scopeWorkArea?: string | null;
+}
+
+const NotCheckedInList: React.FC<NotCheckedInListProps> = ({ scopeWorkArea }) => {
   const [loading, setLoading] = useState(false);
   const [notCheckedIn, setNotCheckedIn] = useState<StaffNotCheckedIn[]>([]);
   const [groupedByArea, setGroupedByArea] = useState<GroupedByArea>({});
@@ -29,13 +33,17 @@ const NotCheckedInList = () => {
     try {
       const today = new Date().toISOString().split('T')[0];
       
-      // Fetch all active staff
-      const { data: allStaff, error: staffError } = await supabase
+      // Fetch all active staff (scoped to area if provided)
+      let staffQuery = supabase
         .from('staff_users')
         .select('uid, name, position, work_area, division')
         .eq('is_active', true)
         .order('work_area')
         .order('name');
+      if (scopeWorkArea) {
+        staffQuery = staffQuery.eq('work_area', scopeWorkArea);
+      }
+      const { data: allStaff, error: staffError } = await staffQuery;
 
       if (staffError) throw staffError;
       
