@@ -147,31 +147,49 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // Fetch attendance records for selected date
-      const { data: attendance, error: attendanceError } = await supabase
+      // Fetch staff list (scoped to site admin area if applicable)
+      let staffQuery = supabase
+        .from('staff_users')
+        .select('*')
+        .eq('is_active', true);
+      if (isSiteAdmin && siteAdminArea) {
+        staffQuery = staffQuery.eq('work_area', siteAdminArea);
+      }
+      const { data: staffData, error: staffError } = await staffQuery;
+      if (staffError) throw staffError;
+
+      // Fetch attendance records for selected date (scoped via staff_uid for site admin)
+      let attendanceQuery = supabase
         .from('attendance_records')
         .select('*')
         .eq('date', selectedDate)
         .order('check_in_time', { ascending: false });
-
+      if (isSiteAdmin && siteAdminArea) {
+        const scopedUids = (staffData || []).map((s: any) => s.uid);
+        if (scopedUids.length === 0) {
+          setAttendanceRecords([]);
+          setFilteredRecords([]);
+          setSummary({ totalStaff: 0, presentToday: 0, wfoCount: 0, wfhCount: 0, dinasCount: 0 });
+          setLocations(siteAdminArea ? [siteAdminArea] : []);
+          setLoading(false);
+          return;
+        }
+        attendanceQuery = attendanceQuery.in('staff_uid', scopedUids);
+      }
+      const { data: attendance, error: attendanceError } = await attendanceQuery;
       if (attendanceError) throw attendanceError;
 
-      // Fetch total staff count
-      const { data: staffData, error: staffError } = await supabase
-        .from('staff_users')
-        .select('*')
-        .eq('is_active', true);
-
-      if (staffError) throw staffError;
-
-      // Fetch geofence areas for location filter
-      const { data: geofences } = await supabase
-        .from('geofence_areas')
-        .select('name')
-        .eq('is_active', true);
-
-      if (geofences) {
-        setLocations(geofences.map(g => g.name));
+      // Fetch geofence areas for location filter (lock to site admin area)
+      if (isSiteAdmin && siteAdminArea) {
+        setLocations([siteAdminArea]);
+      } else {
+        const { data: geofences } = await supabase
+          .from('geofence_areas')
+          .select('name')
+          .eq('is_active', true);
+        if (geofences) {
+          setLocations(geofences.map(g => g.name));
+        }
       }
 
       setAttendanceRecords((attendance || []) as AttendanceRecord[]);
