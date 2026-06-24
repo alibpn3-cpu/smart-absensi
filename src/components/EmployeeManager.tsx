@@ -30,6 +30,7 @@ interface StaffUser {
   created_at: string;
   photo_url?: string;
   is_admin?: boolean;
+  is_site_admin?: boolean;
   is_manager?: boolean;
   employee_type?: string;
   show_attendance_status?: boolean;
