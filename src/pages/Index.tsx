@@ -130,6 +130,22 @@ const Index = () => {
       try {
         const session = JSON.parse(sessionData) as UserSession;
         setUserSession(session);
+        supabase
+          .from('staff_users')
+          .select('is_admin, is_site_admin, work_area')
+          .eq('uid', session.uid)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (!data) return;
+            const refreshedSession = {
+              ...session,
+              is_admin: !!data.is_admin,
+              is_site_admin: !!(data as any).is_site_admin,
+              work_area: data.work_area || session.work_area,
+            };
+            setUserSession(refreshedSession);
+            localStorage.setItem('userSession', JSON.stringify(refreshedSession));
+          });
       } catch (error) {
         console.error('Error parsing session:', error);
         localStorage.removeItem('userSession');

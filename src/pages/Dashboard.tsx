@@ -96,7 +96,7 @@ const Dashboard = () => {
       const s = localStorage.getItem('userSession');
       if (!s) return 'all';
       const p = JSON.parse(s);
-      return (p?.is_site_admin && !p?.is_admin && p?.work_area) ? p.work_area : 'all';
+      return (p?.is_site_admin && p?.work_area) ? p.work_area : 'all';
     } catch { return 'all'; }
   })();
   const [filterLocation, setFilterLocation] = useState<string>(initialSiteArea);
@@ -108,8 +108,8 @@ const Dashboard = () => {
   const isSuperAdmin = !!localStorage.getItem('adminSession');
   const userSessionData = localStorage.getItem('userSession');
   const parsedSession = userSessionData ? JSON.parse(userSessionData) : null;
-  const isSiteAdmin = !!parsedSession?.is_site_admin && !isSuperAdmin && !parsedSession?.is_admin;
-  const isStaffAdmin = !!parsedSession?.is_admin && !isSuperAdmin;
+  const isSiteAdmin = !!parsedSession?.is_site_admin && !isSuperAdmin;
+  const isStaffAdmin = !!parsedSession?.is_admin && !isSuperAdmin && !isSiteAdmin;
   const siteAdminArea: string | null = isSiteAdmin ? (parsedSession?.work_area || null) : null;
 
   // Apply filters to attendance records

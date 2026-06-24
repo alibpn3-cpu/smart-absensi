@@ -16,6 +16,7 @@ interface UserSession {
   division?: string;
   photo_url?: string;
   is_admin: boolean;
+  is_site_admin?: boolean;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
@@ -23,12 +24,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   
   // Check for staff admin session
   const userSessionData = localStorage.getItem('userSession');
-  let isStaffAdmin = false;
+  let hasStaffDashboardAccess = false;
   
   if (userSessionData) {
     try {
       const userSession: UserSession = JSON.parse(userSessionData);
-      isStaffAdmin = userSession.is_admin;
+      hasStaffDashboardAccess = !!userSession.is_admin || !!userSession.is_site_admin;
     } catch (error) {
       console.error('Error parsing user session:', error);
     }
@@ -49,8 +50,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
-  // Allow access if superadmin (from adminSession) OR staff admin (is_admin=true)
-  if (!isAuthenticated && !isStaffAdmin) {
+  // Allow access if superadmin, staff admin, or site admin
+  if (!isAuthenticated && !hasStaffDashboardAccess) {
     return <Navigate to="/login" replace />;
   }
 
