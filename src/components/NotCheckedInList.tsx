@@ -85,7 +85,8 @@ const NotCheckedInList: React.FC<NotCheckedInListProps> = ({ scopeWorkArea }) =>
     // Refresh every 5 minutes
     const interval = setInterval(fetchData, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeWorkArea]);
 
   const percentage = totalStaff > 0 ? Math.round((notCheckedIn.length / totalStaff) * 100) : 0;
   const isHighAbsence = percentage > 50;
