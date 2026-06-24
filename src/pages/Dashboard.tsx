@@ -838,8 +838,8 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="export" className="space-y-6">
-            <AttendanceExporter />
-            <P2HToolboxExporter />
+            <AttendanceExporter forcedWorkArea={siteAdminArea} />
+            {!isSiteAdmin && <P2HToolboxExporter />}
           </TabsContent>
 
           <TabsContent value="geofence">
