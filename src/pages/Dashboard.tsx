@@ -414,7 +414,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
-          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSuperAdmin ? 'grid-cols-3 sm:grid-cols-14' : 'grid-cols-3 sm:grid-cols-10'}`}>
+          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSiteAdmin ? 'grid-cols-3' : (isSuperAdmin ? 'grid-cols-3 sm:grid-cols-14' : 'grid-cols-3 sm:grid-cols-10')}`}>
             <TabsTrigger value="attendance" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Attendance</span>
               <span className="sm:hidden">Absen</span>
