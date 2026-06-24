@@ -38,13 +38,17 @@ interface WorkAreaSchedule {
   clock_out_time: string;
 }
 
-const AttendanceExporter = () => {
+interface AttendanceExporterProps {
+  forcedWorkArea?: string | null;
+}
+
+const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea }) => {
   const [filters, setFilters] = useState<ExportFilters>({
     startDate: '',
     endDate: '',
     status: 'all',
     employeeUid: 'all',
-    workArea: 'all'
+    workArea: forcedWorkArea || 'all'
   });
   const [employees, setEmployees] = useState<StaffUser[]>([]);
   const [allEmployees, setAllEmployees] = useState<StaffUser[]>([]);
