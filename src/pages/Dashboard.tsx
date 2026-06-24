@@ -91,7 +91,15 @@ const Dashboard = () => {
   // Filter states
   const [filterName, setFilterName] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterLocation, setFilterLocation] = useState<string>('all');
+  const initialSiteArea = (() => {
+    try {
+      const s = localStorage.getItem('userSession');
+      if (!s) return 'all';
+      const p = JSON.parse(s);
+      return (p?.is_site_admin && !p?.is_admin && p?.work_area) ? p.work_area : 'all';
+    } catch { return 'all'; }
+  })();
+  const [filterLocation, setFilterLocation] = useState<string>(initialSiteArea);
   const [locations, setLocations] = useState<string[]>([]);
   
   const [loading, setLoading] = useState(true);
