@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   Menu, User, FileText, RefreshCw, Bug, MapPin, Camera, Satellite, Star,
-  LogOut, Info, Lock, Shield, ChevronRight, BarChart3
+  LogOut, Info, Lock, Shield, ChevronRight, BarChart3, MapPinned
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -24,6 +24,7 @@ interface UserSession {
   division?: string;
   photo_url?: string;
   is_admin: boolean;
+  is_site_admin?: boolean;
   is_manager?: boolean;
   employee_type?: string;
 }
@@ -70,11 +71,25 @@ const UserSidebar: React.FC = () => {
     // Check sub-admin status from DB
     supabase
       .from('staff_users')
-      .select('show_attendance_status')
+      .select('show_attendance_status, is_admin, is_site_admin, work_area')
       .eq('uid', userSession.uid)
       .maybeSingle()
-      .then(({ data }) => setIsSubAdmin(!!data?.show_attendance_status));
+      .then(({ data }) => {
+        setIsSubAdmin(!!data?.show_attendance_status);
+        if (data) {
+          const refreshedSession = {
+            ...userSession,
+            is_admin: !!data.is_admin,
+            is_site_admin: !!(data as any).is_site_admin,
+            work_area: data.work_area || userSession.work_area,
+          };
+          setUserSession(refreshedSession);
+          localStorage.setItem('userSession', JSON.stringify(refreshedSession));
+        }
+      });
   }, [open, userSession?.uid]);
+
+  const hasAdminDashboardAccess = !!userSession?.is_admin || !!userSession?.is_site_admin;
 
   const checkGps = async () => {
     setGpsLoading(true);
@@ -211,9 +226,10 @@ const UserSidebar: React.FC = () => {
                   <p className="text-xs text-muted-foreground font-mono">{userSession.uid}</p>
                   <p className="text-xs text-muted-foreground">{userSession.position}</p>
                 </div>
-                {userSession.is_admin && (
-                  <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-300 text-[10px]">
-                    <Shield className="h-3 w-3 mr-0.5" />Admin
+                {hasAdminDashboardAccess && (
+                  <Badge variant="secondary" className={`${userSession.is_site_admin && !userSession.is_admin ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-300'} text-[10px]`}>
+                    {userSession.is_site_admin && !userSession.is_admin ? <MapPinned className="h-3 w-3 mr-0.5" /> : <Shield className="h-3 w-3 mr-0.5" />}
+                    {userSession.is_site_admin && !userSession.is_admin ? 'Site Admin' : 'Admin'}
                   </Badge>
                 )}
               </div>
@@ -295,6 +311,24 @@ const UserSidebar: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <BarChart3 className="h-4 w-4 text-primary" />
                       <span>Laporan Sub-Admin</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                )}
+
+                {hasAdminDashboardAccess && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between h-11"
+                    onClick={() => { setOpen(false); navigate('/dashboard'); }}
+                  >
+                    <div className="flex items-center gap-3">
+                      {userSession.is_site_admin && !userSession.is_admin ? (
+                        <MapPinned className="h-4 w-4 text-primary" />
+                      ) : (
+                        <Shield className="h-4 w-4 text-primary" />
+                      )}
+                      <span>{userSession.is_site_admin && !userSession.is_admin ? 'Menu Site Admin' : 'Menu Admin'}</span>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </Button>
