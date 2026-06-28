@@ -47,7 +47,7 @@ interface AttendanceRow {
   clock_skew_seconds: number | null;
 }
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 const BATCH = 1000;
 
 const FLAG_MAP: Record<string, string> = {

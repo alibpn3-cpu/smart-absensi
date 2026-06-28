@@ -302,19 +302,8 @@ const UserSidebar: React.FC = () => {
                   </Button>
                 )}
 
-                {isSubAdmin && (
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-between h-11"
-                    onClick={() => { setOpen(false); navigate('/reports'); }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <BarChart3 className="h-4 w-4 text-primary" />
-                      <span>Laporan Sub-Admin</span>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                )}
+                {/* Laporan Sub-Admin sekarang dipindah ke dalam Menu Site Admin (tombol perisai) */}
+
 
                 {hasAdminDashboardAccess && (
                   <Button
