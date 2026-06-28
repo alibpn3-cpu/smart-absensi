@@ -92,6 +92,54 @@ export type Database = {
         }
         Relationships: []
       }
+      announcements: {
+        Row: {
+          body: string
+          created_at: string
+          created_by_name: string | null
+          created_by_uid: string | null
+          ends_at: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean
+          link_url: string | null
+          starts_at: string | null
+          title: string
+          updated_at: string
+          work_area: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by_name?: string | null
+          created_by_uid?: string | null
+          ends_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          link_url?: string | null
+          starts_at?: string | null
+          title: string
+          updated_at?: string
+          work_area: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by_name?: string | null
+          created_by_uid?: string | null
+          ends_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          link_url?: string | null
+          starts_at?: string | null
+          title?: string
+          updated_at?: string
+          work_area?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           created_at: string
