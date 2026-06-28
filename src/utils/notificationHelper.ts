@@ -111,6 +111,14 @@ export const notifyApproverNewRequest = async (params: NotifyApproverParams) => 
       details: params.details,
     });
   }
+
+  // Push + in-app notification
+  await sendPush(
+    params.approverUid,
+    `Approval ${params.requestType} Diperlukan`,
+    `${params.creatorName} mengajukan ${params.requestType} (${params.requestNumber}).`,
+    { type: 'approval_needed', link: '/requests', tag: `approval-${params.requestNumber}` }
+  );
 };
 
 // Notify staff that their request status changed
