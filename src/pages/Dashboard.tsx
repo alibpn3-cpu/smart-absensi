@@ -21,7 +21,9 @@ import {
   Cake,
   ImageIcon,
   History,
-  Bug
+  Bug,
+  Megaphone,
+  BarChart3
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -44,6 +46,8 @@ const ScoreReport = React.lazy(() => import('../components/ScoreReport'));
 const RankingOverrideManager = React.lazy(() => import('../components/RankingOverrideManager'));
 const WorkScheduleManager = React.lazy(() => import('../components/WorkScheduleManager'));
 const DebugLogViewer = React.lazy(() => import('../components/DebugLogViewer'));
+const SubAdminReports = React.lazy(() => import('../pages/SubAdminReports'));
+import AnnouncementManager from '../components/AnnouncementManager';
 import { PieChart as RePieChart, Pie, Cell } from 'recharts';
 
 interface AttendanceRecord {
@@ -414,7 +418,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
-          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSiteAdmin ? 'grid-cols-3' : (isSuperAdmin ? 'grid-cols-3 sm:grid-cols-14' : 'grid-cols-3 sm:grid-cols-10')}`}>
+          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSiteAdmin ? 'grid-cols-3 sm:grid-cols-5' : (isSuperAdmin ? 'grid-cols-3 sm:grid-cols-14' : 'grid-cols-3 sm:grid-cols-10')}`}>
             <TabsTrigger value="attendance" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Attendance</span>
               <span className="sm:hidden">Absen</span>
@@ -475,6 +479,20 @@ const Dashboard = () => {
               <span className="hidden sm:inline">Export</span>
               <span className="sm:hidden">Data</span>
             </TabsTrigger>
+            {isSiteAdmin && (
+              <>
+                <TabsTrigger value="reports" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Laporan</span>
+                  <span className="sm:hidden">Rpt</span>
+                </TabsTrigger>
+                <TabsTrigger value="announcements" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <Megaphone className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Pengumuman</span>
+                  <span className="sm:hidden">Info</span>
+                </TabsTrigger>
+              </>
+            )}
             {!isSiteAdmin && (
               <>
                 <TabsTrigger value="geofence" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
@@ -841,6 +859,23 @@ const Dashboard = () => {
             <AttendanceExporter forcedWorkArea={siteAdminArea} />
             {!isSiteAdmin && <P2HToolboxExporter />}
           </TabsContent>
+
+          {isSiteAdmin && (
+            <>
+              <TabsContent value="reports">
+                <React.Suspense fallback={<div className="text-center py-8">Memuat laporan...</div>}>
+                  <SubAdminReports />
+                </React.Suspense>
+              </TabsContent>
+              <TabsContent value="announcements">
+                <AnnouncementManager
+                  workArea={siteAdminArea || parsedSession?.work_area || ''}
+                  createdByUid={parsedSession?.uid || ''}
+                  createdByName={parsedSession?.name || ''}
+                />
+              </TabsContent>
+            </>
+          )}
 
           <TabsContent value="geofence">
             <React.Suspense fallback={<div className="text-center py-8">Loading map...</div>}>

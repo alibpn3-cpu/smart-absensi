@@ -14,6 +14,7 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import CameraCapture from './CameraCapture';
 import BirthdayCard from './BirthdayCard';
+import AnnouncementsCarousel from './AnnouncementsCarousel';
 import RankingCard from './RankingCard';
 import SlideCarousel from './SlideCarousel';
 import PermissionIndicators from './PermissionIndicators';
@@ -2421,6 +2422,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
 
         {/* ========== CARD 3: Birthday Card ========== */}
         <BirthdayCard />
+
+        {/* ========== CARD 3b: Announcements Carousel (auto-hide if empty) ========== */}
+        <AnnouncementsCarousel workArea={selectedStaff?.work_area || null} />
 
         {/* ========== KIOSK MODE: CARD 4 - Company Logo Card (2x height) ========== */}
         {sharedDeviceMode && (

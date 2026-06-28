@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.time-sync]
 verify_jwt = false
+
+[functions.send-push-notification]
+verify_jwt = false
+
+[functions.remind-clock-in]
+verify_jwt = false

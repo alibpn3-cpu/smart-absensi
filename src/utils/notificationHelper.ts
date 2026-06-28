@@ -59,6 +59,28 @@ const sendEmail = async (payload: Record<string, any>) => {
   }
 };
 
+// Send Web Push + in-app notification (fire-and-forget)
+const sendPush = async (
+  staffUid: string,
+  title: string,
+  body: string,
+  opts: { type?: string; link?: string; tag?: string } = {}
+) => {
+  try {
+    await supabase.functions.invoke('send-push-notification', {
+      body: {
+        staff_uids: [staffUid],
+        title, body,
+        type: opts.type || 'info',
+        link: opts.link || '/requests',
+        tag: opts.tag,
+      },
+    });
+  } catch (e) {
+    console.warn('Push notification failed:', e);
+  }
+};
+
 // Notify approver that a new request needs review
 export const notifyApproverNewRequest = async (params: NotifyApproverParams) => {
   const approver = await getStaffInfo(params.approverUid);
@@ -89,6 +111,14 @@ export const notifyApproverNewRequest = async (params: NotifyApproverParams) => 
       details: params.details,
     });
   }
+
+  // Push + in-app notification
+  await sendPush(
+    params.approverUid,
+    `Approval ${params.requestType} Diperlukan`,
+    `${params.creatorName} mengajukan ${params.requestType} (${params.requestNumber}).`,
+    { type: 'approval_needed', link: '/requests', tag: `approval-${params.requestNumber}` }
+  );
 };
 
 // Notify staff that their request status changed
@@ -122,6 +152,14 @@ export const notifyStatusUpdate = async (params: NotifyStatusParams) => {
       details: params.notes,
     });
   }
+
+  const statusLabel = params.status === 'approved' ? '✅ Disetujui' : '❌ Ditolak';
+  await sendPush(
+    params.staffUid,
+    `${params.requestType} ${statusLabel}`,
+    `${params.requestNumber} oleh ${params.approverName}${params.notes ? ' — ' + params.notes : ''}`,
+    { type: 'status_update', link: '/requests', tag: `status-${params.requestNumber}` }
+  );
 };
 
 // Notify staff that their request was submitted
@@ -150,4 +188,11 @@ export const notifyRequestSubmitted = async (params: NotifySubmittedParams) => {
       details: params.details,
     });
   }
+
+  await sendPush(
+    params.staffUid,
+    `Permintaan ${params.requestType} Diajukan`,
+    `${params.requestNumber} sedang menunggu persetujuan.`,
+    { type: 'request_submitted', link: '/requests', tag: `submit-${params.requestNumber}` }
+  );
 };
