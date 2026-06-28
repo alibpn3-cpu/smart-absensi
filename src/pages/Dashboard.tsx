@@ -21,7 +21,9 @@ import {
   Cake,
   ImageIcon,
   History,
-  Bug
+  Bug,
+  Megaphone,
+  BarChart3
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -44,6 +46,8 @@ const ScoreReport = React.lazy(() => import('../components/ScoreReport'));
 const RankingOverrideManager = React.lazy(() => import('../components/RankingOverrideManager'));
 const WorkScheduleManager = React.lazy(() => import('../components/WorkScheduleManager'));
 const DebugLogViewer = React.lazy(() => import('../components/DebugLogViewer'));
+const SubAdminReports = React.lazy(() => import('../pages/SubAdminReports'));
+import AnnouncementManager from '../components/AnnouncementManager';
 import { PieChart as RePieChart, Pie, Cell } from 'recharts';
 
 interface AttendanceRecord {
