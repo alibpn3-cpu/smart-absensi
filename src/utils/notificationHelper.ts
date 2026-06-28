@@ -59,6 +59,28 @@ const sendEmail = async (payload: Record<string, any>) => {
   }
 };
 
+// Send Web Push + in-app notification (fire-and-forget)
+const sendPush = async (
+  staffUid: string,
+  title: string,
+  body: string,
+  opts: { type?: string; link?: string; tag?: string } = {}
+) => {
+  try {
+    await supabase.functions.invoke('send-push-notification', {
+      body: {
+        staff_uids: [staffUid],
+        title, body,
+        type: opts.type || 'info',
+        link: opts.link || '/requests',
+        tag: opts.tag,
+      },
+    });
+  } catch (e) {
+    console.warn('Push notification failed:', e);
+  }
+};
+
 // Notify approver that a new request needs review
 export const notifyApproverNewRequest = async (params: NotifyApproverParams) => {
   const approver = await getStaffInfo(params.approverUid);
