@@ -152,6 +152,14 @@ export const notifyStatusUpdate = async (params: NotifyStatusParams) => {
       details: params.notes,
     });
   }
+
+  const statusLabel = params.status === 'approved' ? '✅ Disetujui' : '❌ Ditolak';
+  await sendPush(
+    params.staffUid,
+    `${params.requestType} ${statusLabel}`,
+    `${params.requestNumber} oleh ${params.approverName}${params.notes ? ' — ' + params.notes : ''}`,
+    { type: 'status_update', link: '/requests', tag: `status-${params.requestNumber}` }
+  );
 };
 
 // Notify staff that their request was submitted
@@ -180,4 +188,11 @@ export const notifyRequestSubmitted = async (params: NotifySubmittedParams) => {
       details: params.details,
     });
   }
+
+  await sendPush(
+    params.staffUid,
+    `Permintaan ${params.requestType} Diajukan`,
+    `${params.requestNumber} sedang menunggu persetujuan.`,
+    { type: 'request_submitted', link: '/requests', tag: `submit-${params.requestNumber}` }
+  );
 };
