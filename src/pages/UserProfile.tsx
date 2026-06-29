@@ -206,14 +206,31 @@ const UserProfile = () => {
           <div className="h-24 bg-gradient-to-r from-primary to-primary/70" />
           
           {/* Avatar overlapping header */}
-          <div className="px-6 -mt-12">
+          <div className="px-6 -mt-12 relative w-fit">
             <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
-              <AvatarImage src={userSession.photo_url} alt={userSession.name} />
+              <AvatarImage src={photoUrl} alt={userSession.name} />
               <AvatarFallback className="text-2xl font-bold bg-primary text-primary-foreground">
                 {userSession.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
               </AvatarFallback>
             </Avatar>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingPhoto}
+              className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-primary text-primary-foreground shadow-md flex items-center justify-center hover:scale-105 transition disabled:opacity-50"
+              title="Ganti foto profil"
+            >
+              {uploadingPhoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoUpload}
+            />
           </div>
+
 
           <CardHeader className="pt-2">
             <div className="flex items-center gap-2 flex-wrap">
@@ -304,8 +321,48 @@ const UserProfile = () => {
               </div>
             </div>
 
+            </div>
+
+            {/* Preferensi Notifikasi */}
+            <div className="space-y-3 pt-4 border-t">
+              <p className="text-sm font-semibold text-muted-foreground">Preferensi Notifikasi</p>
+
+              {push.supported && (
+                <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 rounded-lg">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {push.subscribed ? <Bell className="h-4 w-4 text-primary shrink-0" /> : <BellOff className="h-4 w-4 text-muted-foreground shrink-0" />}
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium">Push Notifikasi</div>
+                      <div className="text-xs text-muted-foreground">Terima notifikasi langsung di perangkat ini.</div>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={push.subscribed}
+                    onCheckedChange={handleTogglePush}
+                    disabled={push.loading}
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 rounded-lg">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Sunrise className="h-4 w-4 text-amber-500 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">Reminder Clock-In Pagi</div>
+                    <div className="text-xs text-muted-foreground">Pengingat otomatis jika belum absen di pagi hari.</div>
+                  </div>
+                </div>
+                <Switch
+                  checked={morningReminder}
+                  onCheckedChange={handleToggleMorningReminder}
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
             {/* Actions */}
             <div className="space-y-3 pt-4 border-t">
+
               <Button
                 variant="outline"
                 className="w-full justify-start h-12"
