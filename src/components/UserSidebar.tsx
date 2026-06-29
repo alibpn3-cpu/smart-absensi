@@ -231,9 +231,14 @@ const UserSidebar: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 p-2"
+            className="relative bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 p-2"
           >
             <Menu className="h-4 w-4" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center rounded-full bg-destructive text-destructive-foreground">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </Button>
         </SheetTrigger>
         <SheetContent side="right" className="w-[85vw] max-w-[340px] overflow-y-auto">
