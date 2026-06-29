@@ -35,12 +35,15 @@ const emptyForm = {
   is_active: true, starts_at: "", ends_at: "",
 };
 
+const BIRTHDAY_KEY = "birthday_disabled_areas";
+
 export default function AnnouncementManager({ workArea, createdByUid, createdByName }: Props) {
   const [items, setItems] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [birthdayEnabled, setBirthdayEnabled] = useState(true);
 
   const load = async () => {
     setLoading(true);
@@ -50,10 +53,43 @@ export default function AnnouncementManager({ workArea, createdByUid, createdByN
       .eq("work_area", workArea)
       .order("created_at", { ascending: false });
     setItems((data || []) as any);
+
+    // Load birthday-disabled flag for this area
+    const { data: setting } = await supabase
+      .from("app_settings")
+      .select("setting_value")
+      .eq("setting_key", BIRTHDAY_KEY)
+      .maybeSingle();
+    try {
+      const arr: string[] = setting?.setting_value ? JSON.parse(setting.setting_value) : [];
+      setBirthdayEnabled(!arr.includes(workArea));
+    } catch { setBirthdayEnabled(true); }
+
     setLoading(false);
   };
 
   useEffect(() => { load(); }, [workArea]);
+
+  const toggleBirthday = async (enabled: boolean) => {
+    setBirthdayEnabled(enabled);
+    const { data: setting } = await supabase
+      .from("app_settings")
+      .select("setting_value")
+      .eq("setting_key", BIRTHDAY_KEY)
+      .maybeSingle();
+    let arr: string[] = [];
+    try { arr = setting?.setting_value ? JSON.parse(setting.setting_value) : []; } catch {}
+    const next = enabled
+      ? arr.filter((a) => a !== workArea)
+      : Array.from(new Set([...arr, workArea]));
+    const payload = { setting_key: BIRTHDAY_KEY, setting_value: JSON.stringify(next) };
+    if (setting) {
+      await supabase.from("app_settings").update({ setting_value: payload.setting_value }).eq("setting_key", BIRTHDAY_KEY);
+    } else {
+      await supabase.from("app_settings").insert(payload);
+    }
+    toast.success(enabled ? "Birthday card diaktifkan" : "Birthday card disembunyikan");
+  };
 
   const openCreate = () => {
     setEditId(null);
