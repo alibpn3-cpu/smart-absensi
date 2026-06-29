@@ -25,8 +25,9 @@ Deno.serve(async (req) => {
     // Active staff
     const { data: allStaff } = await supabase
       .from("staff_users")
-      .select("uid, name, phone_number, is_active")
-      .eq("is_active", true);
+      .select("uid, name, phone_number, is_active, morning_reminder_enabled")
+      .eq("is_active", true)
+      .neq("morning_reminder_enabled", false);
 
     if (!allStaff || allStaff.length === 0) {
       return new Response(JSON.stringify({ success: true, reminded: 0 }), {
