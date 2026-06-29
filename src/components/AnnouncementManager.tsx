@@ -78,12 +78,17 @@ export default function AnnouncementManager({ workArea, createdByUid, createdByN
       toast.error("Judul dan isi wajib diisi");
       return;
     }
+    // Normalize link URL — prepend https:// if missing scheme
+    let normalizedLink: string | null = form.link_url.trim() || null;
+    if (normalizedLink && !/^https?:\/\//i.test(normalizedLink)) {
+      normalizedLink = `https://${normalizedLink}`;
+    }
     const payload: any = {
       title: form.title.trim(),
       body: form.body.trim(),
       work_area: workArea,
       image_url: form.image_url.trim() || null,
-      link_url: form.link_url.trim() || null,
+      link_url: normalizedLink,
       is_active: form.is_active,
       starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : null,
       ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
