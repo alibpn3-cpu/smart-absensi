@@ -134,9 +134,11 @@ const Dashboard = () => {
       filtered = filtered.filter(r => r.status === filterStatus);
     }
     
-    // Filter by location
-    if (filterLocation !== 'all') {
-      filtered = filtered.filter(r => 
+    // Filter by location — skip for site admin karena data sudah di-scope via staff_uid
+    // (filterLocation utk site admin berisi work_area, sedangkan checkin_location_address
+    // adalah alamat reverse-geocode jalan yang tidak pernah mengandung kode work_area).
+    if (filterLocation !== 'all' && !isSiteAdmin) {
+      filtered = filtered.filter(r =>
         r.checkin_location_address?.includes(filterLocation) ||
         r.checkout_location_address?.includes(filterLocation)
       );
@@ -610,7 +612,7 @@ const Dashboard = () => {
                     <span>Filter aktif:</span>
                     {filterName && <Badge variant="secondary">Nama: {filterName}</Badge>}
                     {filterStatus !== 'all' && <Badge variant="secondary">Status: {filterStatus.toUpperCase()}</Badge>}
-                    {filterLocation !== 'all' && <Badge variant="secondary">Lokasi: {filterLocation}</Badge>}
+                    {filterLocation !== 'all' && !isSiteAdmin && <Badge variant="secondary">Lokasi: {filterLocation}</Badge>}
                     <Button 
                       variant="ghost" 
                       size="sm"

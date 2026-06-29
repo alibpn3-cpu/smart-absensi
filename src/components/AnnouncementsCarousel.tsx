@@ -72,8 +72,12 @@ export default function AnnouncementsCarousel({ workArea }: Props) {
                 <div className="font-semibold text-sm">{a.title}</div>
                 <div className="text-xs text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{a.body}</div>
                 {a.link_url && (
-                  <a href={a.link_url} target="_blank" rel="noreferrer"
-                     className="text-xs text-primary underline mt-2 inline-block">
+                  <a
+                    href={/^https?:\/\//i.test(a.link_url) ? a.link_url : `https://${a.link_url}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary underline mt-2 inline-block"
+                  >
                     Selengkapnya →
                   </a>
                 )}

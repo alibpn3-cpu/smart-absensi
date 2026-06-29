@@ -7,7 +7,6 @@ import { supabase } from '@/integrations/supabase/client';
 import AttendanceForm from '../components/AttendanceForm';
 import AdPopup from '../components/AdPopup';
 import UserSidebar from '../components/UserSidebar';
-import NotificationBell from '../components/NotificationBell';
 import { toast } from '@/hooks/use-toast';
 
 interface UserSession {
@@ -272,12 +271,9 @@ const Index = () => {
                 <LogOut className="h-3 w-3" />
               </Button>
 
-              {/* Notification bell + Sidebar menu - only for logged in users (not kiosk) */}
+              {/* Sidebar menu - notification bell sekarang di dalam sidebar */}
               {userSession && !sharedDeviceMode && (
-                <>
-                  <NotificationBell />
-                  <UserSidebar />
-                </>
+                <UserSidebar />
               )}
 
               {/* Login button for kiosk mode - to access personal mode */}

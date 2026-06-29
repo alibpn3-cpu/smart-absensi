@@ -1,46 +1,66 @@
-## Tujuan
-Tambahkan tier baru **Site Admin** di atas user biasa tapi di bawah Staff Admin / Superadmin. Site Admin hanya melihat 3 tab: **Attendance**, **In/Out Status**, **Export** — dan semua datanya dipaksa ter-filter ke `work_area` user tersebut. Tidak ada akses ke Employees, Birthdays, Scores, Geofence, Kiosk, Ads, Analytics, Admins, Logs, Settings.
 
-## Pressure-test singkat
-- **Asumsi terlemah**: bahwa `staff_users.work_area` selalu match dengan teks pada `geofence_areas.name` / `attendance_records.checkin_location_address`. Saat ini filter location di Dashboard pakai `includes()` string — fragile. Saya akan tetap pakai pola yang sama agar konsisten, tapi tambah catatan agar Superadmin memastikan penamaan area konsisten.
-- **Risiko**: Karena auth pakai localStorage (bukan Supabase auth.uid), scoping ini **UI-side only** — user yang manipulasi browser bisa bypass. Sama dengan flag `is_admin` existing. Tidak menambah kerentanan baru, tapi bukan true security boundary.
-- **Yang diverifikasi**: Tidak akan menyentuh logic clock-in/out, Tidak mengubah perilaku Staff Admin atau Superadmin.
+## Ringkasan 5 perubahan
 
-## Perubahan
+### 1. Lonceng & Reminder Pagi → masuk Sidebar/Profile
+**Masalah:** Lonceng di header bikin judul aplikasi sempit di mobile.
 
-### 1. Database (migration)
-Tambah kolom `is_site_admin boolean default false` di `staff_users`. Tidak menyentuh `is_admin`. Aturan: jika `is_site_admin=true`, abaikan `is_admin` (Site Admin lebih rendah).
+**Aksi:**
+- Hapus `<NotificationBell />` dari header `src/pages/Index.tsx`.
+- Tambahkan item "Notifikasi" baru di `UserSidebar` (ikon Bell + badge unread count). Klik → buka Sheet/Drawer berisi daftar notifikasi (reuse logic dari `NotificationBell.tsx` — extract list ke komponen `NotificationList`).
+- Badge unread realtime via Supabase channel (sudah ada di hook).
+- **Reminder pagi toggle**: tambah row baru di Profile (`UserProfile.tsx`) section "Preferensi Notifikasi":
+  - Switch **"Aktifkan Push Notifikasi"** (subscribe / unsubscribe via `usePushNotifications`).
+  - Switch **"Reminder Clock-In Pagi"** → simpan ke kolom baru `staff_users.morning_reminder_enabled BOOLEAN DEFAULT true`.
+- Edge function `remind-clock-in` di-update: filter `morning_reminder_enabled = true` sebelum kirim push/WA.
 
-### 2. Dashboard.tsx
-- Baca `is_site_admin` dari `userSession` (di-set saat login).
-- Tambah state `siteAdminArea = userSession.work_area` saat `isSiteAdmin`.
-- **Tab visibility**: jika `isSiteAdmin`, hanya render tab `attendance`, `notcheckedin`, `export`. Tab lain (termasuk Birthdays, Employees, Scores, Geofence, Kiosk, Ads, Analytics) tidak dirender. Superadmin/Staff Admin tetap seperti sekarang.
-- **Query scoping**: Saat `isSiteAdmin`, semua `supabase.from('attendance_records').select()` dan `staff_users` di-filter `.eq('work_area', siteAdminArea)`. Filter location di UI di-lock ke area tersebut (dropdown hanya 1 pilihan, disabled).
-- Summary card (Total Staff, Hadir, WFO/WFH/Dinas) dihitung ulang berdasarkan staff di area itu saja.
+### 2. Upload Foto User Manual
+**Aksi:**
+- Di `UserProfile.tsx`: tombol "Ganti Foto" di atas avatar — buka file picker, upload ke bucket `staff-photos` (sudah public) dengan path `{uid}/{timestamp}.jpg`, validasi max 2MB & image/*, update `staff_users.photo_url`, refresh `userSession` di localStorage.
+- Di `EmployeeManager.tsx` (form edit): tambah input file upload foto dengan preview + tombol hapus foto. Pakai bucket dan logic yang sama.
+- Tidak ubah schema (kolom `photo_url` sudah ada).
 
-### 3. UserLogin.tsx
-Saat sukses login, sertakan `is_site_admin` & `work_area` di `userSession` payload localStorage (saat ini sudah simpan `is_admin`).
+### 3. URL Link Announcement Salah Prefix
+**Masalah:** Saat user input `example.com/page` tanpa `https://`, `<a href="example.com/page">` jadi relatif → browser tambahkan domain absensi (`https://absensi.petrolog.my.id/example.com/page`).
 
-### 4. Employees tab (Superadmin only)
-Tambah toggle/switch "Site Admin" di form edit employee. Validasi: jika dicentang, `work_area` wajib terisi. Tidak boleh sekaligus `is_admin=true` & `is_site_admin=true` — jika user toggle Site Admin saat is_admin true, set is_admin=false otomatis (atau tampilkan warning).
+**Aksi:**
+- Di `AnnouncementsCarousel.tsx`: normalisasi `link_url` → kalau tidak diawali `http://` atau `https://`, prepend `https://` saat render.
+- Di `AnnouncementManager.tsx`: auto-normalisasi sebelum save (tambah `https://` jika perlu), `target="_blank" rel="noopener noreferrer"` (sudah ada di carousel).
 
-### 5. Export (AttendanceExporter.tsx)
-- Terima prop `forcedWorkArea?: string`.
-- Saat prop terisi: filter area di UI hilang/disabled, query di-paksa `.eq('work_area', forcedWorkArea)` (atau filter address `includes` sesuai pola existing), dan join `staff_users` di-scope.
-- Dipanggil dengan `forcedWorkArea={siteAdminArea}` saat `isSiteAdmin`.
+### 4. Site Admin Bisa Disable Birthday Card di Area-nya
+**Aksi:**
+- Migration: tambah baris `app_settings` dengan key `birthday_disabled_areas` (value JSON array of work_area), atau buat kolom `disable_birthday_card BOOLEAN` di tabel baru `site_admin_preferences (work_area UNIQUE, ...)`. **Lebih simple:** pakai `app_settings` dengan key per area: `birthday_disabled:{work_area}` value `"true"/"false"`.
+- Di `AnnouncementManager.tsx` (tab Pengumuman site admin): tambah card "Pengaturan Area" berisi Switch **"Tampilkan Birthday Card di area {workArea}"** (default ON). Simpan ke `app_settings`.
+- Di `BirthdayCard.tsx`: fetch session user's `work_area`, fetch flag dari `app_settings`, jika disabled untuk area itu → return `null`.
 
-### 6. In/Out Status (komponen `notcheckedin`)
-Cari komponen yang render tab ini, terima prop `scopeWorkArea` dan filter list staff serta status.
+### 5. Bug Filter Attendance Records Kosong untuk Site Admin
+**Root cause:** `src/pages/Dashboard.tsx` baris 98-106 set `filterLocation` default ke `siteAdminArea` (mis. `"PHAS - BATU AMPAR"`). Baris 138-143 mencocokkan dengan `r.checkin_location_address.includes(filterLocation)` — tapi `checkin_location_address` adalah alamat reverse-geocode jalan (tidak pernah berisi string `"PHAS - BATU AMPAR"`). Hasilnya semua record terbuang → "0 dari 1 record".
 
-### 7. SubAdminGuard (no change)
-Halaman `/reports` tetap untuk Sub-Admin existing (`show_attendance_status`). Tidak terkait fitur ini.
+**Aksi (di `Dashboard.tsx`):**
+- Untuk site admin: **skip filter lokasi sepenuhnya** karena data sudah di-scope via `staff_uid`. Set initial `filterLocation = 'all'` walau site admin, dan disable dropdown Lokasi (atau hide-kan untuk site admin).
+- Atau: ubah logic filter — kalau `isSiteAdmin`, jangan apply location filter di `useEffect` filter pipeline.
+- Lebih clean: untuk site admin, sembunyikan dropdown Lokasi dan chip "Filter aktif: Lokasi: …", karena toh sudah otomatis terbatas.
 
-## Catatan teknis
-- Tidak ada perubahan RLS karena project pakai plaintext custom auth (sudah pola existing).
-- Backward compatible: user existing dengan `is_admin=true` tidak terpengaruh.
-- Site Admin tidak bisa lihat data area lain — termasuk Total Staff card di-recompute.
-- Tidak menambah halaman/route baru; semua tetap di `/dashboard`.
+## Perubahan Database (1 migration)
+```sql
+ALTER TABLE public.staff_users
+  ADD COLUMN IF NOT EXISTS morning_reminder_enabled BOOLEAN DEFAULT true;
+-- birthday_disabled per area pakai app_settings existing (tidak perlu schema baru)
+```
 
-## Pertanyaan terbuka untuk konfirmasi setelah implementasi
-- Apakah Site Admin boleh export PDF/Excel keduanya? (Asumsi: ya, sama seperti Staff Admin.)
-- Apakah Site Admin boleh lihat foto absensi staff areanya? (Asumsi: ya.)
+## Files yang Disentuh
+- `src/pages/Index.tsx` — hapus NotificationBell dari header
+- `src/components/UserSidebar.tsx` — tambah item Notifikasi + badge
+- `src/components/NotificationBell.tsx` — extract isi popover jadi reusable list (atau buat `NotificationSheet`)
+- `src/pages/UserProfile.tsx` — upload foto + 2 switch (push + morning reminder)
+- `src/components/EmployeeManager.tsx` — upload foto di form edit
+- `src/components/AnnouncementsCarousel.tsx` — normalize link_url
+- `src/components/AnnouncementManager.tsx` — normalize sebelum save + section "Pengaturan Area" (toggle birthday)
+- `src/components/BirthdayCard.tsx` — cek flag disabled per area
+- `src/pages/Dashboard.tsx` — fix filter lokasi site admin
+- `supabase/functions/remind-clock-in/index.ts` — filter `morning_reminder_enabled`
+
+## Tradeoff & Risiko
+- **Lonceng di sidebar**: user perlu buka sidebar untuk lihat notif baru. Badge unread di tombol sidebar (☰) tetap muncul realtime, jadi tidak hilang awareness.
+- **Foto upload user-sendiri**: tidak ada moderasi konten. Kalau khawatir, bisa tambah approval flow nanti — sekarang trust-based seperti edit kontak.
+- **Birthday disable per area**: pakai `app_settings` (key string) lebih fleksibel daripada bikin tabel baru, tapi tidak ada FK ke work_area. Acceptable karena work_area sendiri cuma string di `staff_users`.
+- **Filter lokasi site admin disembunyikan**: konsisten dengan prinsip "site admin scope-locked", tidak membingungkan.

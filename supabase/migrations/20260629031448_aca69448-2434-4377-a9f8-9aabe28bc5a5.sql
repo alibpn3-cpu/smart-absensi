@@ -1,0 +1,1 @@
+ALTER TABLE public.staff_users ADD COLUMN IF NOT EXISTS morning_reminder_enabled BOOLEAN NOT NULL DEFAULT true;

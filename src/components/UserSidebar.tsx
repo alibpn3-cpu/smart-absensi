@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   Menu, User, FileText, RefreshCw, Bug, MapPin, Camera, Satellite, Star,
-  LogOut, Info, Lock, Shield, ChevronRight, BarChart3, MapPinned
+  LogOut, Info, Lock, Shield, ChevronRight, BarChart3, MapPinned, Bell
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -15,6 +15,7 @@ import { getMonthlyAccumulatedScore } from '@/hooks/useScoreCalculation';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import DebugLogger from './DebugLogger';
 import ChangePasswordDialog from './ChangePasswordDialog';
+import NotificationsDialog from './NotificationsDialog';
 
 interface UserSession {
   uid: string;
@@ -40,7 +41,36 @@ const UserSidebar: React.FC = () => {
   const [monthlyScore, setMonthlyScore] = useState<number | null>(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [isSubAdmin, setIsSubAdmin] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
   const featureFlags = useFeatureFlags();
+
+  // Load session uid + unread count on mount; subscribe to realtime
+  useEffect(() => {
+    const raw = localStorage.getItem('userSession');
+    if (!raw) return;
+    let uid = '';
+    try { uid = JSON.parse(raw)?.uid || ''; } catch { return; }
+    if (!uid) return;
+
+    const loadCount = async () => {
+      const { count } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('staff_uid', uid)
+        .is('read_at', null);
+      setUnreadCount(count || 0);
+    };
+    loadCount();
+
+    const channel = supabase
+      .channel(`sidebar-notif:${uid}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `staff_uid=eq.${uid}` },
+        () => loadCount())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -201,9 +231,14 @@ const UserSidebar: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 p-2"
+            className="relative bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 p-2"
           >
             <Menu className="h-4 w-4" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center rounded-full bg-destructive text-destructive-foreground">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </Button>
         </SheetTrigger>
         <SheetContent side="right" className="w-[85vw] max-w-[340px] overflow-y-auto">
@@ -288,6 +323,25 @@ const UserSidebar: React.FC = () => {
 
               {/* Navigation Items */}
               <div className="space-y-1">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between h-11"
+                  onClick={() => { setOpen(false); setShowNotifications(true); }}
+                >
+                  <div className="flex items-center gap-3">
+                    <Bell className="h-4 w-4 text-primary" />
+                    <span>Notifikasi</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {unreadCount > 0 && (
+                      <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-[10px]">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Badge>
+                    )}
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </Button>
+
                 {(featureFlags.leaveRequestEnabled || featureFlags.permissionRequestEnabled) && (
                   <Button
                     variant="ghost"
@@ -405,6 +459,21 @@ const UserSidebar: React.FC = () => {
           currentPasswordRequired={true}
         />
       )}
+
+      {/* Notifications Dialog */}
+      {(() => {
+        const raw = typeof window !== 'undefined' ? localStorage.getItem('userSession') : null;
+        let uid = '';
+        try { uid = raw ? (JSON.parse(raw)?.uid || '') : ''; } catch {}
+        if (!uid) return null;
+        return (
+          <NotificationsDialog
+            open={showNotifications}
+            onOpenChange={setShowNotifications}
+            staffUid={uid}
+          />
+        );
+      })()}
     </>
   );
 };
