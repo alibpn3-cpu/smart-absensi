@@ -321,8 +321,6 @@ const UserProfile = () => {
               </div>
             </div>
 
-            </div>
-
             {/* Preferensi Notifikasi */}
             <div className="space-y-3 pt-4 border-t">
               <p className="text-sm font-semibold text-muted-foreground">Preferensi Notifikasi</p>
