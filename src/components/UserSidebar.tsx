@@ -459,6 +459,21 @@ const UserSidebar: React.FC = () => {
           currentPasswordRequired={true}
         />
       )}
+
+      {/* Notifications Dialog */}
+      {(() => {
+        const raw = typeof window !== 'undefined' ? localStorage.getItem('userSession') : null;
+        let uid = '';
+        try { uid = raw ? (JSON.parse(raw)?.uid || '') : ''; } catch {}
+        if (!uid) return null;
+        return (
+          <NotificationsDialog
+            open={showNotifications}
+            onOpenChange={setShowNotifications}
+            staffUid={uid}
+          />
+        );
+      })()}
     </>
   );
 };
