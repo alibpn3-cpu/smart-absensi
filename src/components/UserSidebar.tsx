@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   Menu, User, FileText, RefreshCw, Bug, MapPin, Camera, Satellite, Star,
-  LogOut, Info, Lock, Shield, ChevronRight, BarChart3, MapPinned
+  LogOut, Info, Lock, Shield, ChevronRight, BarChart3, MapPinned, Bell
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -15,6 +15,7 @@ import { getMonthlyAccumulatedScore } from '@/hooks/useScoreCalculation';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import DebugLogger from './DebugLogger';
 import ChangePasswordDialog from './ChangePasswordDialog';
+import NotificationsDialog from './NotificationsDialog';
 
 interface UserSession {
   uid: string;
@@ -40,7 +41,36 @@ const UserSidebar: React.FC = () => {
   const [monthlyScore, setMonthlyScore] = useState<number | null>(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [isSubAdmin, setIsSubAdmin] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
   const featureFlags = useFeatureFlags();
+
+  // Load session uid + unread count on mount; subscribe to realtime
+  useEffect(() => {
+    const raw = localStorage.getItem('userSession');
+    if (!raw) return;
+    let uid = '';
+    try { uid = JSON.parse(raw)?.uid || ''; } catch { return; }
+    if (!uid) return;
+
+    const loadCount = async () => {
+      const { count } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('staff_uid', uid)
+        .is('read_at', null);
+      setUnreadCount(count || 0);
+    };
+    loadCount();
+
+    const channel = supabase
+      .channel(`sidebar-notif:${uid}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `staff_uid=eq.${uid}` },
+        () => loadCount())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
