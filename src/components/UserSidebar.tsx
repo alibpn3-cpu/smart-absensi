@@ -323,6 +323,25 @@ const UserSidebar: React.FC = () => {
 
               {/* Navigation Items */}
               <div className="space-y-1">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between h-11"
+                  onClick={() => { setOpen(false); setShowNotifications(true); }}
+                >
+                  <div className="flex items-center gap-3">
+                    <Bell className="h-4 w-4 text-primary" />
+                    <span>Notifikasi</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {unreadCount > 0 && (
+                      <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-[10px]">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Badge>
+                    )}
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </Button>
+
                 {(featureFlags.leaveRequestEnabled || featureFlags.permissionRequestEnabled) && (
                   <Button
                     variant="ghost"
