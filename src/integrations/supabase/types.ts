@@ -826,6 +826,7 @@ export type Database = {
           is_manager: boolean | null
           is_site_admin: boolean
           join_date: string | null
+          morning_reminder_enabled: boolean
           name: string
           password_hash: string | null
           phone_number: string | null
@@ -851,6 +852,7 @@ export type Database = {
           is_manager?: boolean | null
           is_site_admin?: boolean
           join_date?: string | null
+          morning_reminder_enabled?: boolean
           name: string
           password_hash?: string | null
           phone_number?: string | null
@@ -876,6 +878,7 @@ export type Database = {
           is_manager?: boolean | null
           is_site_admin?: boolean
           join_date?: string | null
+          morning_reminder_enabled?: boolean
           name?: string
           password_hash?: string | null
           phone_number?: string | null
