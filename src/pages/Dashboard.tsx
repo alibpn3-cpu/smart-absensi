@@ -612,7 +612,7 @@ const Dashboard = () => {
                     <span>Filter aktif:</span>
                     {filterName && <Badge variant="secondary">Nama: {filterName}</Badge>}
                     {filterStatus !== 'all' && <Badge variant="secondary">Status: {filterStatus.toUpperCase()}</Badge>}
-                    {filterLocation !== 'all' && <Badge variant="secondary">Lokasi: {filterLocation}</Badge>}
+                    {filterLocation !== 'all' && !isSiteAdmin && <Badge variant="secondary">Lokasi: {filterLocation}</Badge>}
                     <Button 
                       variant="ghost" 
                       size="sm"
