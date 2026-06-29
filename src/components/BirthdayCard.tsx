@@ -109,6 +109,7 @@ const BirthdayCard = () => {
 
   const birthdaySlides = splitIntoSlides(upcomingBirthdays, ITEMS_PER_SLIDE);
 
+  if (disabled) return null;
   if (upcomingBirthdays.length === 0) {
     return null;
   }
