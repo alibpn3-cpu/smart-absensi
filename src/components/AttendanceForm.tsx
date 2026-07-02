@@ -350,27 +350,34 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   useEffect(() => {
     // Store current date for comparison
     let lastDate = new Date().toDateString();
-    
+
     // Update current time every second and check for date change
     const timer = setInterval(() => {
       const now = new Date();
       setCurrentDateTime(now);
-      
+
       // Check if date has changed (midnight reset)
       const currentDate = now.toDateString();
       if (currentDate !== lastDate) {
-        console.log('🔄 Date changed, resetting attendance...');
         lastDate = currentDate;
-        // Reset attendance data
-        setTodayAttendance(null);
-        if (selectedStaff) {
-          fetchTodayAttendance();
+        const shiftType = (selectedStaff as any)?.shift_type || 'regular';
+        // For night-shift users with an open (in but not out) record, keep it visible
+        // so they can clock-out after midnight against the previous work-date.
+        const hasOpenShift = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
+        if (isNightShift(shiftType) && hasOpenShift) {
+          console.log('🌙 Night shift open — skipping midnight reset');
+        } else {
+          console.log('🔄 Date changed, resetting attendance...');
+          setTodayAttendance(null);
+          if (selectedStaff) {
+            fetchTodayAttendance();
+          }
         }
       }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [selectedStaff]);
+  }, [selectedStaff, todayAttendance]);
 
   useEffect(() => {
     if (selectedStaff) {
