@@ -539,33 +539,45 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
 
     // Use device-local date (YYYY-MM-DD) to match records created in local timezone
     const nowLocal = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const today = `${nowLocal.getFullYear()}-${pad(nowLocal.getMonth() + 1)}-${pad(nowLocal.getDate())}`;
-    
-    // Fetch regular attendance
-    const { data: regularData } = await supabase
-      .from('attendance_records')
-      .select('*')
-      .eq('staff_uid', selectedStaff.uid)
-      .eq('date', today)
-      .eq('attendance_type', 'regular')
-      .maybeSingle();
-    
-    // Fetch overtime attendance
-    const { data: overtimeData } = await supabase
-      .from('attendance_records')
-      .select('*')
-      .eq('staff_uid', selectedStaff.uid)
-      .eq('date', today)
-      .eq('attendance_type', 'overtime')
-      .maybeSingle();
-    
+    const shiftType = (selectedStaff as any).shift_type || 'regular';
+    const today = toLocalDateString(nowLocal);
+
+    // For night-shift users we may still be working under yesterday's date.
+    // Try today's records first; if none for today and yesterday has an open
+    // (checked-in, not checked-out) record, use that instead.
+    const fetchByDate = async (dateStr: string, type: 'regular' | 'overtime') => {
+      const { data } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('staff_uid', selectedStaff.uid)
+        .eq('date', dateStr)
+        .eq('attendance_type', type)
+        .maybeSingle();
+      return data as AttendanceRecord | null;
+    };
+
+    let regularData = await fetchByDate(today, 'regular');
+    let overtimeData = await fetchByDate(today, 'overtime');
+
+    if (isNightShift(shiftType)) {
+      const yesterday = yesterdayDateString(nowLocal);
+      // If today has no record but yesterday still open, adopt it
+      if (!regularData) {
+        const y = await fetchByDate(yesterday, 'regular');
+        if (y && y.check_in_time && !y.check_out_time) regularData = y;
+      }
+      if (!overtimeData) {
+        const y = await fetchByDate(yesterday, 'overtime');
+        if (y && y.check_in_time && !y.check_out_time) overtimeData = y;
+      }
+    }
+
     setRegularAttendance(regularData as AttendanceRecord);
     setOvertimeAttendance(overtimeData as AttendanceRecord);
-    
+
     // Backward compatibility - set todayAttendance to regular
     setTodayAttendance(regularData as AttendanceRecord);
-    
+
     // Restore attendance status from existing record
     if (regularData && regularData.check_in_time && !regularData.check_out_time) {
       console.log('📝 Restoring attendance status from existing check-in:', regularData.status);
