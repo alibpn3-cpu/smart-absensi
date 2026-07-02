@@ -1103,6 +1103,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           .maybeSingle();
         if (data && data.check_in_time && !data.check_out_time) existingAttendance = data;
       }
+
+      // Validate action
+      if (action.action === 'check-in' && existingAttendance?.check_in_time) {
         toast({
           title: "❌ Sudah Clock In",
           description: `${staff.name} sudah melakukan clock in hari ini`,
