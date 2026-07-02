@@ -1465,12 +1465,16 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const offH = pad(Math.floor(Math.abs(tzMin) / 60));
       const offM = pad(Math.abs(tzMin) % 60);
       const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
-      const localDateStr = `${y}-${M}-${d}`;
-      
+      const staffShiftType = (selectedStaff as any).shift_type || 'regular';
+      // For night-shift users a clock-in in the morning belongs to yesterday's shift.
+      const localDateStr = isCheckOut
+        ? (todayAttendance?.date || toLocalDateString(now))
+        : computeWorkDate(now, staffShiftType);
+
       // Use the checkout reason if it was set (for WFO checkout outside geofence)
       const finalCheckinReason = reason || null;
       const finalCheckoutReason = checkoutReason || null;
-      
+
       const attendanceData = {
         staff_uid: selectedStaff.uid,
         staff_name: selectedStaff.name,
@@ -1478,8 +1482,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         selfie_photo_url: photoPath,
         status: attendanceStatus,
         attendance_type: currentAttendanceType,
-        ...(isCheckOut 
-          ? { 
+        shift_type: staffShiftType,
+        ...(isCheckOut
+          ? {
               check_out_time: formattedTime,
               checkout_location_lat: usedLocation.lat,
               checkout_location_lng: usedLocation.lng,
@@ -1488,7 +1493,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
               checkout_reason: finalCheckoutReason,
               hours_worked: currentAttendanceType === 'overtime' ? calculateHoursWorked(currentRecord!.check_in_time!, formattedTime) : undefined
             }
-          : { 
+          : {
               check_in_time: formattedTime,
               checkin_location_lat: usedLocation.lat,
               checkin_location_lng: usedLocation.lng,
