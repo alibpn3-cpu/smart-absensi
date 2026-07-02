@@ -54,6 +54,7 @@ interface StaffUser {
 
 interface AttendanceRecord {
   id: string;
+  date?: string;
   check_in_time: string | null;
   check_out_time: string | null;
   status: 'wfo' | 'wfh' | 'dinas';
@@ -65,6 +66,7 @@ interface AttendanceRecord {
   checkout_location_lng: number | null;
   attendance_type?: 'regular' | 'overtime';
   hours_worked?: number | null;
+  shift_type?: string | null;
 }
 
 interface PermissionsState {
