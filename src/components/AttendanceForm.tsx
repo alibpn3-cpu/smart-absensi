@@ -1137,6 +1137,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       
       // Process attendance
       const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
       const y = now.getFullYear();
       const M = pad(now.getMonth() + 1);
       const d = pad(now.getDate());
@@ -1149,7 +1150,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const offH = pad(Math.floor(Math.abs(tzMin) / 60));
       const offM = pad(Math.abs(tzMin) % 60);
       const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
-      
+
       if (action.action === 'check-in') {
         const ctx = await getAttendanceContext(staff.uid, 'check_in');
         showClockWarning(ctx, toast);
@@ -1158,7 +1159,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           .insert({
             staff_uid: staff.uid,
             staff_name: staff.name,
-            date: today,
+            date: workDateForCheckin,
+            shift_type: staffShift,
             status: 'wfo',
             attendance_type: action.type,
             check_in_time: formattedTime,
