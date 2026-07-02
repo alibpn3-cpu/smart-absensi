@@ -1074,21 +1074,35 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         locationLng = location.lng;
       }
       
-      // Get today's attendance for this staff
+      // Get today's attendance for this staff (shift-aware for night shift)
       const nowLocal = new Date();
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const today = `${nowLocal.getFullYear()}-${pad(nowLocal.getMonth() + 1)}-${pad(nowLocal.getDate())}`;
-      
-      const { data: existingAttendance } = await supabase
-        .from('attendance_records')
-        .select('*')
-        .eq('staff_uid', staff.uid)
-        .eq('date', today)
-        .eq('attendance_type', action.type)
-        .maybeSingle();
-      
-      // Validate action
-      if (action.action === 'check-in' && existingAttendance?.check_in_time) {
+      const staffShift = (staff as any).shift_type || 'regular';
+      const today = toLocalDateString(nowLocal);
+      const workDateForCheckin = computeWorkDate(nowLocal, staffShift);
+
+      // For night shift: also look for an open record on yesterday's work-date
+      let existingAttendance: any = null;
+      {
+        const { data } = await supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('staff_uid', staff.uid)
+          .eq('date', today)
+          .eq('attendance_type', action.type)
+          .maybeSingle();
+        existingAttendance = data;
+      }
+      if (!existingAttendance && isNightShift(staffShift)) {
+        const yest = yesterdayDateString(nowLocal);
+        const { data } = await supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('staff_uid', staff.uid)
+          .eq('date', yest)
+          .eq('attendance_type', action.type)
+          .maybeSingle();
+        if (data && data.check_in_time && !data.check_out_time) existingAttendance = data;
+      }
         toast({
           title: "❌ Sudah Clock In",
           description: `${staff.name} sudah melakukan clock in hari ini`,
