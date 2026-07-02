@@ -1,66 +1,77 @@
 
-## Ringkasan 5 perubahan
+## 1) Dukungan 3 Shift (Shift Malam Lintas Tengah Malam) — khusus PHAS - BATU AMPAR
 
-### 1. Lonceng & Reminder Pagi → masuk Sidebar/Profile
-**Masalah:** Lonceng di header bikin judul aplikasi sempit di mobile.
+**Konsep inti: "Work Date" (tanggal kerja) ≠ "Calendar Date" (tanggal kalender)**
 
-**Aksi:**
-- Hapus `<NotificationBell />` dari header `src/pages/Index.tsx`.
-- Tambahkan item "Notifikasi" baru di `UserSidebar` (ikon Bell + badge unread count). Klik → buka Sheet/Drawer berisi daftar notifikasi (reuse logic dari `NotificationBell.tsx` — extract list ke komponen `NotificationList`).
-- Badge unread realtime via Supabase channel (sudah ada di hook).
-- **Reminder pagi toggle**: tambah row baru di Profile (`UserProfile.tsx`) section "Preferensi Notifikasi":
-  - Switch **"Aktifkan Push Notifikasi"** (subscribe / unsubscribe via `usePushNotifications`).
-  - Switch **"Reminder Clock-In Pagi"** → simpan ke kolom baru `staff_users.morning_reminder_enabled BOOLEAN DEFAULT true`.
-- Edge function `remind-clock-in` di-update: filter `morning_reminder_enabled = true` sebelum kirim push/WA.
+Saat ini semua record disimpan dengan `date = tanggal kalender clock-in`. Ini pecah untuk shift malam (23:00 → 07:00 besok) karena clock-out dianggap hari baru.
 
-### 2. Upload Foto User Manual
-**Aksi:**
-- Di `UserProfile.tsx`: tombol "Ganti Foto" di atas avatar — buka file picker, upload ke bucket `staff-photos` (sudah public) dengan path `{uid}/{timestamp}.jpg`, validasi max 2MB & image/*, update `staff_users.photo_url`, refresh `userSession` di localStorage.
-- Di `EmployeeManager.tsx` (form edit): tambah input file upload foto dengan preview + tombol hapus foto. Pakai bucket dan logic yang sama.
-- Tidak ubah schema (kolom `photo_url` sudah ada).
+**Solusi: tambah shift preset per user + pinned work date**
 
-### 3. URL Link Announcement Salah Prefix
-**Masalah:** Saat user input `example.com/page` tanpa `https://`, `<a href="example.com/page">` jadi relatif → browser tambahkan domain absensi (`https://absensi.petrolog.my.id/example.com/page`).
+### Database (migration baru)
+- `staff_users.shift_type` TEXT default `'regular'` — nilai: `regular`, `shift_morning` (07-15), `shift_afternoon` (15-23), `shift_night` (23-07).
+- `attendance_records.shift_type` TEXT — snapshot shift saat clock-in.
+- `attendance_records.work_date` DATE — tanggal kerja logis (untuk shift night = tanggal saat clock-in walau clock-out di hari berikut).
+- Backfill: `work_date = date` untuk semua record lama.
 
-**Aksi:**
-- Di `AnnouncementsCarousel.tsx`: normalisasi `link_url` → kalau tidak diawali `http://` atau `https://`, prepend `https://` saat render.
-- Di `AnnouncementManager.tsx`: auto-normalisasi sebelum save (tambah `https://` jika perlu), `target="_blank" rel="noopener noreferrer"` (sudah ada di carousel).
+### Logika Clock-In
+- User dengan `shift_type = shift_night`: window valid clock-in `20:00–03:59`. Jika clock-in `≥ 20:00` → `work_date = tanggal hari ini`. Jika clock-in `00:00–03:59` → `work_date = kemarin` (lanjut shift semalam).
+- Shift lain: `work_date = tanggal hari ini` (tidak berubah).
 
-### 4. Site Admin Bisa Disable Birthday Card di Area-nya
-**Aksi:**
-- Migration: tambah baris `app_settings` dengan key `birthday_disabled_areas` (value JSON array of work_area), atau buat kolom `disable_birthday_card BOOLEAN` di tabel baru `site_admin_preferences (work_area UNIQUE, ...)`. **Lebih simple:** pakai `app_settings` dengan key per area: `birthday_disabled:{work_area}` value `"true"/"false"`.
-- Di `AnnouncementManager.tsx` (tab Pengumuman site admin): tambah card "Pengaturan Area" berisi Switch **"Tampilkan Birthday Card di area {workArea}"** (default ON). Simpan ke `app_settings`.
-- Di `BirthdayCard.tsx`: fetch session user's `work_area`, fetch flag dari `app_settings`, jika disabled untuk area itu → return `null`.
+### Logika Clock-Out (kunci masalah user)
+- Cek "open shift" berdasarkan `work_date + shift_type` (bukan `date` kalender).
+- Untuk `shift_night`: setelah tengah malam, sistem tetap mengenali user masih dalam shift kemarin (belum clock-out), sehingga clock-out `04:00–10:00` akan menutup record `work_date` kemarin, bukan bikin record baru.
+- Reset harian di tengah malam **dilewati** untuk user shift_night yang masih open.
 
-### 5. Bug Filter Attendance Records Kosong untuk Site Admin
-**Root cause:** `src/pages/Dashboard.tsx` baris 98-106 set `filterLocation` default ke `siteAdminArea` (mis. `"PHAS - BATU AMPAR"`). Baris 138-143 mencocokkan dengan `r.checkin_location_address.includes(filterLocation)` — tapi `checkin_location_address` adalah alamat reverse-geocode jalan (tidak pernah berisi string `"PHAS - BATU AMPAR"`). Hasilnya semua record terbuang → "0 dari 1 record".
+### Score & Rekap
+- `calculate-daily-scores`, exporter, ranking, dashboard filter → semua diubah dari filter `date` menjadi `work_date`.
+- Deadline late untuk shift dibaca dari preset shift, bukan `work_area_schedules` default.
 
-**Aksi (di `Dashboard.tsx`):**
-- Untuk site admin: **skip filter lokasi sepenuhnya** karena data sudah di-scope via `staff_uid`. Set initial `filterLocation = 'all'` walau site admin, dan disable dropdown Lokasi (atau hide-kan untuk site admin).
-- Atau: ubah logic filter — kalau `isSiteAdmin`, jangan apply location filter di `useEffect` filter pipeline.
-- Lebih clean: untuk site admin, sembunyikan dropdown Lokasi dan chip "Filter aktif: Lokasi: …", karena toh sudah otomatis terbatas.
+### UI
+- **Employee Manager**: dropdown "Shift Type" (Regular / Pagi / Sore / Malam).
+- **AttendanceForm**: header user memperlihatkan badge shift jika bukan regular; validasi window clock-in disesuaikan shift.
+- **Kompatibilitas**: user non-PHAS / `shift_type = regular` → perilaku 100% seperti sekarang (aditif, tidak mengubah workflow existing).
 
-## Perubahan Database (1 migration)
-```sql
-ALTER TABLE public.staff_users
-  ADD COLUMN IF NOT EXISTS morning_reminder_enabled BOOLEAN DEFAULT true;
--- birthday_disabled per area pakai app_settings existing (tidak perlu schema baru)
-```
+---
 
-## Files yang Disentuh
-- `src/pages/Index.tsx` — hapus NotificationBell dari header
-- `src/components/UserSidebar.tsx` — tambah item Notifikasi + badge
-- `src/components/NotificationBell.tsx` — extract isi popover jadi reusable list (atau buat `NotificationSheet`)
-- `src/pages/UserProfile.tsx` — upload foto + 2 switch (push + morning reminder)
-- `src/components/EmployeeManager.tsx` — upload foto di form edit
-- `src/components/AnnouncementsCarousel.tsx` — normalize link_url
-- `src/components/AnnouncementManager.tsx` — normalize sebelum save + section "Pengaturan Area" (toggle birthday)
-- `src/components/BirthdayCard.tsx` — cek flag disabled per area
-- `src/pages/Dashboard.tsx` — fix filter lokasi site admin
-- `supabase/functions/remind-clock-in/index.ts` — filter `morning_reminder_enabled`
+## 2) Perbaikan Dialog Edit Employee — lebih lebar, tidak terlalu panjang
 
-## Tradeoff & Risiko
-- **Lonceng di sidebar**: user perlu buka sidebar untuk lihat notif baru. Badge unread di tombol sidebar (☰) tetap muncul realtime, jadi tidak hilang awareness.
-- **Foto upload user-sendiri**: tidak ada moderasi konten. Kalau khawatir, bisa tambah approval flow nanti — sekarang trust-based seperti edit kontak.
-- **Birthday disable per area**: pakai `app_settings` (key string) lebih fleksibel daripada bikin tabel baru, tapi tidak ada FK ke work_area. Acceptable karena work_area sendiri cuma string di `staff_users`.
-- **Filter lokasi site admin disembunyikan**: konsisten dengan prinsip "site admin scope-locked", tidak membingungkan.
+- Ubah `DialogContent` menjadi `sm:max-w-4xl` (dari default sempit).
+- Grid 2 kolom pada layar `md+`: pasangan field kiri-kanan (mis. Nama | UID, Position | Work Area, Division | Employee Type, WhatsApp | Email, Tanggal Mulai | Atasan, HC&GA | Toggles).
+- `max-h-[85vh] overflow-y-auto` tetap dipertahankan untuk fallback layar kecil.
+- Field toggle (Site Admin, Show Status, dll) dijadikan grid 2 kolom di bawah.
+
+---
+
+## 3) Ranking Card — tampilkan Work Area di sebelah nama
+
+- Ambil `work_area` dari `staff_users` bersamaan dengan `photo_url` (query yang sudah ada).
+- Simpan di objek `RankingUser` sebagai `work_area?: string`.
+- Render di list tier: nama tetap seperti sekarang, di bawahnya (atau di kanan dengan `text-[10px] text-muted-foreground truncate`) tampilkan work area.
+
+Layout list: `Nama Karyawan · text-xs muted work_area` — muat 1 baris via `truncate`.
+
+---
+
+## 4) Aktivasi Notifikasi Cuti & Ijin (WA Meta + Email api.co.id)
+
+Wiring sudah ada (`notifyRequestSubmitted`, `notifyApproverNewRequest`, `notifyStatusUpdate` dipanggil di LeaveRequestForm, PermissionRequestForm, RequestApprovalDialog). Yang perlu dipastikan/perbaiki:
+
+- Audit `src/utils/notificationHelper.ts` — pastikan memanggil edge function `send-whatsapp-notification` (Meta) dan `send-email-notification` untuk 3 event: submit user, notif approver baru, update status ke pemohon.
+- Audit edge function `send-whatsapp-notification` → memakai `META_TOKEN` + `META_PHONE_ID` (sudah ada di secrets) dengan throttle 3 detik.
+- Audit `send-email-notification` → memakai SMTP secrets yang sudah ada (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`).
+- Tambah logging ke `debug_logs` bila gagal kirim, supaya user bisa cek di Debug Log Viewer.
+- Template pesan WA & email untuk: Pengajuan Cuti (baru), Approver Notifikasi Approval, Status Cuti (approved/rejected). Sama untuk Ijin.
+- Tidak menambah tabel baru; hanya memastikan pipeline berjalan end-to-end.
+
+Setelah implementasi, saya akan minta Anda melakukan test submit 1 pengajuan cuti untuk memverifikasi WA + email terkirim, dan cek Edge Function logs jika ada error.
+
+---
+
+## Urutan Kerja
+1. Migration DB (shift_type + work_date + backfill).
+2. Update AttendanceForm (clock-in/out logic + reset skip untuk night shift).
+3. Update EmployeeManager (dropdown shift + dialog width & layout 2 kolom).
+4. Update `calculate-daily-scores`, Exporter, Dashboard, RankingCard → pakai `work_date`.
+5. Tambah `work_area` di RankingCard.
+6. Audit & aktifkan notifikasi cuti/ijin (WA + email).
+
