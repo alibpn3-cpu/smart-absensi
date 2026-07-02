@@ -39,6 +39,7 @@ import { calculateAdaptiveTolerance, GEOFENCE_CONSTANTS } from '@/utils/geofence
 import { getAttendanceContext, showClockWarning } from '@/utils/attendanceContext';
 import { useClockSkewGuard } from '@/hooks/useClockSkewGuard';
 import ClockInvalidDialog from './ClockInvalidDialog';
+import { computeWorkDate, yesterdayDateString, isNightShift, toLocalDateString } from '@/utils/shiftHelper';
 
 interface StaffUser {
   uid: string;
@@ -53,6 +54,7 @@ interface StaffUser {
 
 interface AttendanceRecord {
   id: string;
+  date?: string;
   check_in_time: string | null;
   check_out_time: string | null;
   status: 'wfo' | 'wfh' | 'dinas';
@@ -64,6 +66,7 @@ interface AttendanceRecord {
   checkout_location_lng: number | null;
   attendance_type?: 'regular' | 'overtime';
   hours_worked?: number | null;
+  shift_type?: string | null;
 }
 
 interface PermissionsState {
@@ -349,27 +352,34 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   useEffect(() => {
     // Store current date for comparison
     let lastDate = new Date().toDateString();
-    
+
     // Update current time every second and check for date change
     const timer = setInterval(() => {
       const now = new Date();
       setCurrentDateTime(now);
-      
+
       // Check if date has changed (midnight reset)
       const currentDate = now.toDateString();
       if (currentDate !== lastDate) {
-        console.log('🔄 Date changed, resetting attendance...');
         lastDate = currentDate;
-        // Reset attendance data
-        setTodayAttendance(null);
-        if (selectedStaff) {
-          fetchTodayAttendance();
+        const shiftType = (selectedStaff as any)?.shift_type || 'regular';
+        // For night-shift users with an open (in but not out) record, keep it visible
+        // so they can clock-out after midnight against the previous work-date.
+        const hasOpenShift = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
+        if (isNightShift(shiftType) && hasOpenShift) {
+          console.log('🌙 Night shift open — skipping midnight reset');
+        } else {
+          console.log('🔄 Date changed, resetting attendance...');
+          setTodayAttendance(null);
+          if (selectedStaff) {
+            fetchTodayAttendance();
+          }
         }
       }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [selectedStaff]);
+  }, [selectedStaff, todayAttendance]);
 
   useEffect(() => {
     if (selectedStaff) {
@@ -538,33 +548,45 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
 
     // Use device-local date (YYYY-MM-DD) to match records created in local timezone
     const nowLocal = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const today = `${nowLocal.getFullYear()}-${pad(nowLocal.getMonth() + 1)}-${pad(nowLocal.getDate())}`;
-    
-    // Fetch regular attendance
-    const { data: regularData } = await supabase
-      .from('attendance_records')
-      .select('*')
-      .eq('staff_uid', selectedStaff.uid)
-      .eq('date', today)
-      .eq('attendance_type', 'regular')
-      .maybeSingle();
-    
-    // Fetch overtime attendance
-    const { data: overtimeData } = await supabase
-      .from('attendance_records')
-      .select('*')
-      .eq('staff_uid', selectedStaff.uid)
-      .eq('date', today)
-      .eq('attendance_type', 'overtime')
-      .maybeSingle();
-    
+    const shiftType = (selectedStaff as any).shift_type || 'regular';
+    const today = toLocalDateString(nowLocal);
+
+    // For night-shift users we may still be working under yesterday's date.
+    // Try today's records first; if none for today and yesterday has an open
+    // (checked-in, not checked-out) record, use that instead.
+    const fetchByDate = async (dateStr: string, type: 'regular' | 'overtime') => {
+      const { data } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('staff_uid', selectedStaff.uid)
+        .eq('date', dateStr)
+        .eq('attendance_type', type)
+        .maybeSingle();
+      return data as AttendanceRecord | null;
+    };
+
+    let regularData = await fetchByDate(today, 'regular');
+    let overtimeData = await fetchByDate(today, 'overtime');
+
+    if (isNightShift(shiftType)) {
+      const yesterday = yesterdayDateString(nowLocal);
+      // If today has no record but yesterday still open, adopt it
+      if (!regularData) {
+        const y = await fetchByDate(yesterday, 'regular');
+        if (y && y.check_in_time && !y.check_out_time) regularData = y;
+      }
+      if (!overtimeData) {
+        const y = await fetchByDate(yesterday, 'overtime');
+        if (y && y.check_in_time && !y.check_out_time) overtimeData = y;
+      }
+    }
+
     setRegularAttendance(regularData as AttendanceRecord);
     setOvertimeAttendance(overtimeData as AttendanceRecord);
-    
+
     // Backward compatibility - set todayAttendance to regular
     setTodayAttendance(regularData as AttendanceRecord);
-    
+
     // Restore attendance status from existing record
     if (regularData && regularData.check_in_time && !regularData.check_out_time) {
       console.log('📝 Restoring attendance status from existing check-in:', regularData.status);
@@ -1052,19 +1074,36 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         locationLng = location.lng;
       }
       
-      // Get today's attendance for this staff
+      // Get today's attendance for this staff (shift-aware for night shift)
       const nowLocal = new Date();
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const today = `${nowLocal.getFullYear()}-${pad(nowLocal.getMonth() + 1)}-${pad(nowLocal.getDate())}`;
-      
-      const { data: existingAttendance } = await supabase
-        .from('attendance_records')
-        .select('*')
-        .eq('staff_uid', staff.uid)
-        .eq('date', today)
-        .eq('attendance_type', action.type)
-        .maybeSingle();
-      
+      const staffShift = (staff as any).shift_type || 'regular';
+      const today = toLocalDateString(nowLocal);
+      const workDateForCheckin = computeWorkDate(nowLocal, staffShift);
+
+      // For night shift: also look for an open record on yesterday's work-date
+      let existingAttendance: any = null;
+      {
+        const { data } = await supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('staff_uid', staff.uid)
+          .eq('date', today)
+          .eq('attendance_type', action.type)
+          .maybeSingle();
+        existingAttendance = data;
+      }
+      if (!existingAttendance && isNightShift(staffShift)) {
+        const yest = yesterdayDateString(nowLocal);
+        const { data } = await supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('staff_uid', staff.uid)
+          .eq('date', yest)
+          .eq('attendance_type', action.type)
+          .maybeSingle();
+        if (data && data.check_in_time && !data.check_out_time) existingAttendance = data;
+      }
+
       // Validate action
       if (action.action === 'check-in' && existingAttendance?.check_in_time) {
         toast({
@@ -1098,6 +1137,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       
       // Process attendance
       const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
       const y = now.getFullYear();
       const M = pad(now.getMonth() + 1);
       const d = pad(now.getDate());
@@ -1110,7 +1150,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const offH = pad(Math.floor(Math.abs(tzMin) / 60));
       const offM = pad(Math.abs(tzMin) % 60);
       const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
-      
+
       if (action.action === 'check-in') {
         const ctx = await getAttendanceContext(staff.uid, 'check_in');
         showClockWarning(ctx, toast);
@@ -1119,7 +1159,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           .insert({
             staff_uid: staff.uid,
             staff_name: staff.name,
-            date: today,
+            date: workDateForCheckin,
+            shift_type: staffShift,
             status: 'wfo',
             attendance_type: action.type,
             check_in_time: formattedTime,
@@ -1445,12 +1486,16 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const offH = pad(Math.floor(Math.abs(tzMin) / 60));
       const offM = pad(Math.abs(tzMin) % 60);
       const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
-      const localDateStr = `${y}-${M}-${d}`;
-      
+      const staffShiftType = (selectedStaff as any).shift_type || 'regular';
+      // For night-shift users a clock-in in the morning belongs to yesterday's shift.
+      const localDateStr = isCheckOut
+        ? (todayAttendance?.date || toLocalDateString(now))
+        : computeWorkDate(now, staffShiftType);
+
       // Use the checkout reason if it was set (for WFO checkout outside geofence)
       const finalCheckinReason = reason || null;
       const finalCheckoutReason = checkoutReason || null;
-      
+
       const attendanceData = {
         staff_uid: selectedStaff.uid,
         staff_name: selectedStaff.name,
@@ -1458,8 +1503,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         selfie_photo_url: photoPath,
         status: attendanceStatus,
         attendance_type: currentAttendanceType,
-        ...(isCheckOut 
-          ? { 
+        shift_type: staffShiftType,
+        ...(isCheckOut
+          ? {
               check_out_time: formattedTime,
               checkout_location_lat: usedLocation.lat,
               checkout_location_lng: usedLocation.lng,
@@ -1468,7 +1514,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
               checkout_reason: finalCheckoutReason,
               hours_worked: currentAttendanceType === 'overtime' ? calculateHoursWorked(currentRecord!.check_in_time!, formattedTime) : undefined
             }
-          : { 
+          : {
               check_in_time: formattedTime,
               checkin_location_lat: usedLocation.lat,
               checkin_location_lng: usedLocation.lng,

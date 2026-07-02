@@ -196,7 +196,8 @@ const EmployeeManager = () => {
     email: '',
     supervisor_uid: '',
     hcga_approver_uid: '',
-    join_date: ''
+    join_date: '',
+    shift_type: 'regular'
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
@@ -469,7 +470,8 @@ const EmployeeManager = () => {
       email: '',
       supervisor_uid: '',
       hcga_approver_uid: '',
-      join_date: ''
+      join_date: '',
+      shift_type: 'regular'
     });
     setEditingEmployee(null);
     setPhotoFile(null);
@@ -492,7 +494,8 @@ const EmployeeManager = () => {
         email: (employee as any).email || '',
         supervisor_uid: (employee as any).supervisor_uid || '',
         hcga_approver_uid: (employee as any).hcga_approver_uid || '',
-        join_date: (employee as any).join_date || ''
+        join_date: (employee as any).join_date || '',
+        shift_type: (employee as any).shift_type || 'regular'
       });
       setPhotoPreview(employee.photo_url || '');
     } else {
@@ -572,7 +575,8 @@ const EmployeeManager = () => {
         email: formData.email || null,
         supervisor_uid: formData.supervisor_uid && formData.supervisor_uid !== 'none' ? formData.supervisor_uid : null,
         hcga_approver_uid: formData.hcga_approver_uid && formData.hcga_approver_uid !== 'none' ? formData.hcga_approver_uid : null,
-        join_date: formData.join_date || null
+        join_date: formData.join_date || null,
+        shift_type: formData.shift_type || 'regular'
       };
 
       if (editingEmployee) {
@@ -1511,188 +1515,211 @@ const EmployeeManager = () => {
                   Add Employee
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
+              <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>
                     {editingEmployee ? 'Edit Employee' : 'Add New Employee'}
                   </DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="uid">Employee UID *</Label>
-                    <Input
-                      id="uid"
-                      value={formData.uid}
-                      onChange={(e) => setFormData({...formData, uid: e.target.value})}
-                      placeholder="e.g., EMP001"
-                    />
-                    {editingEmployee && formData.uid !== originalUid && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                        ⚠️ Mengubah UID akan update semua data attendance, score, dan checklist
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      placeholder="Enter full name"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="position">Position *</Label>
-                    <ComboboxField
-                      value={formData.position}
-                      onValueChange={(value) => setFormData({...formData, position: value})}
-                      options={positions}
-                      placeholder="Pilih atau ketik position baru"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="work_area">Work Area *</Label>
-                    <ComboboxField
-                      value={formData.work_area}
-                      onValueChange={(value) => setFormData({...formData, work_area: value})}
-                      options={workAreas}
-                      placeholder="Pilih atau ketik work area baru"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="division">Division (Optional)</Label>
-                    <ComboboxField
-                      value={formData.division}
-                      onValueChange={(value) => setFormData({...formData, division: value})}
-                      options={divisions}
-                      placeholder="Pilih atau ketik division baru"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="employee_type">Employee Type</Label>
-                    <Select
-                      value={formData.employee_type}
-                      onValueChange={(value) => setFormData({...formData, employee_type: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select employee type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="staff">Staff</SelectItem>
-                        <SelectItem value="primary">Primary (Operator)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Primary: jam masuk 07:00, wajib P2H & Toolbox. Staff: jam masuk 08:00/08:30.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="phone_number">No. WhatsApp (Optional)</Label>
-                    <Input
-                      id="phone_number"
-                      value={formData.phone_number}
-                      onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
-                      placeholder="e.g., 6281234567890"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email (Optional)</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      placeholder="e.g., nama@email.com"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="join_date">Tanggal Mulai Kerja (Optional)</Label>
-                    <Input
-                      id="join_date"
-                      type="date"
-                      value={formData.join_date}
-                      onChange={(e) => setFormData({...formData, join_date: e.target.value})}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Atasan (Optional)</Label>
-                    <EmployeeSearchCombobox
-                      value={formData.supervisor_uid}
-                      onChange={(value) => setFormData({...formData, supervisor_uid: value})}
-                      employees={employees.filter(e => e.uid !== formData.uid)}
-                      placeholder="Cari nama atau UID atasan..."
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>HC&GA Site Approver (Optional)</Label>
-                    <EmployeeSearchCombobox
-                      value={formData.hcga_approver_uid}
-                      onChange={(value) => setFormData({...formData, hcga_approver_uid: value})}
-                      employees={employees.filter(e => e.uid !== formData.uid)}
-                      placeholder="Cari nama atau UID HC&GA..."
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="photo">Photo (Optional)</Label>
-                    <div className="flex items-center gap-4">
-                      {photoPreview ? (
-                        <div className="relative">
-                          <img 
-                            src={photoPreview} 
-                            alt="Preview" 
-                            className="w-16 h-16 rounded-full object-cover border-2 border-primary"
-                          />
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                            onClick={() => {
-                              setPhotoFile(null);
-                              setPhotoPreview(null);
-                            }}
-                          >
-                            ×
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="w-16 h-16 rounded-full bg-muted border-2 border-dashed border-muted-foreground flex items-center justify-center">
-                          <User className="w-8 h-8 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <Input
-                          id="photo"
-                          type="file"
-                          accept="image/*"
-                          onChange={handlePhotoSelect}
-                          className="cursor-pointer"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Max 512KB (akan dikompres otomatis)
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="uid">Employee UID *</Label>
+                      <Input
+                        id="uid"
+                        value={formData.uid}
+                        onChange={(e) => setFormData({...formData, uid: e.target.value})}
+                        placeholder="e.g., EMP001"
+                      />
+                      {editingEmployee && formData.uid !== originalUid && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          ⚠️ Mengubah UID akan update semua data attendance, score, dan checklist
                         </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Full Name *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        placeholder="Enter full name"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="position">Position *</Label>
+                      <ComboboxField
+                        value={formData.position}
+                        onValueChange={(value) => setFormData({...formData, position: value})}
+                        options={positions}
+                        placeholder="Pilih atau ketik position baru"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="work_area">Work Area *</Label>
+                      <ComboboxField
+                        value={formData.work_area}
+                        onValueChange={(value) => setFormData({...formData, work_area: value})}
+                        options={workAreas}
+                        placeholder="Pilih atau ketik work area baru"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="division">Division (Optional)</Label>
+                      <ComboboxField
+                        value={formData.division}
+                        onValueChange={(value) => setFormData({...formData, division: value})}
+                        options={divisions}
+                        placeholder="Pilih atau ketik division baru"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="employee_type">Employee Type</Label>
+                      <Select
+                        value={formData.employee_type}
+                        onValueChange={(value) => setFormData({...formData, employee_type: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select employee type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="staff">Staff</SelectItem>
+                          <SelectItem value="primary">Primary (Operator)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Primary: jam masuk 07:00, wajib P2H & Toolbox. Staff: jam masuk 08:00/08:30.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="shift_type">Tipe Shift Kerja</Label>
+                      <Select
+                        value={formData.shift_type}
+                        onValueChange={(value) => setFormData({...formData, shift_type: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih tipe shift" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="regular">Regular (Non-Shift)</SelectItem>
+                          <SelectItem value="shift_morning">Shift Pagi (07:00 - 15:00)</SelectItem>
+                          <SelectItem value="shift_afternoon">Shift Sore (15:00 - 23:00)</SelectItem>
+                          <SelectItem value="shift_night">Shift Malam (23:00 - 07:00) — lintas hari</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Shift Malam: clock-in setelah pukul 20:00 dan clock-out di pagi berikutnya akan tetap tercatat pada tanggal shift dimulai.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="phone_number">No. WhatsApp (Optional)</Label>
+                      <Input
+                        id="phone_number"
+                        value={formData.phone_number}
+                        onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
+                        placeholder="e.g., 6281234567890"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email (Optional)</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        placeholder="e.g., nama@email.com"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="join_date">Tanggal Mulai Kerja (Optional)</Label>
+                      <Input
+                        id="join_date"
+                        type="date"
+                        value={formData.join_date}
+                        onChange={(e) => setFormData({...formData, join_date: e.target.value})}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Atasan (Optional)</Label>
+                      <EmployeeSearchCombobox
+                        value={formData.supervisor_uid}
+                        onChange={(value) => setFormData({...formData, supervisor_uid: value})}
+                        employees={employees.filter(e => e.uid !== formData.uid)}
+                        placeholder="Cari nama atau UID atasan..."
+                      />
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>HC&GA Site Approver (Optional)</Label>
+                      <EmployeeSearchCombobox
+                        value={formData.hcga_approver_uid}
+                        onChange={(value) => setFormData({...formData, hcga_approver_uid: value})}
+                        employees={employees.filter(e => e.uid !== formData.uid)}
+                        placeholder="Cari nama atau UID HC&GA..."
+                      />
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="photo">Photo (Optional)</Label>
+                      <div className="flex items-center gap-4">
+                        {photoPreview ? (
+                          <div className="relative">
+                            <img
+                              src={photoPreview}
+                              alt="Preview"
+                              className="w-16 h-16 rounded-full object-cover border-2 border-primary"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                              onClick={() => {
+                                setPhotoFile(null);
+                                setPhotoPreview(null);
+                              }}
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="w-16 h-16 rounded-full bg-muted border-2 border-dashed border-muted-foreground flex items-center justify-center">
+                            <User className="w-8 h-8 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <Input
+                            id="photo"
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoSelect}
+                            className="cursor-pointer"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Max 512KB (akan dikompres otomatis)
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex gap-2 pt-4">
                     <Button type="submit" className="flex-1 gradient-primary" disabled={uploadingPhoto}>
                       {uploadingPhoto ? 'Uploading...' : editingEmployee ? 'Update' : 'Add'} Employee
                     </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
                       onClick={() => {
                         setIsDialogOpen(false);
                         resetForm();

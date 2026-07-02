@@ -196,6 +196,7 @@ export type Database = {
           selfie_checkin_url: string | null
           selfie_checkout_url: string | null
           selfie_photo_url: string | null
+          shift_type: string | null
           staff_name: string
           staff_uid: string
           status: string
@@ -230,6 +231,7 @@ export type Database = {
           selfie_checkin_url?: string | null
           selfie_checkout_url?: string | null
           selfie_photo_url?: string | null
+          shift_type?: string | null
           staff_name: string
           staff_uid: string
           status: string
@@ -264,6 +266,7 @@ export type Database = {
           selfie_checkin_url?: string | null
           selfie_checkout_url?: string | null
           selfie_photo_url?: string | null
+          shift_type?: string | null
           staff_name?: string
           staff_uid?: string
           status?: string
@@ -832,6 +835,7 @@ export type Database = {
           phone_number: string | null
           photo_url: string | null
           position: string
+          shift_type: string
           show_attendance_status: boolean | null
           supervisor_uid: string | null
           uid: string
@@ -858,6 +862,7 @@ export type Database = {
           phone_number?: string | null
           photo_url?: string | null
           position: string
+          shift_type?: string
           show_attendance_status?: boolean | null
           supervisor_uid?: string | null
           uid: string
@@ -884,6 +889,7 @@ export type Database = {
           phone_number?: string | null
           photo_url?: string | null
           position?: string
+          shift_type?: string
           show_attendance_status?: boolean | null
           supervisor_uid?: string | null
           uid?: string
