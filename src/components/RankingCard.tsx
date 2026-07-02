@@ -25,6 +25,7 @@ interface RankingUser {
   total_score: number;
   total_days: number;
   photo_url?: string;
+  work_area?: string;
   tierRank?: number; // Position within the tier (1-10)
 }
 
@@ -285,12 +286,14 @@ const RankingCard = () => {
         if (topUids.length > 0) {
           const { data: users } = await supabase
             .from('staff_users')
-            .select('uid, photo_url')
+            .select('uid, photo_url, work_area')
             .in('uid', topUids);
 
-          const photoMap = new Map(users?.map(u => [u.uid, u.photo_url]) || []);
+          const infoMap = new Map(users?.map(u => [u.uid, u]) || []);
           allUsers.forEach(u => {
-            u.photo_url = photoMap.get(u.staff_uid) || undefined;
+            const info = infoMap.get(u.staff_uid);
+            u.photo_url = info?.photo_url || undefined;
+            u.work_area = info?.work_area || undefined;
           });
         }
 
@@ -321,9 +324,14 @@ const RankingCard = () => {
         </AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0">
-        <span className="text-xs font-medium truncate block">
+        <span className="text-xs font-medium truncate block leading-tight">
           {user.staff_name}
         </span>
+        {user.work_area && (
+          <span className="text-[10px] text-muted-foreground truncate block leading-tight">
+            {user.work_area}
+          </span>
+        )}
       </div>
       <span className="text-xs font-semibold text-muted-foreground">
         {Math.round(user.total_score)}⭐
