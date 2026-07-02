@@ -196,7 +196,8 @@ const EmployeeManager = () => {
     email: '',
     supervisor_uid: '',
     hcga_approver_uid: '',
-    join_date: ''
+    join_date: '',
+    shift_type: 'regular'
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
@@ -469,7 +470,8 @@ const EmployeeManager = () => {
       email: '',
       supervisor_uid: '',
       hcga_approver_uid: '',
-      join_date: ''
+      join_date: '',
+      shift_type: 'regular'
     });
     setEditingEmployee(null);
     setPhotoFile(null);
@@ -492,7 +494,8 @@ const EmployeeManager = () => {
         email: (employee as any).email || '',
         supervisor_uid: (employee as any).supervisor_uid || '',
         hcga_approver_uid: (employee as any).hcga_approver_uid || '',
-        join_date: (employee as any).join_date || ''
+        join_date: (employee as any).join_date || '',
+        shift_type: (employee as any).shift_type || 'regular'
       });
       setPhotoPreview(employee.photo_url || '');
     } else {
@@ -572,7 +575,8 @@ const EmployeeManager = () => {
         email: formData.email || null,
         supervisor_uid: formData.supervisor_uid && formData.supervisor_uid !== 'none' ? formData.supervisor_uid : null,
         hcga_approver_uid: formData.hcga_approver_uid && formData.hcga_approver_uid !== 'none' ? formData.hcga_approver_uid : null,
-        join_date: formData.join_date || null
+        join_date: formData.join_date || null,
+        shift_type: formData.shift_type || 'regular'
       };
 
       if (editingEmployee) {
