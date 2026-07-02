@@ -39,6 +39,7 @@ import { calculateAdaptiveTolerance, GEOFENCE_CONSTANTS } from '@/utils/geofence
 import { getAttendanceContext, showClockWarning } from '@/utils/attendanceContext';
 import { useClockSkewGuard } from '@/hooks/useClockSkewGuard';
 import ClockInvalidDialog from './ClockInvalidDialog';
+import { computeWorkDate, yesterdayDateString, isNightShift, toLocalDateString } from '@/utils/shiftHelper';
 
 interface StaffUser {
   uid: string;
