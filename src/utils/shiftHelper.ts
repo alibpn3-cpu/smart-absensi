@@ -9,7 +9,7 @@
  * yesterday). Otherwise, standard rules apply.
  */
 
-export type ShiftType = 'regular' | 'shift_morning' | 'shift_afternoon' | 'shift_night';
+export type ShiftType = 'regular' | 'shift' | 'shift_morning' | 'shift_afternoon' | 'shift_night';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
