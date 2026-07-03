@@ -497,7 +497,8 @@ const EmployeeManager = () => {
         supervisor_uid: (employee as any).supervisor_uid || '',
         hcga_approver_uid: (employee as any).hcga_approver_uid || '',
         join_date: (employee as any).join_date || '',
-        shift_type: (employee as any).shift_type || 'regular'
+        shift_type: (employee as any).shift_type || 'regular',
+        shift_available: !!(employee as any).shift_available
       });
       setPhotoPreview(employee.photo_url || '');
     } else {
