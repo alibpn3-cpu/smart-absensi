@@ -228,6 +228,25 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     setP2hChecked(p2h);
     setToolboxChecked(toolbox);
   }, []);
+
+  // Resolve the effective shift type for the current session.
+  // Priority:
+  //  1. If an open (checked-in, not out) record exists with shift_type set,
+  //     that value wins (so post-midnight clock-out keeps the same shift).
+  //  2. If the staff has shift_available and user picked "shift" this session.
+  //  3. Otherwise fall back to staff.shift_type (legacy) or 'regular'.
+  const getEffectiveShiftType = useCallback((): string => {
+    if (!selectedStaff) return 'regular';
+    const openRecordShift = (regularAttendance?.check_in_time && !regularAttendance?.check_out_time)
+      ? (regularAttendance as any)?.shift_type
+      : null;
+    if (openRecordShift) return openRecordShift;
+    const staffShift = (selectedStaff as any).shift_type || 'regular';
+    const canPick = !!(selectedStaff as any).shift_available;
+    if (canPick && sessionShiftMode === 'shift') return 'shift';
+    return staffShift;
+  }, [selectedStaff, regularAttendance, sessionShiftMode]);
+
   const loadSharedDeviceMode = () => {
     const localKioskMode = localStorage.getItem('shared_device_mode');
     setSharedDeviceMode(localKioskMode === 'true');
