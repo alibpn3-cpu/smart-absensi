@@ -579,7 +579,8 @@ const EmployeeManager = () => {
         supervisor_uid: formData.supervisor_uid && formData.supervisor_uid !== 'none' ? formData.supervisor_uid : null,
         hcga_approver_uid: formData.hcga_approver_uid && formData.hcga_approver_uid !== 'none' ? formData.hcga_approver_uid : null,
         join_date: formData.join_date || null,
-        shift_type: formData.shift_type || 'regular'
+        shift_type: formData.shift_type || 'regular',
+        shift_available: !!formData.shift_available
       };
 
       if (editingEmployee) {
