@@ -102,6 +102,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   const [selectedWorkArea, setSelectedWorkArea] = useState<string>('all');
   const [workAreas, setWorkAreas] = useState<string[]>([]);
   const [attendanceStatus, setAttendanceStatus] = useState<'wfo' | 'wfh' | 'dinas'>('wfo');
+  // Session shift mode — only shown when selectedStaff.shift_available === true
+  // 'regular' behaves as before; 'shift' triggers cross-midnight work-date logic.
+  const [sessionShiftMode, setSessionShiftMode] = useState<'regular' | 'shift'>('regular');
   const [reason, setReason] = useState('');
   const [showCamera, setShowCamera] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number; address: string; coordinates: string; accuracy?: number } | null>(null);
