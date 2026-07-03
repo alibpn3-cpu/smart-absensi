@@ -598,7 +598,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     let regularData = await fetchByDate(today, 'regular');
     let overtimeData = await fetchByDate(today, 'overtime');
 
-    if (isNightShift(shiftType)) {
+    if (shouldCheckYesterday) {
       const yesterday = yesterdayDateString(nowLocal);
       // If today has no record but yesterday still open, adopt it
       if (!regularData) {
