@@ -835,6 +835,7 @@ export type Database = {
           phone_number: string | null
           photo_url: string | null
           position: string
+          shift_available: boolean
           shift_type: string
           show_attendance_status: boolean | null
           supervisor_uid: string | null
@@ -862,6 +863,7 @@ export type Database = {
           phone_number?: string | null
           photo_url?: string | null
           position: string
+          shift_available?: boolean
           shift_type?: string
           show_attendance_status?: boolean | null
           supervisor_uid?: string | null
@@ -889,6 +891,7 @@ export type Database = {
           phone_number?: string | null
           photo_url?: string | null
           position?: string
+          shift_available?: boolean
           shift_type?: string
           show_attendance_status?: boolean | null
           supervisor_uid?: string | null

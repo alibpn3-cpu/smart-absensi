@@ -102,6 +102,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
   const [selectedWorkArea, setSelectedWorkArea] = useState<string>('all');
   const [workAreas, setWorkAreas] = useState<string[]>([]);
   const [attendanceStatus, setAttendanceStatus] = useState<'wfo' | 'wfh' | 'dinas'>('wfo');
+  // Session shift mode — only shown when selectedStaff.shift_available === true
+  // 'regular' behaves as before; 'shift' triggers cross-midnight work-date logic.
+  const [sessionShiftMode, setSessionShiftMode] = useState<'regular' | 'shift'>('regular');
   const [reason, setReason] = useState('');
   const [showCamera, setShowCamera] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number; address: string; coordinates: string; accuracy?: number } | null>(null);
@@ -225,6 +228,25 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     setP2hChecked(p2h);
     setToolboxChecked(toolbox);
   }, []);
+
+  // Resolve the effective shift type for the current session.
+  // Priority:
+  //  1. If an open (checked-in, not out) record exists with shift_type set,
+  //     that value wins (so post-midnight clock-out keeps the same shift).
+  //  2. If the staff has shift_available and user picked "shift" this session.
+  //  3. Otherwise fall back to staff.shift_type (legacy) or 'regular'.
+  const getEffectiveShiftType = useCallback((): string => {
+    if (!selectedStaff) return 'regular';
+    const openRecordShift = (regularAttendance?.check_in_time && !regularAttendance?.check_out_time)
+      ? (regularAttendance as any)?.shift_type
+      : null;
+    if (openRecordShift) return openRecordShift;
+    const staffShift = (selectedStaff as any).shift_type || 'regular';
+    const canPick = !!(selectedStaff as any).shift_available;
+    if (canPick && sessionShiftMode === 'shift') return 'shift';
+    return staffShift;
+  }, [selectedStaff, regularAttendance, sessionShiftMode]);
+
   const loadSharedDeviceMode = () => {
     const localKioskMode = localStorage.getItem('shared_device_mode');
     setSharedDeviceMode(localKioskMode === 'true');
@@ -362,7 +384,12 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const currentDate = now.toDateString();
       if (currentDate !== lastDate) {
         lastDate = currentDate;
-        const shiftType = (selectedStaff as any)?.shift_type || 'regular';
+        // Consider both staff's default shift AND the open record's shift snapshot,
+        // so a user who clocked-in with session mode "shift" still survives midnight.
+        const openRecordShift = (todayAttendance?.check_in_time && !todayAttendance?.check_out_time)
+          ? (todayAttendance as any)?.shift_type
+          : null;
+        const shiftType = openRecordShift || (selectedStaff as any)?.shift_type || 'regular';
         // For night-shift users with an open (in but not out) record, keep it visible
         // so they can clock-out after midnight against the previous work-date.
         const hasOpenShift = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
@@ -549,6 +576,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     // Use device-local date (YYYY-MM-DD) to match records created in local timezone
     const nowLocal = new Date();
     const shiftType = (selectedStaff as any).shift_type || 'regular';
+    // Check yesterday for open shift record if staff has shift_type = night OR
+    // shift_available toggle (meaning they may have picked "Shift" this session).
+    const shouldCheckYesterday = isNightShift(shiftType) || !!(selectedStaff as any).shift_available;
     const today = toLocalDateString(nowLocal);
 
     // For night-shift users we may still be working under yesterday's date.
@@ -568,7 +598,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     let regularData = await fetchByDate(today, 'regular');
     let overtimeData = await fetchByDate(today, 'overtime');
 
-    if (isNightShift(shiftType)) {
+    if (shouldCheckYesterday) {
       const yesterday = yesterdayDateString(nowLocal);
       // If today has no record but yesterday still open, adopt it
       if (!regularData) {
@@ -1486,7 +1516,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const offH = pad(Math.floor(Math.abs(tzMin) / 60));
       const offM = pad(Math.abs(tzMin) % 60);
       const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
-      const staffShiftType = (selectedStaff as any).shift_type || 'regular';
+      const staffShiftType = getEffectiveShiftType();
       // For night-shift users a clock-in in the morning belongs to yesterday's shift.
       const localDateStr = isCheckOut
         ? (todayAttendance?.date || toLocalDateString(now))
@@ -2533,6 +2563,35 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         <Card className="border-0 shadow-md rounded-xl bg-card">
           <CardContent className="p-6">
             <div className="flex flex-col gap-3">
+              {/* Session Shift Mode Selector — only for users with shift_available */}
+              {!sharedDeviceMode && selectedStaff && (selectedStaff as any).shift_available && (
+                <div className="flex items-center justify-center gap-2">
+                  <Label htmlFor="session-shift-mode" className="text-xs text-muted-foreground whitespace-nowrap">
+                    Mode Presensi:
+                  </Label>
+                  <Select
+                    value={(() => {
+                      const openShift = regularAttendance?.check_in_time && !regularAttendance?.check_out_time
+                        ? (regularAttendance as any)?.shift_type
+                        : null;
+                      if (openShift === 'shift' || openShift === 'shift_night') return 'shift';
+                      if (openShift === 'regular') return 'regular';
+                      return sessionShiftMode;
+                    })()}
+                    onValueChange={(v) => setSessionShiftMode(v as 'regular' | 'shift')}
+                    disabled={!!(regularAttendance?.check_in_time && !regularAttendance?.check_out_time) || loading}
+                  >
+                    <SelectTrigger id="session-shift-mode" className="h-8 w-44 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="regular">Reguler</SelectItem>
+                      <SelectItem value="shift">Shift (Lintas Hari)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {/* Main In/Out Buttons */}
               <div className="flex items-center justify-center gap-4">
                 {/* Regular Check In */}

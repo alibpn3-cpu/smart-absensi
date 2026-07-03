@@ -1,0 +1,1 @@
+ALTER TABLE public.staff_users ADD COLUMN IF NOT EXISTS shift_available BOOLEAN NOT NULL DEFAULT FALSE;
