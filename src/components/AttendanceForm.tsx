@@ -1516,7 +1516,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const offH = pad(Math.floor(Math.abs(tzMin) / 60));
       const offM = pad(Math.abs(tzMin) % 60);
       const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
-      const staffShiftType = (selectedStaff as any).shift_type || 'regular';
+      const staffShiftType = getEffectiveShiftType();
       // For night-shift users a clock-in in the morning belongs to yesterday's shift.
       const localDateStr = isCheckOut
         ? (todayAttendance?.date || toLocalDateString(now))
