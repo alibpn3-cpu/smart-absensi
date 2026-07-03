@@ -24,7 +24,7 @@ export const toLocalDateString = (d: Date): string =>
  */
 export const computeWorkDate = (now: Date, shiftType?: string | null): string => {
   const t = (shiftType || 'regular') as ShiftType;
-  if (t === 'shift_night') {
+  if (t === 'shift_night' || t === 'shift') {
     const h = now.getHours();
     if (h < 12) {
       const y = new Date(now);
@@ -45,10 +45,11 @@ export const yesterdayDateString = (now: Date): string => {
 };
 
 export const isNightShift = (shiftType?: string | null): boolean =>
-  shiftType === 'shift_night';
+  shiftType === 'shift_night' || shiftType === 'shift';
 
 export const SHIFT_LABELS: Record<ShiftType, string> = {
   regular: 'Regular',
+  shift: 'Shift (Lintas Hari)',
   shift_morning: 'Shift Pagi (07-15)',
   shift_afternoon: 'Shift Sore (15-23)',
   shift_night: 'Shift Malam (23-07)',
