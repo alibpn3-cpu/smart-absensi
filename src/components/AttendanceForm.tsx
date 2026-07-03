@@ -2563,6 +2563,35 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         <Card className="border-0 shadow-md rounded-xl bg-card">
           <CardContent className="p-6">
             <div className="flex flex-col gap-3">
+              {/* Session Shift Mode Selector — only for users with shift_available */}
+              {!sharedDeviceMode && selectedStaff && (selectedStaff as any).shift_available && (
+                <div className="flex items-center justify-center gap-2">
+                  <Label htmlFor="session-shift-mode" className="text-xs text-muted-foreground whitespace-nowrap">
+                    Mode Presensi:
+                  </Label>
+                  <Select
+                    value={(() => {
+                      const openShift = regularAttendance?.check_in_time && !regularAttendance?.check_out_time
+                        ? (regularAttendance as any)?.shift_type
+                        : null;
+                      if (openShift === 'shift' || openShift === 'shift_night') return 'shift';
+                      if (openShift === 'regular') return 'regular';
+                      return sessionShiftMode;
+                    })()}
+                    onValueChange={(v) => setSessionShiftMode(v as 'regular' | 'shift')}
+                    disabled={!!(regularAttendance?.check_in_time && !regularAttendance?.check_out_time) || loading}
+                  >
+                    <SelectTrigger id="session-shift-mode" className="h-8 w-44 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="regular">Reguler</SelectItem>
+                      <SelectItem value="shift">Shift (Lintas Hari)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {/* Main In/Out Buttons */}
               <div className="flex items-center justify-center gap-4">
                 {/* Regular Check In */}
