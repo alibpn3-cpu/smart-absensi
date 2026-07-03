@@ -472,7 +472,8 @@ const EmployeeManager = () => {
       supervisor_uid: '',
       hcga_approver_uid: '',
       join_date: '',
-      shift_type: 'regular'
+      shift_type: 'regular',
+      shift_available: false
     });
     setEditingEmployee(null);
     setPhotoFile(null);
