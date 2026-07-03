@@ -576,6 +576,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     // Use device-local date (YYYY-MM-DD) to match records created in local timezone
     const nowLocal = new Date();
     const shiftType = (selectedStaff as any).shift_type || 'regular';
+    // Check yesterday for open shift record if staff has shift_type = night OR
+    // shift_available toggle (meaning they may have picked "Shift" this session).
+    const shouldCheckYesterday = isNightShift(shiftType) || !!(selectedStaff as any).shift_available;
     const today = toLocalDateString(nowLocal);
 
     // For night-shift users we may still be working under yesterday's date.
