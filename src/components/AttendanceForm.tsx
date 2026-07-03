@@ -384,7 +384,12 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const currentDate = now.toDateString();
       if (currentDate !== lastDate) {
         lastDate = currentDate;
-        const shiftType = (selectedStaff as any)?.shift_type || 'regular';
+        // Consider both staff's default shift AND the open record's shift snapshot,
+        // so a user who clocked-in with session mode "shift" still survives midnight.
+        const openRecordShift = (todayAttendance?.check_in_time && !todayAttendance?.check_out_time)
+          ? (todayAttendance as any)?.shift_type
+          : null;
+        const shiftType = openRecordShift || (selectedStaff as any)?.shift_type || 'regular';
         // For night-shift users with an open (in but not out) record, keep it visible
         // so they can clock-out after midnight against the previous work-date.
         const hasOpenShift = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
