@@ -1602,24 +1602,25 @@ const EmployeeManager = () => {
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="shift_type">Tipe Shift Kerja</Label>
-                      <Select
-                        value={formData.shift_type}
-                        onValueChange={(value) => setFormData({...formData, shift_type: value})}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih tipe shift" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="regular">Regular (Non-Shift)</SelectItem>
-                          <SelectItem value="shift_morning">Shift Pagi (07:00 - 15:00)</SelectItem>
-                          <SelectItem value="shift_afternoon">Shift Sore (15:00 - 23:00)</SelectItem>
-                          <SelectItem value="shift_night">Shift Malam (23:00 - 07:00) — lintas hari</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        Shift Malam: clock-in setelah pukul 20:00 dan clock-out di pagi berikutnya akan tetap tercatat pada tanggal shift dimulai.
-                      </p>
+                      <div className="flex items-center justify-between rounded-md border p-3">
+                        <div className="space-y-0.5 pr-4">
+                          <Label htmlFor="shift_available" className="text-sm font-medium">
+                            Izinkan Mode Shift (Lintas Hari)
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Jika aktif, di halaman presensi karyawan ini akan muncul pilihan mode
+                            <span className="font-semibold"> Reguler / Shift </span>
+                            di atas tombol Clock In/Out. Mode Shift dipakai untuk jam kerja lintas tengah malam
+                            (misal masuk malam, pulang pagi berikutnya) — record tetap tercatat pada tanggal shift dimulai
+                            dan tidak ke-reset di jam 00:00.
+                          </p>
+                        </div>
+                        <Switch
+                          id="shift_available"
+                          checked={!!formData.shift_available}
+                          onCheckedChange={(checked) => setFormData({ ...formData, shift_available: checked })}
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-2">
