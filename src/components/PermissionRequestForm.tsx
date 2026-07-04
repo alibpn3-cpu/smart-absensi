@@ -118,13 +118,18 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
     setLoading(true);
 
     try {
+      // Sakit / Tidak Bekerja hanya perlu approval atasan (tanpa HC&GA)
+      const requiresHcga = permissionType === 'izin';
+      const effectiveHcgaUid = requiresHcga ? (userSession.hcga_approver_uid || null) : null;
+
       if (isEditMode) {
         const { error } = await supabase.from('permission_requests').update({
           permission_duration: duration.trim(),
           permission_date: format(permissionDate, 'yyyy-MM-dd'),
           phone_number: phoneNumber || null,
           reason: reason.trim(),
-        }).eq('id', editData.id);
+          permission_type: permissionType,
+        } as any).eq('id', editData.id);
 
         if (error) throw error;
         toast({ title: "Berhasil", description: "Permintaan ijin berhasil diperbarui" });
@@ -145,9 +150,10 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
           permission_date: format(permissionDate, 'yyyy-MM-dd'),
           phone_number: phoneNumber || null,
           reason: reason.trim(),
+          permission_type: permissionType,
           supervisor_uid: userSession.supervisor_uid || null,
-          hcga_approver_uid: userSession.hcga_approver_uid || null,
-        });
+          hcga_approver_uid: effectiveHcgaUid,
+        } as any);
 
         if (error) throw error;
         toast({ title: "Berhasil", description: "Permintaan ijin berhasil diajukan" });
