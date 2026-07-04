@@ -59,9 +59,20 @@ const RequestApprovalDialog: React.FC<RequestApprovalDialogProps> = ({
       if (currentReq) {
         const supervisorFinal = approverRole === 'supervisor' ? action : currentReq.supervisor_status;
         const hcgaFinal = approverRole === 'hcga' ? action : currentReq.hcga_status;
+        // Supervisor-only mode: if no HC&GA approver assigned on the request,
+        // supervisor's decision finalizes the request.
+        const supervisorOnly = !currentReq.hcga_approver_uid;
 
-        if (supervisorFinal === 'approved' && hcgaFinal === 'approved') {
+        const finalizeApproved = supervisorOnly
+          ? supervisorFinal === 'approved'
+          : (supervisorFinal === 'approved' && hcgaFinal === 'approved');
+
+        if (finalizeApproved) {
           updateData.status = 'approved';
+          // In supervisor-only mode, mark hcga_status as skipped for clarity
+          if (supervisorOnly && approverRole === 'supervisor') {
+            updateData.hcga_status = 'skipped';
+          }
           // Update leave balance
           if (requestType === 'leave') {
             const { data: balance } = await supabase.from('leave_balances')
@@ -98,7 +109,7 @@ const RequestApprovalDialog: React.FC<RequestApprovalDialogProps> = ({
           notes: notes || undefined,
         });
 
-        // If supervisor approved, notify HC&GA for next approval
+        // If supervisor approved AND HC&GA approver exists, notify HC&GA for next approval
         if (approverRole === 'supervisor' && action === 'approved' && currentReq.hcga_approver_uid) {
           notifyApproverNewRequest({
             requestId,

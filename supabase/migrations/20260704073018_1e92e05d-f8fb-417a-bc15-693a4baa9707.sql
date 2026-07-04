@@ -1,0 +1,2 @@
+ALTER TABLE public.permission_requests ADD COLUMN IF NOT EXISTS permission_type TEXT NOT NULL DEFAULT 'izin';
+COMMENT ON COLUMN public.permission_requests.permission_type IS 'Jenis ijin: izin, sakit, tidak_bekerja';

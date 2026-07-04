@@ -312,11 +312,21 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
     const fetchStatus = async () => {
       const { data } = await supabase
         .from('staff_users')
-        .select('show_attendance_status')
+        .select('show_attendance_status, shift_available, shift_type')
         .eq('uid', selectedStaff.uid)
         .maybeSingle();
       
       setShowAttendanceStatus(data?.show_attendance_status || false);
+      // Merge shift info into selectedStaff so the shift-mode selector renders in login mode
+      if (data) {
+        setSelectedStaff((prev) => {
+          if (!prev) return prev;
+          const nextAvail = (data as any).shift_available ?? false;
+          const nextType = (data as any).shift_type ?? 'regular';
+          if ((prev as any).shift_available === nextAvail && (prev as any).shift_type === nextType) return prev;
+          return { ...prev, shift_available: nextAvail, shift_type: nextType } as any;
+        });
+      }
     };
 
     fetchStatus();

@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Loader2, FileText } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -46,6 +47,7 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [supervisorName, setSupervisorName] = useState('');
   const [hcgaName, setHcgaName] = useState('');
+  const [supervisorOnly, setSupervisorOnly] = useState(false);
 
   const isEditMode = !!editData;
 
@@ -182,7 +184,7 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
           remaining_balance: selectedBalance.remaining - selectedDates.length,
           previous_year_balance: Number(selectedYear) < new Date().getFullYear() ? selectedBalance.remaining : null,
           supervisor_uid: userSession.supervisor_uid || null,
-          hcga_approver_uid: userSession.hcga_approver_uid || null,
+          hcga_approver_uid: supervisorOnly ? null : (userSession.hcga_approver_uid || null),
         });
 
         if (error) throw error;
@@ -284,6 +286,24 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
                 <p><strong>Jumlah hari:</strong> {selectedDates.length} hari</p>
                 <p><strong>Tanggal:</strong> {selectedDates.map(d => format(d, 'dd MMM yyyy', { locale: idLocale })).join(', ')}</p>
                 <p><strong>Sisa cuti setelah approved:</strong> {selectedBalance.remaining - selectedDates.length} hari</p>
+              </div>
+            )}
+
+            {!isEditMode && userSession.hcga_approver_uid && (
+              <div className="flex items-start gap-2 rounded-lg border p-3 bg-muted/30">
+                <Checkbox
+                  id="supervisor-only"
+                  checked={supervisorOnly}
+                  onCheckedChange={(v) => setSupervisorOnly(!!v)}
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="supervisor-only" className="text-sm cursor-pointer">
+                    Hanya perlu approval Atasan (tanpa HC&amp;GA)
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Jika dicentang, permintaan langsung selesai dan sisa cuti berkurang setelah Atasan menyetujui.
+                  </p>
+                </div>
               </div>
             )}
           </div>

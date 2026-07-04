@@ -48,6 +48,7 @@ const WorkScheduleManager = React.lazy(() => import('../components/WorkScheduleM
 const DebugLogViewer = React.lazy(() => import('../components/DebugLogViewer'));
 const SubAdminReports = React.lazy(() => import('../pages/SubAdminReports'));
 import AnnouncementManager from '../components/AnnouncementManager';
+const LeaveBalanceManager = React.lazy(() => import('../components/LeaveBalanceManager'));
 import { PieChart as RePieChart, Pie, Cell } from 'recharts';
 
 interface AttendanceRecord {
@@ -420,7 +421,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
-          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSiteAdmin ? 'grid-cols-3 sm:grid-cols-5' : (isSuperAdmin ? 'grid-cols-3 sm:grid-cols-14' : 'grid-cols-3 sm:grid-cols-10')}`}>
+          <TabsList className={`grid w-full gap-1 bg-muted h-auto p-1 ${isSiteAdmin ? 'grid-cols-3 sm:grid-cols-6' : (isSuperAdmin ? 'grid-cols-3 sm:grid-cols-[repeat(15,minmax(0,1fr))]' : 'grid-cols-3 sm:grid-cols-11')}`}>
             <TabsTrigger value="attendance" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Attendance</span>
               <span className="sm:hidden">Absen</span>
@@ -493,6 +494,11 @@ const Dashboard = () => {
                   <span className="hidden sm:inline">Pengumuman</span>
                   <span className="sm:hidden">Info</span>
                 </TabsTrigger>
+                <TabsTrigger value="leavebal" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Sisa Cuti</span>
+                  <span className="sm:hidden">Cuti</span>
+                </TabsTrigger>
               </>
             )}
             {!isSiteAdmin && (
@@ -511,6 +517,11 @@ const Dashboard = () => {
                   <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Ads</span>
                   <span className="sm:hidden">Iklan</span>
+                </TabsTrigger>
+                <TabsTrigger value="leavebal" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Sisa Cuti</span>
+                  <span className="sm:hidden">Cuti</span>
                 </TabsTrigger>
               </>
             )}
@@ -896,6 +907,13 @@ const Dashboard = () => {
               <AdManager />
             </React.Suspense>
           </TabsContent>
+
+          <TabsContent value="leavebal">
+            <React.Suspense fallback={<div className="text-center py-8">Loading...</div>}>
+              <LeaveBalanceManager siteAdminArea={isSiteAdmin ? siteAdminArea : null} />
+            </React.Suspense>
+          </TabsContent>
+
 
           <TabsContent value="settings">
             <AppSettings />

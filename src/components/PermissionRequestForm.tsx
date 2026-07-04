@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { CalendarIcon, Loader2, ClipboardList } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -40,6 +41,7 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
   const [permissionDate, setPermissionDate] = useState<Date>();
   const [duration, setDuration] = useState('');
   const [reason, setReason] = useState('');
+  const [permissionType, setPermissionType] = useState<'izin' | 'sakit' | 'tidak_bekerja'>('izin');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [joinDateStr, setJoinDateStr] = useState('');
   const [supervisorName, setSupervisorName] = useState('');
@@ -88,10 +90,12 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
       setDuration(editData.permission_duration || '');
       setReason(editData.reason || '');
       setPhoneNumber(editData.phone_number || '');
+      setPermissionType((editData.permission_type as any) || 'izin');
     } else {
       setPermissionDate(undefined);
       setDuration('');
       setReason('');
+      setPermissionType('izin');
     }
   }, [isOpen]);
 
@@ -114,13 +118,18 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
     setLoading(true);
 
     try {
+      // Sakit / Tidak Bekerja hanya perlu approval atasan (tanpa HC&GA)
+      const requiresHcga = permissionType === 'izin';
+      const effectiveHcgaUid = requiresHcga ? (userSession.hcga_approver_uid || null) : null;
+
       if (isEditMode) {
         const { error } = await supabase.from('permission_requests').update({
           permission_duration: duration.trim(),
           permission_date: format(permissionDate, 'yyyy-MM-dd'),
           phone_number: phoneNumber || null,
           reason: reason.trim(),
-        }).eq('id', editData.id);
+          permission_type: permissionType,
+        } as any).eq('id', editData.id);
 
         if (error) throw error;
         toast({ title: "Berhasil", description: "Permintaan ijin berhasil diperbarui" });
@@ -141,9 +150,10 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
           permission_date: format(permissionDate, 'yyyy-MM-dd'),
           phone_number: phoneNumber || null,
           reason: reason.trim(),
+          permission_type: permissionType,
           supervisor_uid: userSession.supervisor_uid || null,
-          hcga_approver_uid: userSession.hcga_approver_uid || null,
-        });
+          hcga_approver_uid: effectiveHcgaUid,
+        } as any);
 
         if (error) throw error;
         toast({ title: "Berhasil", description: "Permintaan ijin berhasil diajukan" });
@@ -204,9 +214,27 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
             )}
 
             <div className="space-y-2">
+              <Label>Jenis Ijin</Label>
+              <Select value={permissionType} onValueChange={(v) => setPermissionType(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="izin">Ijin</SelectItem>
+                  <SelectItem value="sakit">Sakit</SelectItem>
+                  <SelectItem value="tidak_bekerja">Tidak Bekerja</SelectItem>
+                </SelectContent>
+              </Select>
+              {permissionType !== 'izin' && (
+                <p className="text-[11px] text-muted-foreground">
+                  {permissionType === 'sakit' ? 'Sakit' : 'Tidak Bekerja'} — hanya perlu approval Atasan (tanpa HC&amp;GA), tidak memotong sisa cuti.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
               <Label>Mulai Menjadi Karyawan</Label>
               <Input type="date" value={joinDateStr} onChange={(e) => setJoinDateStr(e.target.value)} />
             </div>
+
 
             <div className="space-y-2">
               <Label>Ijin yang Dimohon (jam/hari)</Label>
