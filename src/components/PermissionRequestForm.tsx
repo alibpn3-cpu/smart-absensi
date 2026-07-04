@@ -214,9 +214,27 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
             )}
 
             <div className="space-y-2">
+              <Label>Jenis Ijin</Label>
+              <Select value={permissionType} onValueChange={(v) => setPermissionType(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="izin">Ijin</SelectItem>
+                  <SelectItem value="sakit">Sakit</SelectItem>
+                  <SelectItem value="tidak_bekerja">Tidak Bekerja</SelectItem>
+                </SelectContent>
+              </Select>
+              {permissionType !== 'izin' && (
+                <p className="text-[11px] text-muted-foreground">
+                  {permissionType === 'sakit' ? 'Sakit' : 'Tidak Bekerja'} — hanya perlu approval Atasan (tanpa HC&amp;GA), tidak memotong sisa cuti.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
               <Label>Mulai Menjadi Karyawan</Label>
               <Input type="date" value={joinDateStr} onChange={(e) => setJoinDateStr(e.target.value)} />
             </div>
+
 
             <div className="space-y-2">
               <Label>Ijin yang Dimohon (jam/hari)</Label>
