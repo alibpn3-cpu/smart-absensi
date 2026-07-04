@@ -46,6 +46,7 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [supervisorName, setSupervisorName] = useState('');
+  const [hcgaName, setHcgaName] = useState('');
   const [supervisorOnly, setSupervisorOnly] = useState(false);
 
   const isEditMode = !!editData;
