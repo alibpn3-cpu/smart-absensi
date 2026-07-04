@@ -184,7 +184,7 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
           remaining_balance: selectedBalance.remaining - selectedDates.length,
           previous_year_balance: Number(selectedYear) < new Date().getFullYear() ? selectedBalance.remaining : null,
           supervisor_uid: userSession.supervisor_uid || null,
-          hcga_approver_uid: userSession.hcga_approver_uid || null,
+          hcga_approver_uid: supervisorOnly ? null : (userSession.hcga_approver_uid || null),
         });
 
         if (error) throw error;
