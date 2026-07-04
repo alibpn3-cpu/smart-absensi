@@ -908,6 +908,13 @@ const Dashboard = () => {
             </React.Suspense>
           </TabsContent>
 
+          <TabsContent value="leavebal">
+            <React.Suspense fallback={<div className="text-center py-8">Loading...</div>}>
+              <LeaveBalanceManager siteAdminArea={isSiteAdmin ? siteAdminArea : null} />
+            </React.Suspense>
+          </TabsContent>
+
+
           <TabsContent value="settings">
             <AppSettings />
           </TabsContent>
