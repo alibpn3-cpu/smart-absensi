@@ -715,6 +715,7 @@ export type Database = {
           join_date: string | null
           permission_date: string
           permission_duration: string
+          permission_type: string
           phone_number: string | null
           position: string | null
           reason: string
@@ -739,6 +740,7 @@ export type Database = {
           join_date?: string | null
           permission_date: string
           permission_duration: string
+          permission_type?: string
           phone_number?: string | null
           position?: string | null
           reason: string
@@ -763,6 +765,7 @@ export type Database = {
           join_date?: string | null
           permission_date?: string
           permission_duration?: string
+          permission_type?: string
           phone_number?: string | null
           position?: string | null
           reason?: string
