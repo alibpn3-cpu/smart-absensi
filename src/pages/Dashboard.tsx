@@ -494,6 +494,11 @@ const Dashboard = () => {
                   <span className="hidden sm:inline">Pengumuman</span>
                   <span className="sm:hidden">Info</span>
                 </TabsTrigger>
+                <TabsTrigger value="leavebal" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Sisa Cuti</span>
+                  <span className="sm:hidden">Cuti</span>
+                </TabsTrigger>
               </>
             )}
             {!isSiteAdmin && (
