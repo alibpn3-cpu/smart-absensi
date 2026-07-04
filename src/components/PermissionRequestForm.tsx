@@ -41,6 +41,7 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
   const [permissionDate, setPermissionDate] = useState<Date>();
   const [duration, setDuration] = useState('');
   const [reason, setReason] = useState('');
+  const [permissionType, setPermissionType] = useState<'izin' | 'sakit' | 'tidak_bekerja'>('izin');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [joinDateStr, setJoinDateStr] = useState('');
   const [supervisorName, setSupervisorName] = useState('');
