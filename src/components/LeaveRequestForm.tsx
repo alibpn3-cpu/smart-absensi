@@ -288,6 +288,24 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
                 <p><strong>Sisa cuti setelah approved:</strong> {selectedBalance.remaining - selectedDates.length} hari</p>
               </div>
             )}
+
+            {!isEditMode && userSession.hcga_approver_uid && (
+              <div className="flex items-start gap-2 rounded-lg border p-3 bg-muted/30">
+                <Checkbox
+                  id="supervisor-only"
+                  checked={supervisorOnly}
+                  onCheckedChange={(v) => setSupervisorOnly(!!v)}
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="supervisor-only" className="text-sm cursor-pointer">
+                    Hanya perlu approval Atasan (tanpa HC&amp;GA)
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Jika dicentang, permintaan langsung selesai dan sisa cuti berkurang setelah Atasan menyetujui.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
