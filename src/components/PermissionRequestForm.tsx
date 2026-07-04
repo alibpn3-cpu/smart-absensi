@@ -90,10 +90,12 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
       setDuration(editData.permission_duration || '');
       setReason(editData.reason || '');
       setPhoneNumber(editData.phone_number || '');
+      setPermissionType((editData.permission_type as any) || 'izin');
     } else {
       setPermissionDate(undefined);
       setDuration('');
       setReason('');
+      setPermissionType('izin');
     }
   }, [isOpen]);
 
