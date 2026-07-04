@@ -48,6 +48,7 @@ const WorkScheduleManager = React.lazy(() => import('../components/WorkScheduleM
 const DebugLogViewer = React.lazy(() => import('../components/DebugLogViewer'));
 const SubAdminReports = React.lazy(() => import('../pages/SubAdminReports'));
 import AnnouncementManager from '../components/AnnouncementManager';
+const LeaveBalanceManager = React.lazy(() => import('../components/LeaveBalanceManager'));
 import { PieChart as RePieChart, Pie, Cell } from 'recharts';
 
 interface AttendanceRecord {
