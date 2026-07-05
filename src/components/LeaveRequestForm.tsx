@@ -48,6 +48,7 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
   const [supervisorName, setSupervisorName] = useState('');
   const [hcgaName, setHcgaName] = useState('');
   const [supervisorOnly, setSupervisorOnly] = useState(false);
+  const [supervisorOnlyLocked, setSupervisorOnlyLocked] = useState(false);
 
   const isEditMode = !!editData;
 
@@ -62,7 +63,7 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
       const refreshUserData = async () => {
         const { data } = await supabase
           .from('staff_users')
-          .select('supervisor_uid, hcga_approver_uid, join_date, phone_number, division')
+          .select('supervisor_uid, hcga_approver_uid, join_date, phone_number, division, leave_supervisor_only')
           .eq('uid', session.uid)
           .maybeSingle();
         if (data) {
@@ -76,6 +77,13 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
           setUserSession(updatedSession);
           localStorage.setItem('userSession', JSON.stringify({ ...JSON.parse(sessionData), ...updatedSession }));
           fetchApproverNames(data.supervisor_uid || undefined, data.hcga_approver_uid || undefined);
+          // Auto-apply admin setting: if this user is flagged supervisor-only, force it on
+          if ((data as any).leave_supervisor_only) {
+            setSupervisorOnly(true);
+            setSupervisorOnlyLocked(true);
+          } else {
+            setSupervisorOnlyLocked(false);
+          }
         } else {
           fetchApproverNames(session.supervisor_uid, session.hcga_approver_uid);
         }
@@ -289,7 +297,7 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
               </div>
             )}
 
-            {!isEditMode && userSession.hcga_approver_uid && (
+            {!isEditMode && userSession.hcga_approver_uid && !supervisorOnlyLocked && (
               <div className="flex items-start gap-2 rounded-lg border p-3 bg-muted/30">
                 <Checkbox
                   id="supervisor-only"
@@ -304,6 +312,12 @@ const LeaveRequestForm: React.FC<LeaveRequestFormProps> = ({ isOpen, onClose, on
                     Jika dicentang, permintaan langsung selesai dan sisa cuti berkurang setelah Atasan menyetujui.
                   </p>
                 </div>
+              </div>
+            )}
+
+            {!isEditMode && supervisorOnlyLocked && (
+              <div className="rounded-lg border p-3 bg-primary/5 text-xs text-muted-foreground">
+                ℹ️ Berdasarkan pengaturan admin, permintaan cuti Anda otomatis cukup approval <span className="font-semibold">Atasan</span> saja (tanpa HC&amp;GA).
               </div>
             )}
           </div>
