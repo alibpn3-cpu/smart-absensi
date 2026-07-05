@@ -198,7 +198,8 @@ const EmployeeManager = () => {
     hcga_approver_uid: '',
     join_date: '',
     shift_type: 'regular',
-    shift_available: false
+    shift_available: false,
+    leave_supervisor_only: false
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
@@ -473,7 +474,8 @@ const EmployeeManager = () => {
       hcga_approver_uid: '',
       join_date: '',
       shift_type: 'regular',
-      shift_available: false
+      shift_available: false,
+      leave_supervisor_only: false
     });
     setEditingEmployee(null);
     setPhotoFile(null);
@@ -498,7 +500,8 @@ const EmployeeManager = () => {
         hcga_approver_uid: (employee as any).hcga_approver_uid || '',
         join_date: (employee as any).join_date || '',
         shift_type: (employee as any).shift_type || 'regular',
-        shift_available: !!(employee as any).shift_available
+        shift_available: !!(employee as any).shift_available,
+        leave_supervisor_only: !!(employee as any).leave_supervisor_only
       });
       setPhotoPreview(employee.photo_url || '');
     } else {
@@ -580,7 +583,8 @@ const EmployeeManager = () => {
         hcga_approver_uid: formData.hcga_approver_uid && formData.hcga_approver_uid !== 'none' ? formData.hcga_approver_uid : null,
         join_date: formData.join_date || null,
         shift_type: formData.shift_type || 'regular',
-        shift_available: !!formData.shift_available
+        shift_available: !!formData.shift_available,
+        leave_supervisor_only: !!formData.leave_supervisor_only
       };
 
       if (editingEmployee) {
@@ -1622,6 +1626,25 @@ const EmployeeManager = () => {
                         />
                       </div>
                     </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <div className="flex items-center justify-between rounded-md border p-3">
+                        <div className="space-y-0.5 pr-4">
+                          <Label htmlFor="leave_supervisor_only" className="text-sm font-medium">
+                            Cuti: Cukup Approval Atasan (tanpa HC&amp;GA)
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Jika aktif, semua permintaan cuti karyawan ini otomatis hanya perlu persetujuan Atasan — sisa cuti langsung berkurang setelah Atasan menyetujui. Karyawan tidak perlu mencentang manual setiap kali mengajukan.
+                          </p>
+                        </div>
+                        <Switch
+                          id="leave_supervisor_only"
+                          checked={!!formData.leave_supervisor_only}
+                          onCheckedChange={(checked) => setFormData({ ...formData, leave_supervisor_only: checked })}
+                        />
+                      </div>
+                    </div>
+
 
                     <div className="space-y-2">
                       <Label htmlFor="phone_number">No. WhatsApp (Optional)</Label>
