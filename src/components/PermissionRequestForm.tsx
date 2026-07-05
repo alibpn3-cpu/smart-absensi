@@ -188,7 +188,15 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-md max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(e) => {
+          const t = e.target as HTMLElement;
+          if (t.closest('[data-radix-popper-content-wrapper]') || t.closest('[role="listbox"]') || t.closest('[role="option"]')) {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ClipboardList className="h-5 w-5 text-primary" />
