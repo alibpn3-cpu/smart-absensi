@@ -279,17 +279,22 @@ const RankingCard = () => {
         // Sort by total_score DESC
         allUsers.sort((a, b) => b.total_score - a.total_score);
 
-        // Fetch photos for users that meet minimum threshold (>= 30 stars)
+        // Fetch photos + work_area for ALL users that meet minimum threshold (>= bronze)
         const qualifiedUsers = allUsers.filter(u => u.total_score >= TIER_THRESHOLDS.bronze);
-        const topUids = qualifiedUsers.slice(0, 40).map(u => u.staff_uid);
-        
-        if (topUids.length > 0) {
-          const { data: users } = await supabase
-            .from('staff_users')
-            .select('uid, photo_url, work_area')
-            .in('uid', topUids);
+        const topUids = qualifiedUsers.map(u => u.staff_uid);
 
-          const infoMap = new Map(users?.map(u => [u.uid, u]) || []);
+        if (topUids.length > 0) {
+          // Chunk IN() query to avoid URL length limits
+          const infoMap = new Map<string, { photo_url?: string | null; work_area?: string | null }>();
+          const CHUNK = 200;
+          for (let i = 0; i < topUids.length; i += CHUNK) {
+            const chunk = topUids.slice(i, i + CHUNK);
+            const { data: users } = await supabase
+              .from('staff_users')
+              .select('uid, photo_url, work_area')
+              .in('uid', chunk);
+            users?.forEach(u => infoMap.set(u.uid, u));
+          }
           allUsers.forEach(u => {
             const info = infoMap.get(u.staff_uid);
             u.photo_url = info?.photo_url || undefined;
