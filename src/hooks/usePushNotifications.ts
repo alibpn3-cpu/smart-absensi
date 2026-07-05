@@ -55,6 +55,26 @@ export function usePushNotifications(staffUid?: string | null) {
     checkSubscription();
   }, [checkSubscription]);
 
+  // Auto-recover: if permission is granted but no active subscription (browser dropped it,
+  // service worker updated, or subscription expired), silently re-subscribe so notifications
+  // keep working without the user having to re-toggle.
+  useEffect(() => {
+    if (!supported || !staffUid) return;
+    if (permission !== "granted") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration(SW_URL);
+        const existing = await reg?.pushManager.getSubscription();
+        if (cancelled || existing) return;
+        // Silently resubscribe
+        await subscribe();
+      } catch (_) { /* noop */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supported, staffUid, permission]);
+
   const subscribe = useCallback(async () => {
     if (!supported || !staffUid) return false;
     setLoading(true);
