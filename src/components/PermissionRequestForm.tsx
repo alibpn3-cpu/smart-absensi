@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { CalendarIcon, Loader2, ClipboardList } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -235,14 +235,24 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
 
             <div className="space-y-2">
               <Label>Jenis Ijin</Label>
-              <Select value={permissionType} onValueChange={(v) => setPermissionType(v as any)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="izin">Ijin</SelectItem>
-                  <SelectItem value="sakit">Sakit</SelectItem>
-                  <SelectItem value="tidak_bekerja">Tidak Bekerja</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: 'izin', label: 'Ijin' },
+                  { value: 'sakit', label: 'Sakit' },
+                  { value: 'tidak_bekerja', label: 'Tidak Bekerja' },
+                ] as const).map((opt) => (
+                  <Button
+                    key={opt.value}
+                    type="button"
+                    size="sm"
+                    variant={permissionType === opt.value ? 'default' : 'outline'}
+                    className="w-full text-xs"
+                    onClick={() => setPermissionType(opt.value)}
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
+              </div>
               {permissionType !== 'izin' && (
                 <p className="text-[11px] text-muted-foreground">
                   {permissionType === 'sakit' ? 'Sakit' : 'Tidak Bekerja'} — hanya perlu approval Atasan (tanpa HC&amp;GA), tidak memotong sisa cuti.
