@@ -190,9 +190,21 @@ const PermissionRequestForm: React.FC<PermissionRequestFormProps> = ({ isOpen, o
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         className="max-w-md max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => {
+          const t = e.target as HTMLElement;
+          if (t.closest('[data-radix-popper-content-wrapper]') || t.closest('[data-radix-select-content]') || t.closest('[role="listbox"]') || t.closest('[role="option"]')) {
+            e.preventDefault();
+          }
+        }}
+        onFocusOutside={(e) => {
+          const t = e.target as HTMLElement;
+          if (t.closest('[data-radix-popper-content-wrapper]') || t.closest('[data-radix-select-content]') || t.closest('[role="listbox"]') || t.closest('[role="option"]')) {
+            e.preventDefault();
+          }
+        }}
         onInteractOutside={(e) => {
           const t = e.target as HTMLElement;
-          if (t.closest('[data-radix-popper-content-wrapper]') || t.closest('[role="listbox"]') || t.closest('[role="option"]')) {
+          if (t.closest('[data-radix-popper-content-wrapper]') || t.closest('[data-radix-select-content]') || t.closest('[role="listbox"]') || t.closest('[role="option"]')) {
             e.preventDefault();
           }
         }}
