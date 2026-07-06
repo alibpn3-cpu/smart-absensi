@@ -1,0 +1,1 @@
+UPDATE public.app_settings SET setting_value = 'true', updated_at = now() WHERE setting_key = 'permission_request_enabled';
