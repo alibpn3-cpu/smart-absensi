@@ -6,6 +6,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { getOrCreateDeviceId } from './deviceId';
+import { getLastGpsSnapshot, getTimeSyncVerifiedAt } from './antiJokiCache';
 
 export interface GpsSnapshot {
   accuracy: number | null;
