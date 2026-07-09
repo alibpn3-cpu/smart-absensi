@@ -667,12 +667,20 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
       ];
 
       // Pre-scan: detect device_ids shared across multiple staff_uids in the dataset
+      // (checks legacy + per-action columns so historic rows still light up)
       const deviceUsersMap = new Map<string, Set<string>>();
       attendanceData.forEach((rec: any) => {
-        if (!rec.device_id) return;
-        if (!deviceUsersMap.has(rec.device_id)) deviceUsersMap.set(rec.device_id, new Set());
-        deviceUsersMap.get(rec.device_id)!.add(rec.staff_uid);
+        [rec.device_id, rec.device_id_in, rec.device_id_out]
+          .filter(Boolean)
+          .forEach((d: string) => {
+            if (!deviceUsersMap.has(d)) deviceUsersMap.set(d, new Set());
+            deviceUsersMap.get(d)!.add(rec.staff_uid);
+          });
       });
+
+      // UID -> employee name resolver (used for flag readability)
+      const uidToName = new Map<string, string>();
+      allEmployees.forEach((e: any) => uidToName.set(e.uid, e.name || e.uid));
 
       // Add data rows
       attendanceData.forEach((record: any, index: number) => {
