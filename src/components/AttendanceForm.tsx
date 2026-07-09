@@ -36,7 +36,7 @@ import { getEnhancedLocation, getAccuracyLevel, clearLocationCache } from '@/uti
 import { isPointInPolygon, PolygonCoordinate } from '@/utils/polygonValidator';
 import { validateGPSPosition, clearPositionHistory } from '@/utils/gpsValidator';
 import { calculateAdaptiveTolerance, GEOFENCE_CONSTANTS } from '@/utils/geofenceConstants';
-import { getAttendanceContext, showClockWarning } from '@/utils/attendanceContext';
+import { getAttendanceContext, showClockWarning, contextToColumns } from '@/utils/attendanceContext';
 import { useClockSkewGuard } from '@/hooks/useClockSkewGuard';
 import ClockInvalidDialog from './ClockInvalidDialog';
 import { computeWorkDate, yesterdayDateString, isNightShift, toLocalDateString } from '@/utils/shiftHelper';
@@ -1207,13 +1207,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             checkin_location_address: locationAddress,
             checkin_location_lat: locationLat,
             checkin_location_lng: locationLng,
-            client_ip: ctx.client_ip,
             user_agent: ctx.user_agent,
-            device_id: ctx.device_id,
-            device_label: ctx.device_label,
-            device_flag: ctx.device_flag,
             client_timestamp: ctx.client_timestamp,
-            clock_skew_seconds: ctx.clock_skew_seconds,
+            ...contextToColumns(ctx, 'check_in'),
           });
         
         if (error) throw error;
@@ -1236,13 +1232,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             checkout_location_lat: locationLat,
             checkout_location_lng: locationLng,
             hours_worked: hoursWorked,
-            client_ip: ctx.client_ip,
             user_agent: ctx.user_agent,
-            device_id: ctx.device_id,
-            device_label: ctx.device_label,
-            device_flag: ctx.device_flag,
             client_timestamp: ctx.client_timestamp,
-            clock_skew_seconds: ctx.clock_skew_seconds,
+            ...contextToColumns(ctx, 'check_in'),
           })
           .eq('id', existingAttendance.id);
         
@@ -1441,13 +1433,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             selfie_checkout_url: photoPath,
             checkout_reason: dinasFastCheckoutReason,
             hours_worked: hoursWorked,
-            client_ip: ctxFc.client_ip,
             user_agent: ctxFc.user_agent,
-            device_id: ctxFc.device_id,
-            device_label: ctxFc.device_label,
-            device_flag: ctxFc.device_flag,
             client_timestamp: ctxFc.client_timestamp,
-            clock_skew_seconds: ctxFc.clock_skew_seconds,
+            ...contextToColumns(ctxFc, 'check_out'),
           });
 
         
@@ -1577,13 +1565,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           checkout_location_lat: usedLocation.lat,
           checkout_location_lng: usedLocation.lng,
           checkout_location_address: locationAddress,
-          client_ip: ctxOut.client_ip,
           user_agent: ctxOut.user_agent,
-          device_id: ctxOut.device_id,
-          device_label: ctxOut.device_label,
-          device_flag: ctxOut.device_flag,
           client_timestamp: ctxOut.client_timestamp,
-          clock_skew_seconds: ctxOut.clock_skew_seconds,
+          ...contextToColumns(ctxOut, 'check_out'),
         };
         
         // Only update photo for WFH/Dinas and save to checkout column
@@ -1618,13 +1602,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         showClockWarning(ctxIn, toast);
         const insertData = {
           ...attendanceData,
-          client_ip: ctxIn.client_ip,
           user_agent: ctxIn.user_agent,
-          device_id: ctxIn.device_id,
-          device_label: ctxIn.device_label,
-          device_flag: ctxIn.device_flag,
           client_timestamp: ctxIn.client_timestamp,
-          clock_skew_seconds: ctxIn.clock_skew_seconds,
+          ...contextToColumns(ctxIn, 'check_in'),
         };
         const { error, data } = await supabase
           .from('attendance_records')
@@ -1803,13 +1783,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             checkin_location_address: location.address,
             checkin_location_lat: location.lat,
             checkin_location_lng: location.lng,
-            client_ip: ctxOi.client_ip,
             user_agent: ctxOi.user_agent,
-            device_id: ctxOi.device_id,
-            device_label: ctxOi.device_label,
-            device_flag: ctxOi.device_flag,
             client_timestamp: ctxOi.client_timestamp,
-            clock_skew_seconds: ctxOi.clock_skew_seconds,
+            ...contextToColumns(ctxOi, 'check_in'),
           });
         
         if (error) throw error;
@@ -1831,13 +1807,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             checkout_location_lat: location.lat,
             checkout_location_lng: location.lng,
             hours_worked: hoursWorked,
-            client_ip: ctxOo.client_ip,
             user_agent: ctxOo.user_agent,
-            device_id: ctxOo.device_id,
-            device_label: ctxOo.device_label,
-            device_flag: ctxOo.device_flag,
             client_timestamp: ctxOo.client_timestamp,
-            clock_skew_seconds: ctxOo.clock_skew_seconds,
+            ...contextToColumns(ctxOo, 'check_out'),
           })
           .eq('id', overtimeAttendance!.id);
         
@@ -1938,13 +1910,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           checkout_location_lng: location.lng,
           reason: wfoFastCheckoutReason,
           hours_worked: hoursWorked,
-          client_ip: ctxWf.client_ip,
           user_agent: ctxWf.user_agent,
-          device_id: ctxWf.device_id,
-          device_label: ctxWf.device_label,
-          device_flag: ctxWf.device_flag,
           client_timestamp: ctxWf.client_timestamp,
-          clock_skew_seconds: ctxWf.clock_skew_seconds,
+          ...contextToColumns(ctxWf, 'check_out'),
         });
 
       
