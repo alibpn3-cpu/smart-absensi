@@ -1192,6 +1192,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
 
       if (action.action === 'check-in') {
+        await clockGuard.recheck().catch(() => {});
         const ctx = await getAttendanceContext(staff.uid, 'check_in');
         showClockWarning(ctx, toast);
         const { error } = await supabase
@@ -1222,6 +1223,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         const hoursWorked = existingAttendance?.check_in_time 
           ? calculateHoursWorked(existingAttendance.check_in_time, formattedTime)
           : undefined;
+        await clockGuard.recheck().catch(() => {});
         const ctx = await getAttendanceContext(staff.uid, 'check_out');
         showClockWarning(ctx, toast);
         const { error } = await supabase
@@ -1412,6 +1414,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         const checkOutFormatted = formatTimestamp(now);
         const hoursWorked = calculateHoursWorked(checkInFormatted, checkOutFormatted);
         
+        await clockGuard.recheck().catch(() => {});
+        
         const ctxFc = await getAttendanceContext(selectedStaff!.uid, 'check_out');
         showClockWarning(ctxFc, toast);
         const { error } = await supabase
@@ -1558,6 +1562,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       if (todayAttendance && isCheckOut) {
         // Update existing record for check-out
         console.log('📝 Updating check-out for record:', todayAttendance.id);
+        await clockGuard.recheck().catch(() => {});
         const ctxOut = await getAttendanceContext(selectedStaff.uid, 'check_out');
         showClockWarning(ctxOut, toast);
         const updateData: any = {
@@ -1598,6 +1603,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       } else if (!todayAttendance) {
         // Create new record for check-in
         console.log('📝 Creating new check-in record');
+        await clockGuard.recheck().catch(() => {});
         const ctxIn = await getAttendanceContext(selectedStaff.uid, 'check_in');
         showClockWarning(ctxIn, toast);
         const insertData = {
@@ -1769,6 +1775,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       
       if (!isCheckOut) {
         // Overtime Check-In
+        await clockGuard.recheck().catch(() => {});
         const ctxOi = await getAttendanceContext(selectedStaff!.uid, 'check_in');
         showClockWarning(ctxOi, toast);
         const { error } = await supabase
@@ -1797,6 +1804,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           overtimeAttendance!.check_in_time!,
           formattedTime
         );
+        await clockGuard.recheck().catch(() => {});
         const ctxOo = await getAttendanceContext(selectedStaff!.uid, 'check_out');
         showClockWarning(ctxOo, toast);
         const { error } = await supabase
@@ -1889,6 +1897,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const checkInFormatted = formatTimestamp(manualCheckIn);
       const checkOutFormatted = formatTimestamp(now);
       const hoursWorked = calculateHoursWorked(checkInFormatted, checkOutFormatted);
+      
+      await clockGuard.recheck().catch(() => {});
       
       const ctxWf = await getAttendanceContext(selectedStaff!.uid, 'check_out');
       showClockWarning(ctxWf, toast);
