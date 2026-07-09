@@ -2330,6 +2330,10 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       />
       <div className="max-w-md mx-auto space-y-2 animate-fade-in">
 
+        <OfflineQueueBadge />
+        
+
+
         
         
         {/* ScoreCard moved to UserSidebar */}
