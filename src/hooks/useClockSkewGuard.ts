@@ -77,6 +77,8 @@ export function useClockSkewGuard(): ClockSkewGuard {
         const skewMs = Math.abs(serverMs - deviceMidMs);
         const skewSec = Math.round(skewMs / 1000);
         const invalid = skewSec > THRESHOLD_SECONDS;
+        if (!invalid) setTimeSyncVerifiedNow();
+
 
         setState({
           isClockInvalid: invalid,
