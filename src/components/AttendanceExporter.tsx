@@ -653,11 +653,16 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         { header: 'Alasan Clock Out', key: 'alasanOut', width: 25 },
         { header: 'Alasan Extend In', key: 'alasanExtendIn', width: 25 },
         { header: 'Alasan Extend Out', key: 'alasanExtendOut', width: 25 },
-        { header: 'IP Address', key: 'ipAddress', width: 14 },
-        { header: 'Device', key: 'device', width: 30 },
-        { header: 'Device ID', key: 'deviceId', width: 22 },
-        { header: 'Skew Jam (detik)', key: 'skew', width: 16 },
-        { header: 'Flag Audit', key: 'flag', width: 30 }
+        { header: 'IP Clock-In', key: 'ipIn', width: 14 },
+        { header: 'IP Clock-Out', key: 'ipOut', width: 14 },
+        { header: 'Device Clock-In', key: 'deviceIn', width: 30 },
+        { header: 'Device Clock-Out', key: 'deviceOut', width: 30 },
+        { header: 'Device ID Clock-In', key: 'deviceIdIn', width: 22 },
+        { header: 'Device ID Clock-Out', key: 'deviceIdOut', width: 22 },
+        { header: 'Skew Jam In (detik)', key: 'skewIn', width: 14 },
+        { header: 'Skew Jam Out (detik)', key: 'skewOut', width: 14 },
+        { header: 'Flag Clock-In', key: 'flagIn', width: 30 },
+        { header: 'Flag Clock-Out', key: 'flagOut', width: 30 }
 
       ];
 
