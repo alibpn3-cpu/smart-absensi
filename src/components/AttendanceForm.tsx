@@ -29,6 +29,7 @@ import P2HToolboxCard from './P2HToolboxCard';
 import AttendanceStatusCard from './AttendanceStatusCard';
 import ManagerDivisionStatus from './ManagerDivisionStatus';
 import CompanyLogoCard from './CompanyLogoCard';
+import OfflineQueueBadge from './OfflineQueueBadge';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { saveScore } from '@/hooks/useScoreCalculation';
 import { format } from 'date-fns';
