@@ -29,6 +29,7 @@ import P2HToolboxCard from './P2HToolboxCard';
 import AttendanceStatusCard from './AttendanceStatusCard';
 import ManagerDivisionStatus from './ManagerDivisionStatus';
 import CompanyLogoCard from './CompanyLogoCard';
+import OfflineQueueBadge from './OfflineQueueBadge';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { saveScore } from '@/hooks/useScoreCalculation';
 import { format } from 'date-fns';
@@ -36,7 +37,7 @@ import { getEnhancedLocation, getAccuracyLevel, clearLocationCache } from '@/uti
 import { isPointInPolygon, PolygonCoordinate } from '@/utils/polygonValidator';
 import { validateGPSPosition, clearPositionHistory } from '@/utils/gpsValidator';
 import { calculateAdaptiveTolerance, GEOFENCE_CONSTANTS } from '@/utils/geofenceConstants';
-import { getAttendanceContext, showClockWarning } from '@/utils/attendanceContext';
+import { getAttendanceContext, showClockWarning, contextToColumns } from '@/utils/attendanceContext';
 import { useClockSkewGuard } from '@/hooks/useClockSkewGuard';
 import ClockInvalidDialog from './ClockInvalidDialog';
 import { computeWorkDate, yesterdayDateString, isNightShift, toLocalDateString } from '@/utils/shiftHelper';
@@ -1192,6 +1193,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const formattedTime = `${y}-${M}-${d} ${h}:${m}:${s}.${ms}${sign}${offH}:${offM}`;
 
       if (action.action === 'check-in') {
+        await clockGuard.recheck().catch(() => {});
         const ctx = await getAttendanceContext(staff.uid, 'check_in');
         showClockWarning(ctx, toast);
         const { error } = await supabase
@@ -1207,13 +1209,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             checkin_location_address: locationAddress,
             checkin_location_lat: locationLat,
             checkin_location_lng: locationLng,
-            client_ip: ctx.client_ip,
             user_agent: ctx.user_agent,
-            device_id: ctx.device_id,
-            device_label: ctx.device_label,
-            device_flag: ctx.device_flag,
             client_timestamp: ctx.client_timestamp,
-            clock_skew_seconds: ctx.clock_skew_seconds,
+            ...contextToColumns(ctx, 'check_in'),
           });
         
         if (error) throw error;
@@ -1226,6 +1224,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         const hoursWorked = existingAttendance?.check_in_time 
           ? calculateHoursWorked(existingAttendance.check_in_time, formattedTime)
           : undefined;
+        await clockGuard.recheck().catch(() => {});
         const ctx = await getAttendanceContext(staff.uid, 'check_out');
         showClockWarning(ctx, toast);
         const { error } = await supabase
@@ -1236,13 +1235,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             checkout_location_lat: locationLat,
             checkout_location_lng: locationLng,
             hours_worked: hoursWorked,
-            client_ip: ctx.client_ip,
             user_agent: ctx.user_agent,
-            device_id: ctx.device_id,
-            device_label: ctx.device_label,
-            device_flag: ctx.device_flag,
             client_timestamp: ctx.client_timestamp,
-            clock_skew_seconds: ctx.clock_skew_seconds,
+            ...contextToColumns(ctx, 'check_out'),
           })
           .eq('id', existingAttendance.id);
         
@@ -1420,6 +1415,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         const checkOutFormatted = formatTimestamp(now);
         const hoursWorked = calculateHoursWorked(checkInFormatted, checkOutFormatted);
         
+        await clockGuard.recheck().catch(() => {});
+        
         const ctxFc = await getAttendanceContext(selectedStaff!.uid, 'check_out');
         showClockWarning(ctxFc, toast);
         const { error } = await supabase
@@ -1441,13 +1438,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             selfie_checkout_url: photoPath,
             checkout_reason: dinasFastCheckoutReason,
             hours_worked: hoursWorked,
-            client_ip: ctxFc.client_ip,
             user_agent: ctxFc.user_agent,
-            device_id: ctxFc.device_id,
-            device_label: ctxFc.device_label,
-            device_flag: ctxFc.device_flag,
             client_timestamp: ctxFc.client_timestamp,
-            clock_skew_seconds: ctxFc.clock_skew_seconds,
+            ...contextToColumns(ctxFc, 'check_out'),
           });
 
         
@@ -1570,6 +1563,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       if (todayAttendance && isCheckOut) {
         // Update existing record for check-out
         console.log('📝 Updating check-out for record:', todayAttendance.id);
+        await clockGuard.recheck().catch(() => {});
         const ctxOut = await getAttendanceContext(selectedStaff.uid, 'check_out');
         showClockWarning(ctxOut, toast);
         const updateData: any = {
@@ -1577,13 +1571,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           checkout_location_lat: usedLocation.lat,
           checkout_location_lng: usedLocation.lng,
           checkout_location_address: locationAddress,
-          client_ip: ctxOut.client_ip,
           user_agent: ctxOut.user_agent,
-          device_id: ctxOut.device_id,
-          device_label: ctxOut.device_label,
-          device_flag: ctxOut.device_flag,
           client_timestamp: ctxOut.client_timestamp,
-          clock_skew_seconds: ctxOut.clock_skew_seconds,
+          ...contextToColumns(ctxOut, 'check_out'),
         };
         
         // Only update photo for WFH/Dinas and save to checkout column
@@ -1614,17 +1604,14 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       } else if (!todayAttendance) {
         // Create new record for check-in
         console.log('📝 Creating new check-in record');
+        await clockGuard.recheck().catch(() => {});
         const ctxIn = await getAttendanceContext(selectedStaff.uid, 'check_in');
         showClockWarning(ctxIn, toast);
         const insertData = {
           ...attendanceData,
-          client_ip: ctxIn.client_ip,
           user_agent: ctxIn.user_agent,
-          device_id: ctxIn.device_id,
-          device_label: ctxIn.device_label,
-          device_flag: ctxIn.device_flag,
           client_timestamp: ctxIn.client_timestamp,
-          clock_skew_seconds: ctxIn.clock_skew_seconds,
+          ...contextToColumns(ctxIn, 'check_in'),
         };
         const { error, data } = await supabase
           .from('attendance_records')
@@ -1789,6 +1776,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       
       if (!isCheckOut) {
         // Overtime Check-In
+        await clockGuard.recheck().catch(() => {});
         const ctxOi = await getAttendanceContext(selectedStaff!.uid, 'check_in');
         showClockWarning(ctxOi, toast);
         const { error } = await supabase
@@ -1803,13 +1791,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             checkin_location_address: location.address,
             checkin_location_lat: location.lat,
             checkin_location_lng: location.lng,
-            client_ip: ctxOi.client_ip,
             user_agent: ctxOi.user_agent,
-            device_id: ctxOi.device_id,
-            device_label: ctxOi.device_label,
-            device_flag: ctxOi.device_flag,
             client_timestamp: ctxOi.client_timestamp,
-            clock_skew_seconds: ctxOi.clock_skew_seconds,
+            ...contextToColumns(ctxOi, 'check_in'),
           });
         
         if (error) throw error;
@@ -1821,6 +1805,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           overtimeAttendance!.check_in_time!,
           formattedTime
         );
+        await clockGuard.recheck().catch(() => {});
         const ctxOo = await getAttendanceContext(selectedStaff!.uid, 'check_out');
         showClockWarning(ctxOo, toast);
         const { error } = await supabase
@@ -1831,13 +1816,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             checkout_location_lat: location.lat,
             checkout_location_lng: location.lng,
             hours_worked: hoursWorked,
-            client_ip: ctxOo.client_ip,
             user_agent: ctxOo.user_agent,
-            device_id: ctxOo.device_id,
-            device_label: ctxOo.device_label,
-            device_flag: ctxOo.device_flag,
             client_timestamp: ctxOo.client_timestamp,
-            clock_skew_seconds: ctxOo.clock_skew_seconds,
+            ...contextToColumns(ctxOo, 'check_out'),
           })
           .eq('id', overtimeAttendance!.id);
         
@@ -1918,6 +1899,8 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
       const checkOutFormatted = formatTimestamp(now);
       const hoursWorked = calculateHoursWorked(checkInFormatted, checkOutFormatted);
       
+      await clockGuard.recheck().catch(() => {});
+      
       const ctxWf = await getAttendanceContext(selectedStaff!.uid, 'check_out');
       showClockWarning(ctxWf, toast);
       const { error } = await supabase
@@ -1938,13 +1921,9 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
           checkout_location_lng: location.lng,
           reason: wfoFastCheckoutReason,
           hours_worked: hoursWorked,
-          client_ip: ctxWf.client_ip,
           user_agent: ctxWf.user_agent,
-          device_id: ctxWf.device_id,
-          device_label: ctxWf.device_label,
-          device_flag: ctxWf.device_flag,
           client_timestamp: ctxWf.client_timestamp,
-          clock_skew_seconds: ctxWf.clock_skew_seconds,
+          ...contextToColumns(ctxWf, 'check_out'),
         });
 
       
@@ -2351,6 +2330,10 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         onDismiss={() => setShowClockInvalidDialog(false)}
       />
       <div className="max-w-md mx-auto space-y-2 animate-fade-in">
+
+        <OfflineQueueBadge />
+        
+
 
         
         

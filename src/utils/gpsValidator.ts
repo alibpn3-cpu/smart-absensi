@@ -1,4 +1,5 @@
 // GPS Validator - Anti Fake GPS Algorithm
+import { setLastGpsSnapshot } from './antiJokiCache';
 
 export interface GPSValidationResult {
   isValid: boolean;
@@ -151,7 +152,17 @@ export const validateGPSPosition = async (
 
   // Determine if mocked based on confidence score
   const isMocked = confidenceScore < 50;
-  
+
+  // Cache raw GPS snapshot so attendanceContext can attach it automatically.
+  setLastGpsSnapshot({
+    accuracy: position.coords.accuracy ?? null,
+    altitude: position.coords.altitude ?? null,
+    speed: position.coords.speed ?? null,
+    confidence_score: confidenceScore,
+    is_mocked: isMocked,
+    reason: checks.length > 0 ? checks.join(', ') : null,
+  });
+
   return {
     isValid: !isMocked,
     isMocked,

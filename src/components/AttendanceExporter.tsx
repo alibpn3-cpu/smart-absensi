@@ -653,21 +653,34 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         { header: 'Alasan Clock Out', key: 'alasanOut', width: 25 },
         { header: 'Alasan Extend In', key: 'alasanExtendIn', width: 25 },
         { header: 'Alasan Extend Out', key: 'alasanExtendOut', width: 25 },
-        { header: 'IP Address', key: 'ipAddress', width: 14 },
-        { header: 'Device', key: 'device', width: 30 },
-        { header: 'Device ID', key: 'deviceId', width: 22 },
-        { header: 'Skew Jam (detik)', key: 'skew', width: 16 },
-        { header: 'Flag Audit', key: 'flag', width: 30 }
+        { header: 'IP Clock-In', key: 'ipIn', width: 14 },
+        { header: 'IP Clock-Out', key: 'ipOut', width: 14 },
+        { header: 'Device Clock-In', key: 'deviceIn', width: 30 },
+        { header: 'Device Clock-Out', key: 'deviceOut', width: 30 },
+        { header: 'Device ID Clock-In', key: 'deviceIdIn', width: 22 },
+        { header: 'Device ID Clock-Out', key: 'deviceIdOut', width: 22 },
+        { header: 'Skew Jam In (detik)', key: 'skewIn', width: 14 },
+        { header: 'Skew Jam Out (detik)', key: 'skewOut', width: 14 },
+        { header: 'Flag Clock-In', key: 'flagIn', width: 30 },
+        { header: 'Flag Clock-Out', key: 'flagOut', width: 30 }
 
       ];
 
       // Pre-scan: detect device_ids shared across multiple staff_uids in the dataset
+      // (checks legacy + per-action columns so historic rows still light up)
       const deviceUsersMap = new Map<string, Set<string>>();
       attendanceData.forEach((rec: any) => {
-        if (!rec.device_id) return;
-        if (!deviceUsersMap.has(rec.device_id)) deviceUsersMap.set(rec.device_id, new Set());
-        deviceUsersMap.get(rec.device_id)!.add(rec.staff_uid);
+        [rec.device_id, rec.device_id_in, rec.device_id_out]
+          .filter(Boolean)
+          .forEach((d: string) => {
+            if (!deviceUsersMap.has(d)) deviceUsersMap.set(d, new Set());
+            deviceUsersMap.get(d)!.add(rec.staff_uid);
+          });
       });
+
+      // UID -> employee name resolver (used for flag readability)
+      const uidToName = new Map<string, string>();
+      allEmployees.forEach((e: any) => uidToName.set(e.uid, e.name || e.uid));
 
       // Add data rows
       attendanceData.forEach((record: any, index: number) => {
@@ -691,26 +704,53 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         const offDuty = getOffDuty(emp?.work_area, emp?.employee_type);
 
         // Joki suspect: same device_id used by >1 staff_uid in dataset
-        const sharedUsers = record.device_id ? deviceUsersMap.get(record.device_id) : null;
-        const isJokiSuspect = !!(sharedUsers && sharedUsers.size > 1);
-        const otherUsers = isJokiSuspect
-          ? Array.from(sharedUsers!).filter((u) => u !== record.staff_uid)
-          : [];
+        // Check per-action device_ids first, fall back to legacy.
+        const deviceIdIn = record.device_id_in || record.device_id || null;
+        const deviceIdOut = record.device_id_out || record.device_id || null;
+        const sharedInSet = deviceIdIn ? deviceUsersMap.get(deviceIdIn) : null;
+        const sharedOutSet = deviceIdOut ? deviceUsersMap.get(deviceIdOut) : null;
+        const otherIn = sharedInSet ? Array.from(sharedInSet).filter((u) => u !== record.staff_uid) : [];
+        const otherOut = sharedOutSet ? Array.from(sharedOutSet).filter((u) => u !== record.staff_uid) : [];
+        const isJokiSuspect = otherIn.length > 0 || otherOut.length > 0;
 
         const FLAG_MAP: Record<string, string> = {
           new_device: 'Perangkat Baru',
           device_shared_with_other_user: 'Perangkat Dipakai User Lain',
           user_on_other_device: 'User Pindah Perangkat',
           clock_manipulated: 'Jam Manipulasi',
+          clock_manipulated_hard: 'Jam Manipulasi (Offline Trick)',
+          suspected_mock_gps: 'Suspek Fake GPS',
+          ip_gps_mismatch: 'IP di Luar Indonesia',
+          offline_queued: 'Absensi Offline (Perlu Review)',
+        };
+        // A flag token may carry ":extra" — e.g. device_shared_with_other_user:BUDI or ip_gps_mismatch:MY.
+        // If the extra is a UID we can find in allEmployees, replace with the name.
+        const labelToken = (tok: string): string => {
+          const [base, ...rest] = tok.split(':');
+          const label = FLAG_MAP[base] || base;
+          if (rest.length === 0) return label;
+          const extra = rest.join(':');
+          const resolved = uidToName.get(extra) || extra;
+          return `${label} (${resolved})`;
         };
         const labelFlag = (f: string | null | undefined) =>
-          !f ? '-' : f.split(',').map((x) => FLAG_MAP[x.trim()] || x.trim()).join(' + ');
+          !f ? '-' : f.split(',').map((x) => labelToken(x.trim())).join(' + ');
 
-        const flagText = isJokiSuspect
-          ? `⚠ JOKI SUSPECT: device juga dipakai oleh ${otherUsers.join(', ')}${record.device_flag ? ' • ' + labelFlag(record.device_flag) : ''}`
-          : labelFlag(record.device_flag);
+        const flagInBase = record.device_flag_in || record.device_flag || null;
+        const flagOutBase = record.device_flag_out || null;
+        const jokiInPrefix = otherIn.length > 0
+          ? `⚠ JOKI SUSPECT: device dipakai oleh ${otherIn.map((u) => uidToName.get(u) || u).join(', ')}`
+          : null;
+        const jokiOutPrefix = otherOut.length > 0
+          ? `⚠ JOKI SUSPECT: device dipakai oleh ${otherOut.map((u) => uidToName.get(u) || u).join(', ')}`
+          : null;
+        const flagInText = jokiInPrefix
+          ? `${jokiInPrefix}${flagInBase ? ' • ' + labelFlag(flagInBase) : ''}`
+          : labelFlag(flagInBase);
+        const flagOutText = jokiOutPrefix
+          ? `${jokiOutPrefix}${flagOutBase ? ' • ' + labelFlag(flagOutBase) : ''}`
+          : labelFlag(flagOutBase);
 
-        
         const row = worksheet.addRow({
           no: index + 1,
           uid: record.staff_uid,
@@ -750,11 +790,16 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
           alasanOut: record.checkout_reason || '-',
           alasanExtendIn: record.extend_reason || '-',
           alasanExtendOut: record.extend_reason || '-',
-          ipAddress: record.client_ip || '-',
-          device: record.device_label || '-',
-          deviceId: record.device_id || '-',
-          skew: record.clock_skew_seconds == null ? '-' : record.clock_skew_seconds,
-          flag: flagText
+          ipIn: record.client_ip_in || record.client_ip || '-',
+          ipOut: record.client_ip_out || '-',
+          deviceIn: record.device_label_in || record.device_label || '-',
+          deviceOut: record.device_label_out || '-',
+          deviceIdIn: deviceIdIn || '-',
+          deviceIdOut: record.device_id_out || '-',
+          skewIn: record.clock_skew_seconds_in ?? record.clock_skew_seconds ?? '-',
+          skewOut: record.clock_skew_seconds_out ?? '-',
+          flagIn: flagInText,
+          flagOut: flagOutText
         });
 
 
@@ -763,7 +808,7 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
           row.eachCell((cell) => {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCDD2' } };
           });
-        } else if (record.device_flag) {
+        } else if (record.device_flag || record.device_flag_in || record.device_flag_out) {
           row.eachCell((cell) => {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3CD' } };
           });
