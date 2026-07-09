@@ -182,16 +182,36 @@ export type Database = {
           checkout_reason: string | null
           checkout_status: string | null
           client_ip: string | null
+          client_ip_in: string | null
+          client_ip_out: string | null
           client_timestamp: string | null
           clock_skew_seconds: number | null
+          clock_skew_seconds_in: number | null
+          clock_skew_seconds_out: number | null
           created_at: string
           date: string
           device_flag: string | null
+          device_flag_in: string | null
+          device_flag_out: string | null
           device_id: string | null
+          device_id_in: string | null
+          device_id_out: string | null
           device_label: string | null
+          device_label_in: string | null
+          device_label_out: string | null
           extend_reason: string | null
+          gps_accuracy_in: number | null
+          gps_accuracy_out: number | null
+          gps_altitude_in: number | null
+          gps_altitude_out: number | null
+          gps_confidence_in: number | null
+          gps_confidence_out: number | null
+          gps_speed_in: number | null
+          gps_speed_out: number | null
           hours_worked: number | null
           id: string
+          offline_queued: boolean
+          offline_queued_at: string | null
           reason: string | null
           selfie_checkin_url: string | null
           selfie_checkout_url: string | null
@@ -200,6 +220,8 @@ export type Database = {
           staff_name: string
           staff_uid: string
           status: string
+          time_sync_verified_at_in: string | null
+          time_sync_verified_at_out: string | null
           updated_at: string
           user_agent: string | null
         }
@@ -217,16 +239,36 @@ export type Database = {
           checkout_reason?: string | null
           checkout_status?: string | null
           client_ip?: string | null
+          client_ip_in?: string | null
+          client_ip_out?: string | null
           client_timestamp?: string | null
           clock_skew_seconds?: number | null
+          clock_skew_seconds_in?: number | null
+          clock_skew_seconds_out?: number | null
           created_at?: string
           date?: string
           device_flag?: string | null
+          device_flag_in?: string | null
+          device_flag_out?: string | null
           device_id?: string | null
+          device_id_in?: string | null
+          device_id_out?: string | null
           device_label?: string | null
+          device_label_in?: string | null
+          device_label_out?: string | null
           extend_reason?: string | null
+          gps_accuracy_in?: number | null
+          gps_accuracy_out?: number | null
+          gps_altitude_in?: number | null
+          gps_altitude_out?: number | null
+          gps_confidence_in?: number | null
+          gps_confidence_out?: number | null
+          gps_speed_in?: number | null
+          gps_speed_out?: number | null
           hours_worked?: number | null
           id?: string
+          offline_queued?: boolean
+          offline_queued_at?: string | null
           reason?: string | null
           selfie_checkin_url?: string | null
           selfie_checkout_url?: string | null
@@ -235,6 +277,8 @@ export type Database = {
           staff_name: string
           staff_uid: string
           status: string
+          time_sync_verified_at_in?: string | null
+          time_sync_verified_at_out?: string | null
           updated_at?: string
           user_agent?: string | null
         }
@@ -252,16 +296,36 @@ export type Database = {
           checkout_reason?: string | null
           checkout_status?: string | null
           client_ip?: string | null
+          client_ip_in?: string | null
+          client_ip_out?: string | null
           client_timestamp?: string | null
           clock_skew_seconds?: number | null
+          clock_skew_seconds_in?: number | null
+          clock_skew_seconds_out?: number | null
           created_at?: string
           date?: string
           device_flag?: string | null
+          device_flag_in?: string | null
+          device_flag_out?: string | null
           device_id?: string | null
+          device_id_in?: string | null
+          device_id_out?: string | null
           device_label?: string | null
+          device_label_in?: string | null
+          device_label_out?: string | null
           extend_reason?: string | null
+          gps_accuracy_in?: number | null
+          gps_accuracy_out?: number | null
+          gps_altitude_in?: number | null
+          gps_altitude_out?: number | null
+          gps_confidence_in?: number | null
+          gps_confidence_out?: number | null
+          gps_speed_in?: number | null
+          gps_speed_out?: number | null
           hours_worked?: number | null
           id?: string
+          offline_queued?: boolean
+          offline_queued_at?: string | null
           reason?: string | null
           selfie_checkin_url?: string | null
           selfie_checkout_url?: string | null
@@ -270,6 +334,8 @@ export type Database = {
           staff_name?: string
           staff_uid?: string
           status?: string
+          time_sync_verified_at_in?: string | null
+          time_sync_verified_at_out?: string | null
           updated_at?: string
           user_agent?: string | null
         }
