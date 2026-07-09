@@ -39,7 +39,7 @@ export default defineConfig(({ mode }) => ({
             },
           },
           {
-            urlPattern: ({ url }) => url.origin === self.location.origin && /\/assets\//.test(url.pathname),
+            urlPattern: ({ url }) => /\/assets\//.test(url.pathname),
             handler: "CacheFirst",
             options: {
               cacheName: "hashed-assets",
