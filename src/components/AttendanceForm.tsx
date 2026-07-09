@@ -1234,7 +1234,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
             hours_worked: hoursWorked,
             user_agent: ctx.user_agent,
             client_timestamp: ctx.client_timestamp,
-            ...contextToColumns(ctx, 'check_in'),
+            ...contextToColumns(ctx, 'check_out'),
           })
           .eq('id', existingAttendance.id);
         
