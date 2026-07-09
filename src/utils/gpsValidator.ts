@@ -1,4 +1,5 @@
 // GPS Validator - Anti Fake GPS Algorithm
+import { setLastGpsSnapshot } from './antiJokiCache';
 
 export interface GPSValidationResult {
   isValid: boolean;
