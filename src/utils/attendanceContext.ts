@@ -44,8 +44,11 @@ export async function getAttendanceContext(
   const device_id = getOrCreateDeviceId();
   const user_agent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
   const client_timestamp = new Date().toISOString();
-  const gps = extras.gps ?? null;
-  const time_sync_verified_at = extras.time_sync_verified_at ?? null;
+  const gps = extras.gps !== undefined ? extras.gps : getLastGpsSnapshot();
+  const time_sync_verified_at =
+    extras.time_sync_verified_at !== undefined
+      ? extras.time_sync_verified_at
+      : getTimeSyncVerifiedAt();
 
   try {
     const { data, error } = await supabase.functions.invoke('attendance-context', {
