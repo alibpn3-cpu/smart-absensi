@@ -22,16 +22,7 @@ export const toLocalDateString = (d: Date): string =>
  * - shift_night + hour >= 12 -> today (new shift starting evening)
  * - other shifts             -> today (calendar date)
  */
-export const computeWorkDate = (now: Date, shiftType?: string | null): string => {
-  const t = (shiftType || 'regular') as ShiftType;
-  if (t === 'shift_night' || t === 'shift') {
-    const h = now.getHours();
-    if (h < 12) {
-      const y = new Date(now);
-      y.setDate(y.getDate() - 1);
-      return toLocalDateString(y);
-    }
-  }
+export const computeWorkDate = (now: Date, _shiftType?: string | null): string => {
   return toLocalDateString(now);
 };
 
