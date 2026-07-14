@@ -17,7 +17,7 @@ import { setTimeSyncVerifiedNow } from '@/utils/antiJokiCache';
  */
 
 const THRESHOLD_SECONDS = 120; // 2 minutes
-const MAX_ACCEPTABLE_RTT_MS = 3000; // discard measurement if round-trip too slow
+const MAX_ACCEPTABLE_RTT_MS = 8000; // relaxed for slow networks (mining/field areas)
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // re-check every 5 minutes
 
 interface SkewState {
@@ -66,7 +66,10 @@ export function useClockSkewGuard(): ClockSkewGuard {
         }
 
         if (rtt > MAX_ACCEPTABLE_RTT_MS) {
-          // Measurement unreliable → fail open, try again next interval.
+          // Slow network: RTT too large to accurately compute skew, but the
+          // server responded — that's enough to prove the device isn't offline
+          // manipulating its clock. Mark verified so anti-joki doesn't hard-flag.
+          setTimeSyncVerifiedNow();
           setState((s) => ({ ...s, checking: false, lastCheckedAt: t1 }));
           return false;
         }

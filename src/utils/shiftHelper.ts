@@ -1,12 +1,17 @@
 /**
  * Shift-aware date helpers for night-shift users.
  *
- * Concept: the `date` column on attendance_records always stores the LOGICAL
- * work date (the date the shift started). For regular users this equals the
- * calendar date. For shift_night users who clock in at 20:00-23:59, the work
- * date is today. If they clock in at 00:00-11:59 (very early), we treat it as
- * a continuation of yesterday's shift (only if there is an open record from
- * yesterday). Otherwise, standard rules apply.
+ * Concept: `date` on attendance_records stores the LOGICAL work date (the
+ * calendar date at clock-in). Night-shift users clocking OUT the next morning
+ * do NOT create a new record — the checkout flow adopts the still-open
+ * record from yesterday (see fetchTodayAttendance) and writes check_out_time
+ * onto it, so the record keeps its original clock-in date.
+ *
+ * Rationale: previously we treated any clock-in before 12:00 as a
+ * continuation of yesterday's shift. That caused morning-shift users who
+ * picked "shift" to be logged under the previous day. Now clock-in always
+ * uses today's calendar date; cross-day continuation is handled purely by
+ * matching an open yesterday record at checkout time.
  */
 
 export type ShiftType = 'regular' | 'shift' | 'shift_morning' | 'shift_afternoon' | 'shift_night';
@@ -16,12 +21,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
 export const toLocalDateString = (d: Date): string =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-/**
- * Return the logical work date (YYYY-MM-DD) for a clock-in at `now`.
- * - shift_night + hour < 12  -> yesterday (continuation)
- * - shift_night + hour >= 12 -> today (new shift starting evening)
- * - other shifts             -> today (calendar date)
- */
+/** Logical work date for a clock-in at `now` = today's local calendar date. */
 export const computeWorkDate = (now: Date, _shiftType?: string | null): string => {
   return toLocalDateString(now);
 };

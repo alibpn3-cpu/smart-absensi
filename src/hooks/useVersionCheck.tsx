@@ -35,8 +35,13 @@ export const useVersionCheck = (currentAppVersion: string): VersionCheckResult =
       const dbVersion = versionSetting?.setting_value || '';
       const dbChangelog = changelogSetting?.setting_value || '';
 
-      // Get locally installed version
-      const installedVersion = localStorage.getItem(LOCAL_VERSION_KEY) || currentAppVersion;
+      // Write baseline on first ever run so a user on the current build
+      // isn't asked to "update" to the same version they already have.
+      let installedVersion = localStorage.getItem(LOCAL_VERSION_KEY);
+      if (!installedVersion) {
+        installedVersion = currentAppVersion;
+        try { localStorage.setItem(LOCAL_VERSION_KEY, currentAppVersion); } catch {}
+      }
 
       // Compare versions
       if (dbVersion && dbVersion !== installedVersion) {
