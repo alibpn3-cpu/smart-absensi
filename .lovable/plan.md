@@ -1,119 +1,65 @@
 
-# Plan: Anti-Joki Enhancements + Offline Queue
+## 1. False positive `clock_manipulated_hard` (banyak user terflag padahal jam benar)
 
-Semua perubahan **additive** — kolom lama tetap ada agar workflow existing tidak rusak. Backfill data lama tidak dilakukan (mulai berlaku dari sekarang).
+**Root cause** di `useClockSkewGuard.ts` + `attendance-context/index.ts`:
+- `setTimeSyncVerifiedNow()` hanya dipanggil kalau **RTT ≤ 3000 ms**. Jaringan lambat (4G lemah, area tambang) sering >3 s → cache time-sync **tidak pernah terisi** → edge function menganggap "belum verify" → hard flag.
+- Batas usia verifikasi cuma **15 menit**. Kalau user buka app, menunggu, lalu clock-in setelah >15 menit → hard flag.
+- `recheck()` sebelum submit juga tunduk pada RTT<3s yang sama, jadi tidak menyelamatkan.
 
----
+**Fix (aman, tidak mengubah aturan bisnis)**:
+- Relax constraint di `useClockSkewGuard`:
+  - Perpanjang `MAX_ACCEPTABLE_RTT_MS` dari 3 s → **8 s**.
+  - Kalau RTT > 8 s tapi masih dapat response valid dan `skew ≤ 120 s`, tetap set `setTimeSyncVerifiedNow()` (server merespons = jam server terverifikasi; RTT tinggi hanya bikin estimasi skew kurang presisi, bukan bukti manipulasi).
+- Perpanjang `TIME_SYNC_MAX_AGE_MS` di edge function dari 15 menit → **60 menit** (masih cukup ketat untuk mendeteksi trik airplane-mode-tunggu-lama, tapi tidak menghukum user yang idle 20–30 menit).
+- Trigger `clockGuard.recheck()` **hanya sekali** tambahan tepat sebelum submit (sudah ada) — pastikan menunggu selesai (`await`) sebelum panggil `getAttendanceContext`.
 
-## 1. Pisahkan Device / Flag / IP per Aksi (Check-in vs Check-out)
+Hasilnya: user dengan jaringan lambat / aplikasi kebuka lama tidak lagi terflag palsu; manipulasi jam nyata (skew >2 menit) tetap terdeteksi.
 
-### Database (migration)
-Tambah kolom baru di `attendance_records` (tanpa hapus yang lama):
-- `device_id_in`, `device_id_out` (text)
-- `device_label_in`, `device_label_out` (text)
-- `device_flag_in`, `device_flag_out` (text)
-- `client_ip_in`, `client_ip_out` (text)
-- `clock_skew_seconds_in`, `clock_skew_seconds_out` (int)
+## 2. Anti-joki split in/out — verifikasi
 
-Kolom lama (`device_id`, `device_flag`, dll) tetap ada — akan tetap terisi (mirror dari yang terbaru) untuk backward compatibility.
+Cek konfirmasi (tidak ada perubahan kalau sudah benar):
+- `contextToColumns(ctx, 'check_in')` menulis ke `*_in`, `contextToColumns(ctx, 'check_out')` ke `*_out`.
+- Semua site submit di `AttendanceForm.tsx` (form biasa + kiosk) memakai helper ini → clock-out **tidak** menimpa data clock-in. Report exporter sudah menampilkan dua kolom terpisah + resolve UID → nama.
+- Tidak ada regresi dari fix #1 karena hanya threshold yang berubah.
 
-### Edge function `attendance-context`
-Sudah menerima `action: 'check_in' | 'check_out'`. Tidak berubah — perbedaan penulisan kolom dilakukan di client.
+## 3. Shift lintas hari — validasi setelah penghapusan cabang `h < 12`
 
-### Client (`AttendanceForm.tsx`)
-- Saat **check-in**: tulis ke kolom `*_in` + mirror ke kolom lama.
-- Saat **check-out**: tulis ke kolom `*_out` + mirror ke kolom lama (jangan overwrite `*_in`).
+Verifikasi flow saat ini (setelah simplifikasi `computeWorkDate` menjadi selalu `toLocalDateString(now)`):
 
-### Report UI (`AttendanceExporter.tsx` + `DashboardAnalytics.tsx` bagian device/flag)
-- Tampilkan dua baris flag: "Check-in: Chrome • Android 13 | flag: device_shared_with_other_user (Budi Santoso)" dan "Check-out: ...".
-- **Resolve UID → nama karyawan**: saat flag mengandung `device_shared_with_other_user` atau `user_on_other_device`, query nama staff dari `staff_users` berdasarkan UID yang tersimpan di history device_id itu, lalu tampilkan `nama (UID)` bukan hanya UID.
+- **Clock-in shift malam pukul 23:00 (14 Juli)** → `date = 2026-07-14` ✓.
+- **Clock-out pukul 07:00 (15 Juli)**: `fetchTodayAttendance` cari record 15 Juli (kosong), lalu karena `isNightShift || shift_available` cek 14 Juli → menemukan record open → `todayAttendance.date = 2026-07-14` → submit checkout memakai `todayAttendance?.date` (line 1525) → **tetap tercatat di 14 Juli** ✓.
+- **User pilih shift saat clock-in pagi (07:30)** → `date = hari ini` ✓ (bukan lagi kemarin) — sesuai perbaikan user.
+- Kiosk flow (line 1136–1146) juga sudah cek yesterday untuk night shift saat clock-out → konsisten.
 
----
+Kesimpulan: perubahan user sudah tepat. **Tidak perlu edit** file `shiftHelper.ts` maupun logika terkait; hanya update komentar JSDoc di `computeWorkDate` supaya tidak menyesatkan (sekarang komentar masih menyebut "hour < 12 → yesterday" padahal sudah dihapus).
 
-## 2. Anti Fake GPS — Tambah Flag Baru (tidak block)
+## 4. Update modal: user ter-logout & modal muncul terus
 
-### Client (`gpsValidator.ts`)
-Tambah indikator mentah ke `AttendanceContext`:
-- `gps_accuracy`, `gps_altitude_null` (bool), `gps_speed`, `gps_confidence_score` (dari validator existing).
+**Root cause** di `ForceUpdateModal.tsx` (`handleCarouselComplete`):
+- `localStorage.clear()` menghapus **semua** key termasuk token sesi Supabase (`sb-<ref>-auth-token`, dll). Setelah reload, user tidak login lagi.
+- Preserve list hanya menyimpan `shared_device_mode`, `device_id`, `user_timezone` — sesi hilang.
+- Selain itu, jika `localStorage.clear()` gagal sebagian atau reload race, `app_installed_version` bisa hilang → modal muncul lagi di reload berikutnya.
 
-### Edge function `attendance-context` — tambah flag baru
-- **`suspected_mock_gps`**: jika `gps_confidence_score < 50` (dari client) ATAU accuracy < 3m + altitude null + speed null (kombinasi klasik Fake GPS).
-- **`ip_gps_mismatch`**: reverse-geolocate IP client via IP → country/region (gunakan header CF `cf-ipcountry` jika ada; kalau tidak, skip). Bandingkan negara IP vs koordinat GPS (Indonesia vs bukan). Jarak antar kota tidak dicek karena butuh API berbayar.
-- **`clock_manipulated_hard`** (BARU): jika `time-sync` gagal dipanggil di sesi ini SAMA SEKALI padahal request masuk (indikasi user matikan jaringan → clock in → nyalakan). Client kirim boolean `time_sync_verified_at` (timestamp terakhir sukses time-sync). Edge function tandai jika > 15 menit lalu atau null.
+**Fix**:
+- Ganti strategi dari "clear all + restore" jadi **selective clear**: iterate `localStorage` keys, hapus hanya key non-esensial (mis. cache attendance, cache dropdown). Whitelist yang **wajib disimpan**:
+  - Semua key berawalan `sb-` (Supabase auth session).
+  - `shared_device_mode`, `device_id`, `user_timezone`, `app_installed_version` (di-set setelahnya).
+  - Key user preference lain (`selected_staff_uid`, dll) — audit singkat.
+- Tetap clear `caches` API + trigger `registration.unregister()` untuk SW lama biar aset baru ke-fetch.
+- Set `app_installed_version = newVersion` **sebelum** reload, dengan try/catch dan verify `getItem` cocok setelah set.
+- Di `useVersionCheck.tsx`: initial default `installedVersion` sudah `currentAppVersion` (fallback), tapi tambahkan **write-once**: kalau `LOCAL_VERSION_KEY` belum ada, tulis `currentAppVersion` saat pertama check — sehingga user baru tidak dianggap "belum update" ketika DB version = current build version.
 
-### Client — perkuat time guard
-- Di `AttendanceForm.tsx` sebelum submit clock in/out: **wajib panggil `time-sync` sekali lagi** (bukan hanya dari polling 5 menit). Kalau gagal → toast peringatan "Jaringan tidak stabil, absensi tetap diproses tapi akan ditandai" — tetap lanjut submit (fail-open, tapi flag tercatat).
-- Kirim `time_sync_verified_at` ke `attendance-context` supaya bisa dijadikan flag.
+Hasil: setelah update user tetap login; modal hanya muncul saat DB version benar-benar berubah lebih tinggi dari yang sudah tercatat.
 
-### Report UI
-Warna badge flag:
-- Merah: `device_shared_with_other_user`, `clock_manipulated`, `clock_manipulated_hard`, `suspected_mock_gps`, `ip_gps_mismatch`
-- Kuning: `new_device`, `user_on_other_device`
+## Files to edit
 
-**Tidak ada block/prevent** — semua tetap bisa clock in. Admin cek di laporan.
+- `src/hooks/useClockSkewGuard.ts` — relax RTT, mark verified even on slow RTT.
+- `supabase/functions/attendance-context/index.ts` — `TIME_SYNC_MAX_AGE_MS` 15m → 60m.
+- `src/utils/shiftHelper.ts` — update stale JSDoc only.
+- `src/components/ForceUpdateModal.tsx` — selective localStorage clear preserving `sb-*` session.
+- `src/hooks/useVersionCheck.tsx` — write baseline `LOCAL_VERSION_KEY` on first run.
 
----
-
-## 3. Offline Queue untuk Clock In/Out (PWA — Full Offline)
-
-### Ekspektasi jujur (harus disampaikan ke user di UI)
-- Web/PWA **tidak bisa** deteksi mock GPS setingkat native.
-- Saat offline: koordinat & jam **dari device** (tidak ada validasi server). Manipulasi jauh lebih mudah.
-- Semua clock-in offline **otomatis di-flag** `offline_queued` + `offline_client_time_only` supaya admin tahu ini butuh review manual.
-
-### Implementasi
-
-**PWA setup (mengikuti PWA skill)**
-- Update `public/manifest.json` — sudah ada, pastikan `display: standalone`, icon lengkap.
-- Ganti `public/sw.js` custom yang sekarang (bermasalah, cache script) dengan setup `vite-plugin-pwa` (`generateSW`, `NetworkFirst` untuk HTML, `CacheFirst` untuk asset hashed). Guard registration: hanya di produksi, bukan di preview Lovable.
-
-**Offline queue (IndexedDB)**
-- Utility baru `src/utils/offlineAttendanceQueue.ts` pakai `idb-keyval` (ringan).
-- Schema entry: `{ id, action, staff_uid, timestamp_client, location, photo_blob, geofence_area_id, work_status, shift_type, context, queued_at }`.
-- Saat online + submit gagal → simpan ke queue → toast "Absensi tersimpan offline, akan sync saat online".
-- Saat offline → langsung antre + toast.
-
-**Sync worker**
-- Listen `online` event + interval 30 detik saat halaman aktif.
-- Proses antrian FIFO: upload foto ke storage → insert row `attendance_records` dengan flag `offline_queued` + jam asli client (bukan server `now()`).
-- Setelah sukses → hapus dari queue + notif "N absensi offline berhasil sync".
-- Kalau gagal (mis. duplikat, staff dinonaktifkan): pindahkan ke "failed queue" + notif ke user.
-
-**UI indicator**
-- Badge di `AttendanceForm.tsx`: "🔴 Offline — N absensi menunggu sync" saat ada antrian.
-- Tombol manual sync di badge.
-
-**Batasan (dokumentasikan di komentar + toast)**
-- Foto disimpan sebagai Blob di IndexedDB (bisa besar) — batasi max 20 entry di queue.
-- Time-sync tidak bisa jalan → flag `clock_manipulated_hard` otomatis.
-- Geofence tetap divalidasi dari koordinat cached terakhir jika ada; kalau tidak → flag `offline_no_location_validation`.
-
-### Rekomendasi tegas (tetap sarankan native)
-Setelah fitur offline PWA jalan, tambahkan **catatan di UI Admin** dan **README**: untuk anti-joki tingkat serius (mock GPS detection, secure device attestation, background sync andal), migrasi ke Capacitor native tetap direkomendasikan. PWA offline queue = pragmatic compromise, bukan solusi ideal.
-
----
-
-## Technical Details
-
-### Files to change
-- **Migration baru**: tambah kolom `*_in`/`*_out` di `attendance_records`.
-- **Edit `supabase/functions/attendance-context/index.ts`**: tambah logic flag `suspected_mock_gps`, `ip_gps_mismatch`, `clock_manipulated_hard`. Terima field baru dari client.
-- **Edit `src/utils/attendanceContext.ts`**: kirim `gps_*` fields + `time_sync_verified_at`.
-- **Edit `src/components/AttendanceForm.tsx`**: pre-submit time-sync check; tulis ke kolom `*_in`/`*_out`.
-- **Edit `src/components/AttendanceExporter.tsx` + komponen laporan yang tampilkan flag**: resolve UID→nama, tampilkan flag check-in vs check-out terpisah.
-- **New `src/utils/offlineAttendanceQueue.ts`**: IndexedDB queue.
-- **New `src/hooks/useOfflineSync.tsx`**: hook untuk auto-sync.
-- **Edit `src/components/AttendanceForm.tsx`**: integrate queue + UI indicator.
-- **Setup `vite-plugin-pwa`**: `bun add -D vite-plugin-pwa`, edit `vite.config.ts`, ganti `public/sw.js` (kill-switch dulu untuk SW lama, lalu generateSW).
-- **New `src/pwa/registerSW.ts`**: guarded registration wrapper.
-
-### Non-goals (eksplisit)
-- Tidak backfill data device_id lama.
-- Tidak block clock in walaupun terdeteksi mock GPS (sesuai keputusan user).
-- Tidak migrasi ke Capacitor di iterasi ini — hanya direkomendasikan.
-- Tidak call API IP-geolocation berbayar; hanya pakai header CF gratis.
-
-### Risiko
-- **PWA switch dari custom `sw.js` ke `vite-plugin-pwa`**: user existing yang sudah install PWA butuh 1 kali reload untuk kill-switch worker lama menghapus registrasi. Sudah standard flow di PWA skill.
-- **IndexedDB blob**: bisa penuh di HP low-storage. Cap 20 entry + expire >7 hari.
-- **Flag `ip_gps_mismatch` false-positive**: user yg pakai VPN → flagged. OK karena tetap non-blocking.
+## Non-goals
+- Tidak mengubah skema DB.
+- Tidak menyentuh logika geofence / GPS validator.
+- Tidak mengubah aturan penulisan kolom `*_in` / `*_out`.
