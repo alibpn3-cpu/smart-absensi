@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => ({
       filename: "sw.js",
       devOptions: { enabled: false },
       workbox: {
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         // NetworkFirst for HTML navigations — never serve stale app shell
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api/],

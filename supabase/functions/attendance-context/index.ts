@@ -27,7 +27,7 @@ interface ReqBody {
 }
 
 const CLOCK_SKEW_THRESHOLD_SECONDS = 120;
-const TIME_SYNC_MAX_AGE_MS = 15 * 60 * 1000; // 15 minutes
+const TIME_SYNC_MAX_AGE_MS = 60 * 60 * 1000; // 60 minutes
 
 function getClientIp(req: Request): string | null {
   const xff = req.headers.get('x-forwarded-for');

@@ -36,32 +36,54 @@ const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({
 
   const handleCarouselComplete = async () => {
     try {
-      // Preserve kiosk mode and device settings
-      const kioskMode = localStorage.getItem('shared_device_mode');
-      const deviceId = localStorage.getItem('device_id');
-      const userTimezone = localStorage.getItem('user_timezone');
-      
-      // Clear all caches
-      if ('caches' in window) {
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
+      // Selective clear: preserve auth session (sb-*) and critical settings.
+      // A blanket localStorage.clear() would sign the user out.
+      const PRESERVE_PREFIXES = ['sb-']; // Supabase auth tokens
+      const PRESERVE_KEYS = new Set([
+        'shared_device_mode',
+        'device_id',
+        'user_timezone',
+        'app_installed_version',
+        'selected_staff_uid',
+        'kiosk_geofence_area_id',
+      ]);
+
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k) continue;
+          if (PRESERVE_KEYS.has(k)) continue;
+          if (PRESERVE_PREFIXES.some((p) => k.startsWith(p))) continue;
+          keysToRemove.push(k);
+        }
+        keysToRemove.forEach((k) => localStorage.removeItem(k));
+      } catch (e) {
+        console.warn('Selective localStorage clear failed:', e);
       }
-      
-      // Clear localStorage except preserved items
-      localStorage.clear();
-      
-      // Restore preserved settings
-      if (kioskMode) localStorage.setItem('shared_device_mode', kioskMode);
-      if (deviceId) localStorage.setItem('device_id', deviceId);
-      if (userTimezone) localStorage.setItem('user_timezone', userTimezone);
-      
-      // Update installed version
-      localStorage.setItem('app_installed_version', newVersion);
-      
-      // Trigger callback
+
+      // Clear runtime caches so new build assets are fetched
+      if ('caches' in window) {
+        try {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map((n) => caches.delete(n)));
+        } catch (e) {
+          console.warn('Cache clear failed:', e);
+        }
+      }
+
+      // Persist installed version BEFORE reload, and verify it stuck
+      try {
+        localStorage.setItem('app_installed_version', newVersion);
+        if (localStorage.getItem('app_installed_version') !== newVersion) {
+          console.warn('Version write verification failed');
+        }
+      } catch (e) {
+        console.warn('Version write failed:', e);
+      }
+
       onUpdate();
-      
-      // Reload page
+
       setTimeout(() => {
         window.location.reload();
       }, 300);
