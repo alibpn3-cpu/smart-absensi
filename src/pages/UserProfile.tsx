@@ -114,20 +114,21 @@ const UserProfile = () => {
     }
   };
 
-  const handleToggleMorningReminder = async (v: boolean) => {
+  const handleToggleEveningReminder = async (v: boolean) => {
     if (!userSession) return;
-    setMorningReminder(v);
+    setEveningReminder(v);
     const { error } = await supabase
       .from('staff_users')
-      .update({ morning_reminder_enabled: v } as any)
+      .update({ evening_reminder_enabled: v } as any)
       .eq('uid', userSession.uid);
     if (error) {
-      setMorningReminder(!v);
+      setEveningReminder(!v);
       toast({ title: 'Gagal', description: error.message, variant: 'destructive' });
     } else {
-      toast({ title: 'Tersimpan', description: v ? 'Reminder pagi aktif' : 'Reminder pagi dimatikan' });
+      toast({ title: 'Tersimpan', description: v ? 'Reminder clock-out aktif' : 'Reminder clock-out dimatikan' });
     }
   };
+
 
   const handleTogglePush = async (v: boolean) => {
     if (v) {
