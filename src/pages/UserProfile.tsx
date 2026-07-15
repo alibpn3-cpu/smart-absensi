@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, User, MapPin, Briefcase, Building2, LogOut, Lock, Shield, FileText, Phone, Mail, Save, Loader2, Camera, Bell, BellOff, Sunrise } from 'lucide-react';
+import { ArrowLeft, User, MapPin, Briefcase, Building2, LogOut, Lock, Shield, FileText, Phone, Mail, Save, Loader2, Camera, Bell, BellOff, Sunset } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
@@ -29,7 +29,7 @@ const UserProfile = () => {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
-  const [morningReminder, setMorningReminder] = useState(true);
+  const [eveningReminder, setEveningReminder] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
@@ -59,7 +59,7 @@ const UserProfile = () => {
     setIsLoading(true);
     const { data } = await supabase
       .from('staff_users')
-      .select('phone_number, email, photo_url, morning_reminder_enabled')
+      .select('phone_number, email, photo_url, evening_reminder_enabled')
       .eq('uid', uid)
       .maybeSingle();
 
@@ -67,10 +67,11 @@ const UserProfile = () => {
       setPhoneNumber(data.phone_number || '');
       setEmail((data as any).email || '');
       setPhotoUrl((data as any).photo_url || undefined);
-      setMorningReminder((data as any).morning_reminder_enabled !== false);
+      setEveningReminder((data as any).evening_reminder_enabled !== false);
     }
     setIsLoading(false);
   };
+
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -113,20 +114,21 @@ const UserProfile = () => {
     }
   };
 
-  const handleToggleMorningReminder = async (v: boolean) => {
+  const handleToggleEveningReminder = async (v: boolean) => {
     if (!userSession) return;
-    setMorningReminder(v);
+    setEveningReminder(v);
     const { error } = await supabase
       .from('staff_users')
-      .update({ morning_reminder_enabled: v } as any)
+      .update({ evening_reminder_enabled: v } as any)
       .eq('uid', userSession.uid);
     if (error) {
-      setMorningReminder(!v);
+      setEveningReminder(!v);
       toast({ title: 'Gagal', description: error.message, variant: 'destructive' });
     } else {
-      toast({ title: 'Tersimpan', description: v ? 'Reminder pagi aktif' : 'Reminder pagi dimatikan' });
+      toast({ title: 'Tersimpan', description: v ? 'Reminder clock-out aktif' : 'Reminder clock-out dimatikan' });
     }
   };
+
 
   const handleTogglePush = async (v: boolean) => {
     if (v) {
@@ -344,18 +346,19 @@ const UserProfile = () => {
 
               <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 rounded-lg">
                 <div className="flex items-center gap-3 min-w-0">
-                  <Sunrise className="h-4 w-4 text-amber-500 shrink-0" />
+                  <Sunset className="h-4 w-4 text-orange-500 shrink-0" />
                   <div className="min-w-0">
-                    <div className="text-sm font-medium">Reminder Clock-In Pagi</div>
-                    <div className="text-xs text-muted-foreground">Pengingat otomatis jika belum absen di pagi hari.</div>
+                    <div className="text-sm font-medium">Reminder Clock-Out Sore</div>
+                    <div className="text-xs text-muted-foreground">Pengingat otomatis (WhatsApp & push) jika belum clock out di sore hari.</div>
                   </div>
                 </div>
                 <Switch
-                  checked={morningReminder}
-                  onCheckedChange={handleToggleMorningReminder}
+                  checked={eveningReminder}
+                  onCheckedChange={handleToggleEveningReminder}
                   disabled={isLoading}
                 />
               </div>
+
             </div>
 
             {/* Actions */}

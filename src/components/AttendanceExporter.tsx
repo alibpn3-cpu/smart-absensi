@@ -662,9 +662,12 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         { header: 'Skew Jam In (detik)', key: 'skewIn', width: 14 },
         { header: 'Skew Jam Out (detik)', key: 'skewOut', width: 14 },
         { header: 'Flag Clock-In', key: 'flagIn', width: 30 },
-        { header: 'Flag Clock-Out', key: 'flagOut', width: 30 }
+        { header: 'Flag Clock-Out', key: 'flagOut', width: 30 },
+        { header: 'Fake GPS Clock-In', key: 'fakeGpsIn', width: 14 },
+        { header: 'Fake GPS Clock-Out', key: 'fakeGpsOut', width: 14 }
 
       ];
+
 
       // Pre-scan: detect device_ids shared across multiple staff_uids in the dataset
       // (checks legacy + per-action columns so historic rows still light up)
@@ -791,16 +794,28 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
           alasanExtendIn: record.extend_reason || '-',
           alasanExtendOut: record.extend_reason || '-',
           ipIn: record.client_ip_in || record.client_ip || '-',
-          ipOut: record.client_ip_out || '-',
+          ipOut: record.client_ip_out || (record.check_out_time ? (record.client_ip || '-') : '-'),
           deviceIn: record.device_label_in || record.device_label || '-',
-          deviceOut: record.device_label_out || '-',
+          deviceOut: record.device_label_out || (record.check_out_time ? (record.device_label || '-') : '-'),
           deviceIdIn: deviceIdIn || '-',
-          deviceIdOut: record.device_id_out || '-',
+          deviceIdOut: record.device_id_out || (record.check_out_time ? (record.device_id || '-') : '-'),
           skewIn: record.clock_skew_seconds_in ?? record.clock_skew_seconds ?? '-',
           skewOut: record.clock_skew_seconds_out ?? '-',
           flagIn: flagInText,
-          flagOut: flagOutText
+          flagOut: flagOutText,
+          fakeGpsIn: (() => {
+            const flag = (record.device_flag_in || record.device_flag || '').includes('suspected_mock_gps');
+            const conf = record.gps_confidence_in;
+            return flag || (typeof conf === 'number' && conf < 50) ? 'Ya' : 'Tidak';
+          })(),
+          fakeGpsOut: (() => {
+            if (!record.check_out_time) return '-';
+            const flag = (record.device_flag_out || '').includes('suspected_mock_gps');
+            const conf = record.gps_confidence_out;
+            return flag || (typeof conf === 'number' && conf < 50) ? 'Ya' : 'Tidak';
+          })()
         });
+
 
 
         // Highlight: red for joki suspect (priority), yellow for other flags

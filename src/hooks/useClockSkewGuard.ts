@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { setTimeSyncVerifiedNow } from '@/utils/antiJokiCache';
+import { setTimeSyncVerifiedNow, getTimeSyncVerifiedAt } from '@/utils/antiJokiCache';
 
 /**
  * Clock skew guard (timezone-agnostic).
@@ -11,14 +11,19 @@ import { setTimeSyncVerifiedNow } from '@/utils/antiJokiCache';
  *
  * Fail-open behavior: if the server is unreachable (offline / network error),
  * we deliberately set `isClockInvalid = false` so users in the field are not
- * locked out of the app. The server still records `now()` for the actual
- * attendance row, so this guard is a UX deterrent on top of the existing
- * server-side flag.
+ * locked out of the app.
+ *
+ * We ALSO honor a persisted "last known good" verification: if the previous
+ * time-sync succeeded within the grace window, we don't hard-flag the user
+ * just because the current request timed out on a weak network. This is the
+ * root cause of the false-positive `clock_manipulated_hard` flood.
  */
 
 const THRESHOLD_SECONDS = 120; // 2 minutes
 const MAX_ACCEPTABLE_RTT_MS = 8000; // relaxed for slow networks (mining/field areas)
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // re-check every 5 minutes
+const LAST_KNOWN_GOOD_GRACE_MS = 6 * 60 * 60 * 1000; // 6h grace
+const RETRY_DELAYS_MS = [400, 900, 1800];
 
 interface SkewState {
   isClockInvalid: boolean;
@@ -30,6 +35,18 @@ interface SkewState {
 export interface ClockSkewGuard extends SkewState {
   /** Force a fresh check. Returns whether the clock is invalid AFTER the check. */
   recheck: () => Promise<boolean>;
+}
+
+async function callTimeSync(): Promise<{ serverMs: number; rtt: number } | null> {
+  const t0 = Date.now();
+  try {
+    const { data, error } = await supabase.functions.invoke('time-sync', { method: 'GET' });
+    const t1 = Date.now();
+    if (error || !data || typeof (data as any).server_epoch_ms !== 'number') return null;
+    return { serverMs: (data as any).server_epoch_ms as number, rtt: t1 - t0 };
+  } catch {
+    return null;
+  }
 }
 
 export function useClockSkewGuard(): ClockSkewGuard {
@@ -46,62 +63,63 @@ export function useClockSkewGuard(): ClockSkewGuard {
 
     const p = (async () => {
       setState((s) => ({ ...s, checking: true }));
-      const t0 = Date.now();
-      try {
-        const { data, error } = await supabase.functions.invoke('time-sync', {
-          method: 'GET',
-        });
-        const t1 = Date.now();
-        const rtt = t1 - t0;
 
-        if (error || !data || typeof (data as any).server_epoch_ms !== 'number') {
-          // Network/server error → fail open.
-          setState({
-            isClockInvalid: false,
-            skewSeconds: null,
-            lastCheckedAt: t1,
-            checking: false,
-          });
-          return false;
+      // Retry a few times on transient failures before declaring the server unreachable.
+      let sync = await callTimeSync();
+      for (let i = 0; !sync && i < RETRY_DELAYS_MS.length; i++) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[i]));
+        sync = await callTimeSync();
+      }
+
+      const now = Date.now();
+
+      if (!sync) {
+        // Server unreachable. Honor last-known-good so anti-joki doesn't
+        // hard-flag a user just because the network dropped momentarily.
+        const lastGoodIso = getTimeSyncVerifiedAt();
+        if (lastGoodIso) {
+          const t = Date.parse(lastGoodIso);
+          if (!isNaN(t) && now - t < LAST_KNOWN_GOOD_GRACE_MS) {
+            // Refresh the cached verification so the server also sees it as fresh.
+            setTimeSyncVerifiedNow();
+          }
         }
-
-        if (rtt > MAX_ACCEPTABLE_RTT_MS) {
-          // Slow network: RTT too large to accurately compute skew, but the
-          // server responded — that's enough to prove the device isn't offline
-          // manipulating its clock. Mark verified so anti-joki doesn't hard-flag.
-          setTimeSyncVerifiedNow();
-          setState((s) => ({ ...s, checking: false, lastCheckedAt: t1 }));
-          return false;
-        }
-
-        const serverMs = (data as any).server_epoch_ms as number;
-        // Estimate device time at the midpoint of the request.
-        const deviceMidMs = t0 + rtt / 2;
-        const skewMs = Math.abs(serverMs - deviceMidMs);
-        const skewSec = Math.round(skewMs / 1000);
-        const invalid = skewSec > THRESHOLD_SECONDS;
-        if (!invalid) setTimeSyncVerifiedNow();
-
-
-        setState({
-          isClockInvalid: invalid,
-          skewSeconds: skewSec,
-          lastCheckedAt: t1,
-          checking: false,
-        });
-        return invalid;
-      } catch {
         setState({
           isClockInvalid: false,
           skewSeconds: null,
-          lastCheckedAt: Date.now(),
+          lastCheckedAt: now,
           checking: false,
         });
         return false;
-      } finally {
-        inflight.current = null;
       }
-    })();
+
+      const { serverMs, rtt } = sync;
+
+      if (rtt > MAX_ACCEPTABLE_RTT_MS) {
+        // Slow network: server responded but RTT is too large to trust skew.
+        // Server contact alone proves the device isn't offline-manipulating the clock.
+        setTimeSyncVerifiedNow();
+        setState((s) => ({ ...s, checking: false, lastCheckedAt: now }));
+        return false;
+      }
+
+      // Estimate device time at the midpoint of the request.
+      const deviceMidMs = now - rtt / 2;
+      const skewMs = Math.abs(serverMs - deviceMidMs);
+      const skewSec = Math.round(skewMs / 1000);
+      const invalid = skewSec > THRESHOLD_SECONDS;
+      if (!invalid) setTimeSyncVerifiedNow();
+
+      setState({
+        isClockInvalid: invalid,
+        skewSeconds: skewSec,
+        lastCheckedAt: now,
+        checking: false,
+      });
+      return invalid;
+    })().finally(() => {
+      inflight.current = null;
+    });
 
     inflight.current = p;
     return p;
@@ -112,7 +130,29 @@ export function useClockSkewGuard(): ClockSkewGuard {
     const id = setInterval(() => {
       doCheck();
     }, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
+
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        doCheck();
+      }
+    };
+    const onOnline = () => doCheck();
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisible);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', onOnline);
+    }
+
+    return () => {
+      clearInterval(id);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisible);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('online', onOnline);
+      }
+    };
   }, [doCheck]);
 
   return {

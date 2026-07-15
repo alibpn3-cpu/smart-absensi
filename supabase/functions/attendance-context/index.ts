@@ -27,7 +27,8 @@ interface ReqBody {
 }
 
 const CLOCK_SKEW_THRESHOLD_SECONDS = 120;
-const TIME_SYNC_MAX_AGE_MS = 60 * 60 * 1000; // 60 minutes
+const TIME_SYNC_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 hours (relaxed for weak networks)
+
 
 function getClientIp(req: Request): string | null {
   const xff = req.headers.get('x-forwarded-for');
@@ -140,16 +141,23 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Hard clock manipulation: no recent server time-sync verification
-  let clock_manipulated_hard = false;
+  // Time-sync freshness: prior policy hard-flagged any missing/stale sync.
+  // That produced false positives on weak networks. Now:
+  //   - "time_sync_stale"           = soft flag (no recent server verification)
+  //   - "clock_manipulated_hard"    = ONLY when we measured skew > threshold
+  //                                   AND the client couldn't prove a fresh sync
+  let time_sync_stale = false;
   if (!time_sync_verified_at_raw) {
-    clock_manipulated_hard = true;
+    time_sync_stale = true;
   } else {
     const ts = Date.parse(time_sync_verified_at_raw);
     if (isNaN(ts) || Date.now() - ts > TIME_SYNC_MAX_AGE_MS) {
-      clock_manipulated_hard = true;
+      time_sync_stale = true;
     }
   }
+  const clock_manipulated_hard =
+    time_sync_stale && clock_skew_seconds != null && clock_skew_seconds > CLOCK_SKEW_THRESHOLD_SECONDS;
+
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -210,6 +218,7 @@ Deno.serve(async (req) => {
 
     if (clock_warning) flags.push('clock_manipulated');
     if (clock_manipulated_hard) flags.push('clock_manipulated_hard');
+    else if (time_sync_stale) flags.push('time_sync_stale');
     if (detectMockGps(gps)) flags.push('suspected_mock_gps');
 
     // IP vs GPS mismatch (only when we have a country code from CF)
@@ -217,6 +226,7 @@ Deno.serve(async (req) => {
       flags.push(`ip_gps_mismatch:${ip_country}`);
     }
   } catch (e) {
+
     console.error('flag computation failed:', e);
   }
 

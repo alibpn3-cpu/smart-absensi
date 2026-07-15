@@ -58,21 +58,46 @@ serve(async (req: Request) => {
     const staffUids = records.map(r => r.staff_uid);
     const { data: staffUsers } = await supabase
       .from('staff_users')
-      .select('uid, name, phone_number')
+      .select('uid, name, phone_number, evening_reminder_enabled')
       .in('uid', staffUids)
-      .not('phone_number', 'is', null);
+      .neq('evening_reminder_enabled', false);
+
+    // Fire web push in parallel so users still get notified even when the
+    // browser/tab is closed (Android Chrome / installed PWA on desktop).
+    // We push to ALL opted-in users, not just those with a phone number.
+    const pushTargets = (staffUsers || []).map((s: any) => s.uid);
+    if (pushTargets.length > 0) {
+      try {
+        await supabase.functions.invoke('send-push-notification', {
+          body: {
+            staff_uids: pushTargets,
+            title: '⏰ Reminder Clock Out',
+            body: 'Anda belum melakukan clock out hari ini. Buka aplikasi untuk clock out sekarang.',
+            type: 'reminder',
+            link: '/dashboard',
+            tag: `clockout-reminder-${todayStr}`,
+            data: { kind: 'clockout-reminder', date: todayStr },
+          },
+        });
+      } catch (e) {
+        console.warn('push reminder failed:', e);
+      }
+    }
 
     if (!staffUsers || staffUsers.length === 0) {
-      console.log('ℹ️ No users with phone numbers to remind');
+      console.log('ℹ️ No opted-in users to remind via WhatsApp');
       return new Response(JSON.stringify({ success: true, reminded: 0, total_not_clocked_out: records.length }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    const smsTargets = staffUsers.filter((s: any) => s.phone_number);
+
+
     let sentCount = 0;
     let failCount = 0;
 
-    for (const staff of staffUsers) {
+    for (const staff of smsTargets) {
       let phone = staff.phone_number!.replace(/[\s\-\+]/g, '');
       if (phone.startsWith('0')) {
         phone = '62' + phone.substring(1);

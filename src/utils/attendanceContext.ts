@@ -118,16 +118,8 @@ export function contextToColumns(
   action: 'check_in' | 'check_out'
 ): Record<string, any> {
   const suffix = action === 'check_in' ? 'in' : 'out';
-  return {
-    // legacy mirror (kept for old code paths / reports)
-    client_ip: ctx.client_ip,
-    user_agent: ctx.user_agent,
-    device_id: ctx.device_id,
-    device_label: ctx.device_label,
-    device_flag: ctx.device_flag,
-    client_timestamp: ctx.client_timestamp,
-    clock_skew_seconds: ctx.clock_skew_seconds,
-    // per-action
+  // Per-action columns are ALWAYS written (source of truth for anti-joki v2).
+  const perAction: Record<string, any> = {
     [`client_ip_${suffix}`]: ctx.client_ip,
     [`device_id_${suffix}`]: ctx.device_id,
     [`device_label_${suffix}`]: ctx.device_label,
@@ -138,6 +130,27 @@ export function contextToColumns(
     [`gps_speed_${suffix}`]: ctx.gps?.speed ?? null,
     [`gps_confidence_${suffix}`]: ctx.gps?.confidence_score ?? null,
     [`time_sync_verified_at_${suffix}`]: ctx.time_sync_verified_at,
+  };
+
+  // Legacy mirror: only on check_in, so a later check_out does NOT overwrite
+  // the check-in evidence stored in device_id / client_ip / device_label / etc.
+  // For check_out, only user_agent + client_timestamp are refreshed.
+  if (action === 'check_in') {
+    return {
+      client_ip: ctx.client_ip,
+      user_agent: ctx.user_agent,
+      device_id: ctx.device_id,
+      device_label: ctx.device_label,
+      device_flag: ctx.device_flag,
+      client_timestamp: ctx.client_timestamp,
+      clock_skew_seconds: ctx.clock_skew_seconds,
+      ...perAction,
+    };
+  }
+  return {
+    user_agent: ctx.user_agent,
+    client_timestamp: ctx.client_timestamp,
+    ...perAction,
   };
 }
 
