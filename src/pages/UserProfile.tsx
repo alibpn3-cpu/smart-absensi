@@ -59,7 +59,7 @@ const UserProfile = () => {
     setIsLoading(true);
     const { data } = await supabase
       .from('staff_users')
-      .select('phone_number, email, photo_url, morning_reminder_enabled')
+      .select('phone_number, email, photo_url, evening_reminder_enabled')
       .eq('uid', uid)
       .maybeSingle();
 
@@ -67,10 +67,11 @@ const UserProfile = () => {
       setPhoneNumber(data.phone_number || '');
       setEmail((data as any).email || '');
       setPhotoUrl((data as any).photo_url || undefined);
-      setMorningReminder((data as any).morning_reminder_enabled !== false);
+      setEveningReminder((data as any).evening_reminder_enabled !== false);
     }
     setIsLoading(false);
   };
+
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
