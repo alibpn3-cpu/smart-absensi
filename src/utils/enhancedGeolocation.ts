@@ -183,6 +183,11 @@ export const getEnhancedLocation = async (
     } else {
       // Single reading with fallback
       const position = await getPositionWithWatchFallback(positionOptions);
+      // Run anti-fake-GPS validation to cache snapshot for attendance context.
+      // Non-blocking — result is only used to flag, not to reject.
+      try {
+        await validateGPSPosition(position);
+      } catch {}
       result = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
@@ -194,6 +199,7 @@ export const getEnhancedLocation = async (
     
     // Cache the result
     locationCache = { result, timestamp: Date.now() };
+
     
     return result;
   } catch (error) {
