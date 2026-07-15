@@ -97,7 +97,7 @@ serve(async (req: Request) => {
     let sentCount = 0;
     let failCount = 0;
 
-    for (const staff of staffUsers) {
+    for (const staff of smsTargets) {
       let phone = staff.phone_number!.replace(/[\s\-\+]/g, '');
       if (phone.startsWith('0')) {
         phone = '62' + phone.substring(1);
