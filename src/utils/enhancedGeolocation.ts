@@ -169,6 +169,7 @@ export const getEnhancedLocation = async (
         // Fallback to watch position
         console.log('📍 No readings, trying watchPosition fallback...');
         const position = await getPositionWithWatchFallback(positionOptions);
+        try { await validateGPSPosition(position); } catch {}
         result = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -177,9 +178,12 @@ export const getEnhancedLocation = async (
           readingsCount: 1,
         };
       } else {
+        // Validate the freshest reading to cache anti-joki snapshot.
+        try { await validateGPSPosition(readings[readings.length - 1]); } catch {}
         result = averageReadings(readings);
         console.log(`📍 Averaged ${readings.length} readings: ${result.latitude}, ${result.longitude} (avg accuracy: ${result.accuracy.toFixed(1)}m)`);
       }
+
     } else {
       // Single reading with fallback
       const position = await getPositionWithWatchFallback(positionOptions);
