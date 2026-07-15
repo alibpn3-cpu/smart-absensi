@@ -141,16 +141,23 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Hard clock manipulation: no recent server time-sync verification
-  let clock_manipulated_hard = false;
+  // Time-sync freshness: prior policy hard-flagged any missing/stale sync.
+  // That produced false positives on weak networks. Now:
+  //   - "time_sync_stale"           = soft flag (no recent server verification)
+  //   - "clock_manipulated_hard"    = ONLY when we measured skew > threshold
+  //                                   AND the client couldn't prove a fresh sync
+  let time_sync_stale = false;
   if (!time_sync_verified_at_raw) {
-    clock_manipulated_hard = true;
+    time_sync_stale = true;
   } else {
     const ts = Date.parse(time_sync_verified_at_raw);
     if (isNaN(ts) || Date.now() - ts > TIME_SYNC_MAX_AGE_MS) {
-      clock_manipulated_hard = true;
+      time_sync_stale = true;
     }
   }
+  const clock_manipulated_hard =
+    time_sync_stale && clock_skew_seconds != null && clock_skew_seconds > CLOCK_SKEW_THRESHOLD_SECONDS;
+
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
