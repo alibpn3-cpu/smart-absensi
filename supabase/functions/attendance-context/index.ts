@@ -218,6 +218,7 @@ Deno.serve(async (req) => {
 
     if (clock_warning) flags.push('clock_manipulated');
     if (clock_manipulated_hard) flags.push('clock_manipulated_hard');
+    else if (time_sync_stale) flags.push('time_sync_stale');
     if (detectMockGps(gps)) flags.push('suspected_mock_gps');
 
     // IP vs GPS mismatch (only when we have a country code from CF)
@@ -225,6 +226,7 @@ Deno.serve(async (req) => {
       flags.push(`ip_gps_mismatch:${ip_country}`);
     }
   } catch (e) {
+
     console.error('flag computation failed:', e);
   }
 
