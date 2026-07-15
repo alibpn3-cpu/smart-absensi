@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, User, MapPin, Briefcase, Building2, LogOut, Lock, Shield, FileText, Phone, Mail, Save, Loader2, Camera, Bell, BellOff, Sunrise } from 'lucide-react';
+import { ArrowLeft, User, MapPin, Briefcase, Building2, LogOut, Lock, Shield, FileText, Phone, Mail, Save, Loader2, Camera, Bell, BellOff, Sunset } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
