@@ -662,9 +662,12 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         { header: 'Skew Jam In (detik)', key: 'skewIn', width: 14 },
         { header: 'Skew Jam Out (detik)', key: 'skewOut', width: 14 },
         { header: 'Flag Clock-In', key: 'flagIn', width: 30 },
-        { header: 'Flag Clock-Out', key: 'flagOut', width: 30 }
+        { header: 'Flag Clock-Out', key: 'flagOut', width: 30 },
+        { header: 'Fake GPS Clock-In', key: 'fakeGpsIn', width: 14 },
+        { header: 'Fake GPS Clock-Out', key: 'fakeGpsOut', width: 14 }
 
       ];
+
 
       // Pre-scan: detect device_ids shared across multiple staff_uids in the dataset
       // (checks legacy + per-action columns so historic rows still light up)
