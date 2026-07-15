@@ -29,7 +29,7 @@ const UserProfile = () => {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
-  const [morningReminder, setMorningReminder] = useState(true);
+  const [eveningReminder, setEveningReminder] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
