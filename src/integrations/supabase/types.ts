@@ -890,6 +890,7 @@ export type Database = {
           division: string | null
           email: string | null
           employee_type: string | null
+          evening_reminder_enabled: boolean
           hcga_approver_uid: string | null
           id: string
           is_active: boolean
@@ -919,6 +920,7 @@ export type Database = {
           division?: string | null
           email?: string | null
           employee_type?: string | null
+          evening_reminder_enabled?: boolean
           hcga_approver_uid?: string | null
           id?: string
           is_active?: boolean
@@ -948,6 +950,7 @@ export type Database = {
           division?: string | null
           email?: string | null
           employee_type?: string | null
+          evening_reminder_enabled?: boolean
           hcga_approver_uid?: string | null
           id?: string
           is_active?: boolean
