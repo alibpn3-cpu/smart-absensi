@@ -1,5 +1,7 @@
 // Enhanced Geolocation Utility with Multiple Readings
 // Provides better accuracy through averaging and fallbacks
+import { validateGPSPosition } from './gpsValidator';
+
 
 export interface LocationResult {
   latitude: number;
