@@ -346,18 +346,19 @@ const UserProfile = () => {
 
               <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 rounded-lg">
                 <div className="flex items-center gap-3 min-w-0">
-                  <Sunrise className="h-4 w-4 text-amber-500 shrink-0" />
+                  <Sunset className="h-4 w-4 text-orange-500 shrink-0" />
                   <div className="min-w-0">
-                    <div className="text-sm font-medium">Reminder Clock-In Pagi</div>
-                    <div className="text-xs text-muted-foreground">Pengingat otomatis jika belum absen di pagi hari.</div>
+                    <div className="text-sm font-medium">Reminder Clock-Out Sore</div>
+                    <div className="text-xs text-muted-foreground">Pengingat otomatis (WhatsApp & push) jika belum clock out di sore hari.</div>
                   </div>
                 </div>
                 <Switch
-                  checked={morningReminder}
-                  onCheckedChange={handleToggleMorningReminder}
+                  checked={eveningReminder}
+                  onCheckedChange={handleToggleEveningReminder}
                   disabled={isLoading}
                 />
               </div>
+
             </div>
 
             {/* Actions */}
