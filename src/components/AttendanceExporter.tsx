@@ -346,9 +346,11 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     }
 
     const BATCH_SIZE = 1000;
+    const MAX_BATCHES = 200; // 200k rows safety cap
     let allData: any[] = [];
     let from = 0;
     let hasMore = true;
+    let batchIndex = 0;
 
     // Get work area UIDs once if filtering by work area
     let workAreaUids: string[] = [];
@@ -404,10 +406,15 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
       if (data && data.length > 0) {
         allData = [...allData, ...data];
         from += BATCH_SIZE;
+        batchIndex += 1;
         setFetchProgress(`Mengambil data... (${allData.length} records)`);
-        
-        // If data count is less than batch size, we've reached the end
-        if (data.length < BATCH_SIZE) {
+        if (data.length < BATCH_SIZE) hasMore = false;
+        if (batchIndex >= MAX_BATCHES) {
+          toast({
+            title: 'Data terlalu banyak',
+            description: `Export dibatasi ${MAX_BATCHES * BATCH_SIZE} baris. Persempit filter tanggal.`,
+            variant: 'destructive',
+          });
           hasMore = false;
         }
       } else {
@@ -722,7 +729,12 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
           user_on_other_device: 'User Pindah Perangkat',
           clock_manipulated: 'Jam Manipulasi',
           clock_manipulated_hard: 'Jam Manipulasi (Offline Trick)',
+          clock_skew_high: 'Jam Menyimpang Besar',
+          clock_drift_soft: 'Jam Sedikit Menyimpang',
+          time_sync_stale: 'Verifikasi Jam Kadaluarsa',
+          unusual_timezone: 'Zona Waktu Tidak Wajar',
           suspected_mock_gps: 'Suspek Fake GPS',
+          gps_low_confidence: 'Sinyal GPS Meragukan',
           ip_gps_mismatch: 'IP di Luar Indonesia',
           offline_queued: 'Absensi Offline (Perlu Review)',
         };
@@ -806,13 +818,13 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
           fakeGpsIn: (() => {
             const flag = (record.device_flag_in || record.device_flag || '').includes('suspected_mock_gps');
             const conf = record.gps_confidence_in;
-            return flag || (typeof conf === 'number' && conf < 50) ? 'Ya' : 'Tidak';
+            return flag || (typeof conf === 'number' && conf < 35) ? 'Ya' : 'Tidak';
           })(),
           fakeGpsOut: (() => {
             if (!record.check_out_time) return '-';
             const flag = (record.device_flag_out || '').includes('suspected_mock_gps');
             const conf = record.gps_confidence_out;
-            return flag || (typeof conf === 'number' && conf < 50) ? 'Ya' : 'Tidak';
+            return flag || (typeof conf === 'number' && conf < 35) ? 'Ya' : 'Tidak';
           })()
         });
 

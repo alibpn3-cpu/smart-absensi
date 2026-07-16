@@ -1,4 +1,4 @@
-// GPS Validator - Anti Fake GPS Algorithm
+// GPS Validator - Anti Fake GPS Algorithm (platform-aware)
 import { setLastGpsSnapshot } from './antiJokiCache';
 
 export interface GPSValidationResult {
@@ -6,6 +6,7 @@ export interface GPSValidationResult {
   isMocked: boolean;
   reason?: string;
   confidenceScore: number;
+  platform: 'ios' | 'android' | 'desktop' | 'unknown';
 }
 
 interface PositionHistory {
@@ -15,145 +16,157 @@ interface PositionHistory {
   accuracy: number;
 }
 
-// Store position history for movement analysis
 const positionHistory: PositionHistory[] = [];
 const MAX_HISTORY_SIZE = 10;
+
+// Threshold below which we mark as mocked. Loosened from 50 to 35 to avoid
+// penalising legit iPhone Safari readings that have no altitude/speed metadata.
+const MOCK_THRESHOLD = 35;
+// Soft "watch this" band for admin review only.
+const LOW_CONFIDENCE_THRESHOLD = 60;
+
+function detectPlatform(): 'ios' | 'android' | 'desktop' | 'unknown' {
+  if (typeof navigator === 'undefined') return 'unknown';
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod/i.test(ua)) return 'ios';
+  if (/Android/i.test(ua)) return 'android';
+  if (/Windows|Macintosh|Linux/i.test(ua)) return 'desktop';
+  return 'unknown';
+}
 
 export const addPositionToHistory = (position: GeolocationPosition) => {
   positionHistory.push({
     lat: position.coords.latitude,
     lng: position.coords.longitude,
     timestamp: position.timestamp,
-    accuracy: position.coords.accuracy
+    accuracy: position.coords.accuracy,
   });
-  
-  // Keep only last N positions
-  if (positionHistory.length > MAX_HISTORY_SIZE) {
-    positionHistory.shift();
-  }
+  if (positionHistory.length > MAX_HISTORY_SIZE) positionHistory.shift();
 };
 
 export const clearPositionHistory = () => {
   positionHistory.length = 0;
 };
 
-// Haversine formula for distance calculation
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R = 6371000; // Earth's radius in meters
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
 
 export const validateGPSPosition = async (
   position: GeolocationPosition
 ): Promise<GPSValidationResult> => {
+  const platform = detectPlatform();
   const checks: string[] = [];
   let confidenceScore = 100;
+  // Hard indicators only trigger `isMocked = true` regardless of confidence
+  // score. These are truly impossible for a real GPS reading.
+  let hardMock = false;
 
-  // 1. Check accuracy - fake GPS often has perfect accuracy (<3m)
   const accuracy = position.coords.accuracy;
-  if (accuracy < 3) {
-    checks.push('Akurasi GPS terlalu sempurna');
-    confidenceScore -= 25;
-  } else if (accuracy > 100) {
-    // Very poor accuracy might indicate indoor or GPS spoofing
-    checks.push('Akurasi GPS sangat buruk');
-    confidenceScore -= 10;
-  }
-
-  // 2. Check timestamp freshness - data should be recent
-  const timeDiff = Date.now() - position.timestamp;
-  if (timeDiff > 30000) { // >30 seconds old
-    checks.push('Data lokasi terlalu lama');
-    confidenceScore -= 20;
-  }
-
-  // 3. Check altitude - real GPS usually has altitude data
-  // Note: Some devices/browsers don't provide altitude, so this is a soft check
   const altitude = position.coords.altitude;
-  const altitudeAccuracy = position.coords.altitudeAccuracy;
-  
-  if (altitude === null && altitudeAccuracy === null) {
-    // No altitude data - minor flag
-    confidenceScore -= 5;
-  } else if (altitude !== null) {
-    // Check for suspicious altitude values
-    if (altitude < -500 || altitude > 10000) {
-      checks.push('Ketinggian GPS tidak wajar');
+  const speed = position.coords.speed;
+
+  // 1. Accuracy: perfect accuracy is a fake-GPS signature but iOS Safari
+  //    genuinely reports 2–5m outdoors. Only Android sub-3m is suspicious.
+  if (platform === 'android') {
+    if (accuracy < 3) {
+      checks.push('Akurasi GPS terlalu sempurna (Android)');
+      confidenceScore -= 20;
+    }
+  } else if (platform === 'ios') {
+    // iOS: only sub-1m is essentially impossible.
+    if (accuracy < 1) {
+      checks.push('Akurasi GPS mustahil (iOS)');
+      confidenceScore -= 30;
+      hardMock = true;
+    }
+  } else {
+    if (accuracy < 2) {
+      checks.push('Akurasi GPS terlalu sempurna');
       confidenceScore -= 15;
     }
   }
+  if (accuracy > 150) {
+    checks.push('Akurasi GPS sangat buruk');
+    confidenceScore -= 5;
+  }
 
-  // 4. Check for impossible movement (teleportation)
+  // 2. Freshness
+  const timeDiff = Date.now() - position.timestamp;
+  if (timeDiff > 60000) {
+    checks.push('Data lokasi terlalu lama');
+    confidenceScore -= 15;
+  }
+
+  // 3. Altitude: iOS Safari almost never exposes altitude on the web. Do NOT
+  //    penalise iOS/desktop for missing altitude — that was the main source
+  //    of false positives on iPhone.
+  if (platform === 'android' && altitude === null && position.coords.altitudeAccuracy === null) {
+    confidenceScore -= 5;
+  } else if (altitude !== null && (altitude < -500 || altitude > 10000)) {
+    checks.push('Ketinggian GPS tidak wajar');
+    confidenceScore -= 10;
+  }
+
+  // 4. Teleportation (impossible movement) — HARD indicator.
   if (positionHistory.length > 0) {
     const lastPos = positionHistory[positionHistory.length - 1];
-    const timeDeltaSeconds = (position.timestamp - lastPos.timestamp) / 1000;
-    
-    if (timeDeltaSeconds > 0 && timeDeltaSeconds < 60) {
+    const dtSec = (position.timestamp - lastPos.timestamp) / 1000;
+    if (dtSec > 0 && dtSec < 60) {
       const distance = calculateDistance(
-        lastPos.lat, lastPos.lng,
-        position.coords.latitude, position.coords.longitude
+        lastPos.lat,
+        lastPos.lng,
+        position.coords.latitude,
+        position.coords.longitude
       );
-      
-      // Speed in m/s
-      const speed = distance / timeDeltaSeconds;
-      
-      // Human walking ~1.4m/s, running ~5m/s, driving ~30m/s
-      // Teleportation detection: >100 m/s = 360 km/h (impossible for pedestrian)
-      if (speed > 100) {
+      const mps = distance / dtSec;
+      if (mps > 100) {
         checks.push('Perpindahan lokasi tidak wajar (teleportasi)');
         confidenceScore -= 40;
-      } else if (speed > 50 && accuracy < 10) {
-        // High speed with high accuracy - suspicious
+        hardMock = true;
+      } else if (mps > 50 && accuracy < 10) {
         checks.push('Kecepatan tinggi dengan akurasi sempurna');
-        confidenceScore -= 20;
+        confidenceScore -= 15;
       }
     }
   }
 
-  // 5. Check for coordinate consistency
-  // Fake GPS often produces coordinates with too many decimal places of precision
-  // or coordinates that don't change at all
-  if (positionHistory.length >= 3) {
-    const recentPositions = positionHistory.slice(-3);
-    const allSame = recentPositions.every(p => 
-      p.lat === position.coords.latitude && 
-      p.lng === position.coords.longitude
+  // 5. Static coords with unrealistically high accuracy across readings.
+  //    Only penalise on Android (iOS static readings while stationary are normal).
+  if (platform === 'android' && positionHistory.length >= 3) {
+    const recent = positionHistory.slice(-3);
+    const allSame = recent.every(
+      (p) => p.lat === position.coords.latitude && p.lng === position.coords.longitude
     );
-    
     if (allSame && accuracy < 5) {
       checks.push('Posisi tidak berubah dengan akurasi tinggi');
+      confidenceScore -= 10;
+    }
+  }
+
+  // 6. Speed sanity — HARD if negative.
+  if (speed !== null) {
+    if (speed < 0) {
+      checks.push('Kecepatan GPS negatif');
+      confidenceScore -= 30;
+      hardMock = true;
+    } else if (speed > 100) {
+      checks.push('Kecepatan GPS tidak wajar');
       confidenceScore -= 15;
     }
   }
 
-  // 6. Speed consistency check
-  const speed = position.coords.speed;
-  if (speed !== null) {
-    // Speed is available
-    if (speed < 0) {
-      checks.push('Kecepatan GPS negatif');
-      confidenceScore -= 30;
-    } else if (speed > 100) {
-      // >360 km/h - suspicious for ground vehicle
-      checks.push('Kecepatan GPS tidak wajar');
-      confidenceScore -= 20;
-    }
-  }
-
-  // Add current position to history
   addPositionToHistory(position);
 
-  // Determine if mocked based on confidence score
-  const isMocked = confidenceScore < 50;
+  const isMocked = hardMock || confidenceScore < MOCK_THRESHOLD;
 
-  // Cache raw GPS snapshot so attendanceContext can attach it automatically.
   setLastGpsSnapshot({
     accuracy: position.coords.accuracy ?? null,
     altitude: position.coords.altitude ?? null,
@@ -161,26 +174,27 @@ export const validateGPSPosition = async (
     confidence_score: confidenceScore,
     is_mocked: isMocked,
     reason: checks.length > 0 ? checks.join(', ') : null,
+    platform,
+    low_confidence: !isMocked && confidenceScore < LOW_CONFIDENCE_THRESHOLD,
   });
 
   return {
     isValid: !isMocked,
     isMocked,
     reason: checks.length > 0 ? checks.join(', ') : undefined,
-    confidenceScore
+    confidenceScore,
+    platform,
   };
 };
 
-// Quick validation without history tracking (for kiosk mode)
+// Quick check for kiosk (no history dependency).
 export const quickValidateGPS = (position: GeolocationPosition): boolean => {
-  // Only check basic indicators
+  const platform = detectPlatform();
   const accuracy = position.coords.accuracy;
   const timeDiff = Date.now() - position.timestamp;
-  
-  // Reject if accuracy is impossibly good or data is stale
-  if (accuracy < 2 || timeDiff > 60000) {
-    return false;
-  }
-  
+  // Only reject truly impossible readings.
+  if (platform === 'android' && accuracy < 2) return false;
+  if (platform !== 'android' && accuracy < 1) return false;
+  if (timeDiff > 90000) return false;
   return true;
 };
