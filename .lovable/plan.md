@@ -1,118 +1,76 @@
-## Ringkasan Masalah (Data dari DB & Export)
+## Perbaikan 4 Isu: Fake GPS, Reminder, Manipulasi Jam, Export
 
-Query DB (`attendance_records` sejak 2026-07-01, 2356 baris):
-- `device_id_in` NOT NULL: **0** baris
-- `device_id_out` NOT NULL: **0** baris
-- `device_id` (legacy) terisi: 2290 baris
+### 1. Fake GPS false positive (khususnya iPhone)
 
-Artinya kolom split `_in`/`_out` **tidak pernah tertulis sekalipun**, meskipun `contextToColumns()` sudah spread-nya ke insert. Ini root cause issue #2 dan sebagian issue #4 (fake-GPS flag hilang karena disimpan di `device_flag_in/_out`).
+**Root cause**: `gpsValidator.ts` menghukum akurasi < 3m (-25 poin) dan tidak-ada-altitude (-5 poin). iPhone modern (iOS 15+) di outdoor kerap melaporkan akurasi 2–5m tanpa altitude di web Safari — bukan spoofing. Ambang mocked di skor <50 juga terlalu ketat.
 
-Untuk issue #1: query menunjukkan hampir semua baris hari ini punya `device_flag = 'clock_manipulated_hard'`. Berarti `time_sync_verified_at` sering kosong / basi walau user tidak mengubah jam.
+**Perbaikan**:
+- Deteksi platform via `userAgent` (iOS Safari vs Android Chrome) dan longgarkan aturan untuk iOS:
+  - iOS: akurasi <2m baru dianggap terlalu sempurna (bukan <3m); no-altitude tidak dipenalti sama sekali (Safari memang jarang expose altitude di web).
+  - Android: pertahankan aturan lama (akurasi <3m suspicious) karena aplikasi fake GPS Android umum.
+- Turunkan ambang "mocked" dari `<50` menjadi `<35` supaya tidak terlalu agresif.
+- Tambah "hard signal" yang lebih spesifik: hanya tandai `is_mocked=true` bila menemui indikator kuat (kecepatan negatif, teleportasi >100 m/s, atau accuracy 0/1 m yang mustahil).
+- Simpan `platform` di snapshot GPS supaya edge function bisa menerapkan aturan yang sama saat cross-check.
+- Di `attendance-context/index.ts`, hanya tandai `suspected_mock_gps` bila `is_mocked=true` **atau** confidence <35 (bukan <50), agar konsisten dengan client.
+- Tambahkan flag halus baru `gps_low_confidence` (skor 35–60) di kolom `device_flag` sehingga admin tetap melihat gejala tanpa tuduhan keras.
 
----
+### 2. Reminder clock-out belum maksimal
 
-## 1. Main Concern
+**Root cause**: Cron hanya jalan sekali di `0 15 * * *` UTC (=22:00 WIB / 23:00 WITA). Push notification memang sudah dipanggil ke `send-push-notification`, tapi sekali saja dan terlalu larut untuk WITA.
 
-Split column `_in` / `_out` **tidak pernah masuk DB** → seluruh sistem anti-joki v2 (per-action device, IP, GPS, skew) belum berjalan. Semua analisa (fake GPS, joki, checkout evidence) masih bergantung ke kolom legacy yang di-overwrite saat clock-out.
+**Perbaikan**:
+- Migrasi baru menjadwalkan **dua** cron:
+  - `14 * * * *` UTC (=21:00 WIB & 22:00 WITA) untuk WIB.
+  - `15 * * * *` UTC (=22:00 WIB & 23:00 WITA) untuk WITA.
+  - Alternatif lebih rapi: satu cron per jam antara 21:00–23:59 local (parameter `?tz=WIB|WITA`), edge function memfilter user by `work_area`.
+- Ubah `remind-clock-out/index.ts`:
+  - Terima `tz` param dan hitung tanggal lokal dari zona itu (bukan hardcoded WIB).
+  - Filter `staff_users` by `work_area` yang sesuai zona.
+  - Kirim web push dulu (paralel, tak bergantung nomor HP), lalu WhatsApp untuk user yang punya `phone_number`.
+  - Web push kirim dengan `requireInteraction: true` dan `renotify: true` supaya notifikasi tetap terlihat saat browser tertutup / user tidur.
+  - Idempotent: kirim ulang OK karena `tag` unik per (uid,date,slot).
+- Di `push-sw.js` pastikan opsi `requireInteraction`, `renotify`, `silent: false`, dan vibrate diteruskan dari payload.
+- Di UI `UserProfile`, tambah copy singkat: "Aktifkan notifikasi browser agar reminder tetap muncul walau aplikasi ditutup."
 
-## 2. Weakest Assumption
+### 3. Manipulasi jam masih ke-flag walau tidak dimanipulasi
 
-Asumsi bahwa `contextToColumns()` sudah cukup untuk memastikan kolom split terisi. Kenyataan: 0/2356 baris terisi. Ada gap antara kode & DB — kemungkinan besar user masih pakai bundle PWA lama (cache SW) yang belum punya split writer, atau ada schema-cache mismatch di PostgREST.
+**Root cause**:
+- Perbedaan zona waktu memang tidak jadi masalah di guard client (`useClockSkewGuard` sudah pakai epoch UTC), tapi di `attendance-context/index.ts` `client_timestamp` dibandingkan dengan `Date.now()` server. Jika ada latency network / clock drift kecil <2 menit itu OK, tapi kombinasi (a) `time_sync_stale` karena user offline saat verifikasi terakhir dan (b) skew karena RTT tinggi bisa memicu `clock_manipulated` (soft) padahal jam benar.
+- Threshold `CLOCK_SKEW_THRESHOLD_SECONDS = 120` terlalu ketat untuk jaringan lemah.
 
-## 3. Strongest Counterargument
+**Perbaikan**:
+- Naikkan `CLOCK_SKEW_THRESHOLD_SECONDS` menjadi 300 (5 menit) — cukup untuk clock drift wajar tapi tetap menangkap manipulasi jam bulanan.
+- Tambah "grace window" bila `time_sync_verified_at` ada dan usianya <24 jam: tidak pernah set `clock_manipulated_hard`, maksimal `time_sync_stale`.
+- Sertakan `client_tz_offset_minutes` di payload (dari `new Date().getTimezoneOffset()`). Server memvalidasi offset masuk akal (WIB=-420 atau WITA=-480). Jika offset tidak masuk akal, cukup catat flag `unusual_timezone` — bukan `clock_manipulated_hard`.
+- Ubah label flag jadi lebih deskriptif: `clock_drift_soft` (skew 120–300s), `clock_skew_high` (>300s tapi sync fresh), `clock_manipulated_hard` (>300s DAN sync stale >24h).
+- Update exporter agar tetap kompatibel: kolom flag baru dimapping ke label bahasa Indonesia.
 
-"Cukup tunggu force-update rollout." — Tidak cukup. Bahkan setelah bundle baru sampai ke semua device, kita perlu verifikasi via satu insert test bahwa PostgREST menerima kolom `_in`/`_out`. Kalau tidak, semua tetap NULL.
+### 4. Export XLS & limit 1000 Supabase
 
-## 4. Yang Perlu Diverifikasi
+**Root cause**: `AttendanceExporter.fetchAttendanceData` sudah pakai batch 1000 dengan `.range()`, tapi:
+- Kondisi berhenti `data.length < BATCH_SIZE` benar, tapi tidak ada log jika error di batch ke-N (silent partial return).
+- Ada risiko duplikasi baris jika `date` + `check_in_time` tidak unik dan sorting tie-break tidak stabil.
+- Filter status/employee/area sudah OK; hanya perlu memastikan tidak ada `.limit()` implisit yang lolos.
 
-- Apakah bundle di `absensi.petrolog.my.id` sudah punya `device_id_in` di payload insert (cek via Network tab / rebuild).
-- Apakah PostgREST schema cache mengenali kolom `_in`/`_out` (test insert manual via SQL Editor / edge function).
-- Apakah `enhancedGeolocation` memanggil `gpsValidator.validateGPS()` sebelum submit (kalau tidak, `setLastGpsSnapshot` tak pernah dipanggil → fake-gps flag selalu null).
+**Perbaikan**:
+- Tambah safety upper bound (mis. 200 batch = 200.000 rows) dan toast jika terpotong.
+- Sertakan kolom flag baru (`gps_low_confidence`, `clock_drift_soft`, `clock_skew_high`, `unusual_timezone`) di header export XLS/CSV/PDF.
+- Pastikan fallback legacy untuk `device_id_out`/`client_ip_out` sudah tetap ada (sudah), dan tambah kolom `Fake GPS Confidence In/Out` menampilkan angka mentah supaya admin bisa audit.
+- Cek juga `AttendanceStatusList` dan API endpoint lain (`sub-admin-reports` jika ada) menggunakan pola batch yang sama; kalau ada yang belum, samakan.
 
-## 5. Rencana Perbaikan
+### File yang akan diubah
 
-### Isu 1 — False positive `clock_manipulated_hard`
+- `src/utils/gpsValidator.ts` — aturan iOS-aware, ambang baru.
+- `src/utils/enhancedGeolocation.ts` — sertakan hasil validasi (platform) ke snapshot.
+- `src/utils/attendanceContext.ts` — kirim `client_tz_offset_minutes`.
+- `supabase/functions/attendance-context/index.ts` — threshold baru, validasi TZ, flag baru.
+- `supabase/functions/remind-clock-out/index.ts` — support `tz` param, push web maksimal.
+- `public/push-sw.js` — `requireInteraction`, `renotify`.
+- `src/components/AttendanceExporter.tsx` — kolom flag baru + safety cap.
+- `src/pages/UserProfile.tsx` — copy edukasi notifikasi.
+- Migrasi baru untuk cron dua-jadwal (via `supabase--insert`, bukan file migrasi, sesuai instruksi karena berisi anon key).
 
-Root cause: `time-sync` sering gagal di jaringan lambat (mining site), sehingga `time_sync_verified_at` kosong / lewat 60 menit → edge function men-flag hard.
+### Yang TIDAK diubah
 
-**Fix (frontend + backend, additive):**
-- `useClockSkewGuard.ts`:
-  - Poll ulang saat `visibilitychange` (user buka app), bukan cuma tiap 5 menit.
-  - Tambah retry ringan (3× dengan backoff 500ms/1s/2s) sebelum give-up.
-  - Kalau RTT ≤ 8s DAN skew invalid → tetap invalid; tapi kalau server tidak reachable sama sekali → **tetap panggil `setTimeSyncVerifiedNow()`** hanya jika sebelumnya sudah pernah sukses dalam 24 jam (grace period offline).
-- `useAttendanceForm` / titik sebelum submit: `await clockGuard.recheck()` **sebelum** `getAttendanceContext`, dan kalau masih gagal, kirim `time_sync_verified_at` dari last-known-good (persist di localStorage, bukan cuma memory).
-- `attendance-context/index.ts`: naikkan `TIME_SYNC_MAX_AGE_MS` dari 60m → **6 jam**, dan pisahkan `clock_manipulated_hard` (skew > 120s TERUKUR) vs `time_sync_stale` (soft flag, tidak block). Flag hard hanya kalau `clock_skew_seconds` benar-benar > 120.
-- Persist `time_sync_verified_at` di `localStorage` (key `last_time_sync_ok`) sehingga bertahan across reload/PWA restart.
-
-### Isu 2 — Kolom `_in` / `_out` kosong di DB & Export
-
-**Langkah A: Buktikan penyebab.**
-Insert test 1 baris via SQL editor dengan semua kolom `_in` terisi. Kalau tersimpan → root cause = bundle lama di device user. Kalau tetap NULL → PostgREST/RLS masalah.
-
-**Langkah B: Fix di frontend (defensif):**
-- `attendanceContext.ts` → `contextToColumns()`: tetap tulis legacy + split (sudah OK), tapi **tambah** kolom yang sekarang hilang untuk check-out:
-  - Saat action = `check_out`, JANGAN overwrite `device_id`, `client_ip`, `device_label`, `device_flag` legacy — biarkan tetap punya nilai check-in. Cukup tulis `*_out` versinya.
-  - Sekarang legacy diwrite ulang di setiap update → data check-in hilang. Fix: hapus kunci legacy dari hasil `contextToColumns` ketika action=`check_out`.
-
-**Langkah C: Debug logging & fallback:**
-- Tambah `console.debug('[attendance] insert payload keys', Object.keys(row))` supaya bisa lihat di production apakah `device_id_in` ikut terkirim.
-- Force SW replacement + version bump agar semua user pakai bundle baru.
-
-**Langkah D: Exporter (`AttendanceExporter.tsx`)**
-- Fallback: `device_in = device_label_in || device_label || '-'`, `device_out = device_label_out || (checkout ada ? device_label : '-')`. Sama untuk ip/device_id/flag/skew.
-- Ini menjaga backward compat sampai split cols terisi konsisten.
-
-### Isu 3 — Reminder di Profile: hapus clock-in, ganti clock-out (+ push notif maksimal)
-
-**DB migration (baru):**
-- Tambah kolom `evening_reminder_enabled boolean DEFAULT true` di `staff_users`.
-- Biarkan `morning_reminder_enabled` tetap ada (jangan drop — dipakai `remind-clock-in`). User hanya minta UI di profile diubah.
-
-**Frontend (`src/pages/UserProfile.tsx`):**
-- Ganti toggle "Reminder Clock-In Pagi" → "Reminder Clock-Out Sore".
-- Baca/tulis kolom `evening_reminder_enabled`.
-
-**Backend (`remind-clock-out/index.ts`):**
-- Filter staff `.neq('evening_reminder_enabled', false)`.
-- Tambah kirim **Web Push** (via `web-push` + tabel `push_subscriptions` yang sudah ada) selain WA, supaya jalan walaupun browser tertutup. Sudah ada infra `push-sw.js` & `send-push-notification` edge function → cukup panggil untuk staff yang belum clock-out.
-
-**Push reliability:**
-- Pastikan `push-sw.js` handle event `push` & `notificationclick` benar (tampilkan bahkan saat browser closed di Android Chrome/PWA). Cek subscription auto-renew di `usePushNotifications.ts`.
-
-### Isu 4 — Fake GPS: pastikan terbaca di export
-
-**Verifikasi flow:**
-- `enhancedGeolocation.getCurrentPosition()` harus panggil `gpsValidator.validateGPS(coords)` → `setLastGpsSnapshot(...)` sebelum submit. Kalau belum, tambahkan.
-- `attendance-context` sudah punya `detectMockGps()` dan menambah flag `suspected_mock_gps` ke `device_flag`. Sekarang hilang karena split cols kosong (issue #2).
-
-**Tambahan di export XLS:**
-- Tambah 2 kolom baru: `Fake GPS Clock-In` & `Fake GPS Clock-Out` (Ya/Tidak) berdasarkan `device_flag_in/_out` mengandung `suspected_mock_gps` ATAU `gps_confidence_in/out < 50`.
-- Highlight baris merah kalau kedua-nya `Ya`.
-
-## 6. Rekomendasi Final
-
-Kerjakan urutan: **#2 dulu** (paling fundamental — kalau split col masih NULL, isu #4 & sebagian #1 percuma diperbaiki), lalu **#1** (relax hard-flag + persist last sync), lalu **#3** (reminder), terakhir **#4** (kolom export & verifikasi validator).
-
-## File yang Akan Diubah
-
-**Frontend:**
-- `src/utils/attendanceContext.ts` — jangan overwrite legacy saat check_out; log payload keys
-- `src/utils/antiJokiCache.ts` — persist `time_sync_verified_at` ke localStorage
-- `src/utils/enhancedGeolocation.ts` — pastikan panggil `validateGPS()` & set snapshot
-- `src/hooks/useClockSkewGuard.ts` — retry + visibilitychange + last-known-good grace
-- `src/components/AttendanceExporter.tsx` — fallback legacy + 2 kolom Fake GPS baru
-- `src/pages/UserProfile.tsx` — ganti toggle jadi clock-out reminder
-- `src/hooks/usePushNotifications.ts` — pastikan auto-renew subscription
-- `public/push-sw.js` — verifikasi handler push/notificationclick
-
-**Backend:**
-- `supabase/functions/attendance-context/index.ts` — `TIME_SYNC_MAX_AGE_MS` 60m→6h, pisahkan hard vs soft flag
-- `supabase/functions/remind-clock-out/index.ts` — filter `evening_reminder_enabled` + trigger push notif
-
-**Migration (data-only, no schema di kolom absensi):**
-- `ALTER TABLE staff_users ADD COLUMN evening_reminder_enabled boolean DEFAULT true`
-
-**Non-goals:**
-- Tidak backfill data lama (permintaan sebelumnya "mulai sekarang saja")
-- Tidak ubah geofence, star score, shift logic
-- Tidak block user karena fake GPS — cuma flag (permintaan user)
+- Skema DB attendance tidak berubah (flag baru masuk ke kolom string `device_flag` yang sama).
+- Flow clock-in/out di `AttendanceForm` tidak disentuh — hanya utilitas pendukung.
