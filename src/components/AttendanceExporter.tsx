@@ -811,13 +811,13 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
           fakeGpsIn: (() => {
             const flag = (record.device_flag_in || record.device_flag || '').includes('suspected_mock_gps');
             const conf = record.gps_confidence_in;
-            return flag || (typeof conf === 'number' && conf < 50) ? 'Ya' : 'Tidak';
+            return flag || (typeof conf === 'number' && conf < 35) ? 'Ya' : 'Tidak';
           })(),
           fakeGpsOut: (() => {
             if (!record.check_out_time) return '-';
             const flag = (record.device_flag_out || '').includes('suspected_mock_gps');
             const conf = record.gps_confidence_out;
-            return flag || (typeof conf === 'number' && conf < 50) ? 'Ya' : 'Tidak';
+            return flag || (typeof conf === 'number' && conf < 35) ? 'Ya' : 'Tidak';
           })()
         });
 
