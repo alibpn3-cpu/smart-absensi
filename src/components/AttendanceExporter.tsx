@@ -722,7 +722,12 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
           user_on_other_device: 'User Pindah Perangkat',
           clock_manipulated: 'Jam Manipulasi',
           clock_manipulated_hard: 'Jam Manipulasi (Offline Trick)',
+          clock_skew_high: 'Jam Menyimpang Besar',
+          clock_drift_soft: 'Jam Sedikit Menyimpang',
+          time_sync_stale: 'Verifikasi Jam Kadaluarsa',
+          unusual_timezone: 'Zona Waktu Tidak Wajar',
           suspected_mock_gps: 'Suspek Fake GPS',
+          gps_low_confidence: 'Sinyal GPS Meragukan',
           ip_gps_mismatch: 'IP di Luar Indonesia',
           offline_queued: 'Absensi Offline (Perlu Review)',
         };
