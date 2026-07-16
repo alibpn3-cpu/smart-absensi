@@ -406,10 +406,15 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
       if (data && data.length > 0) {
         allData = [...allData, ...data];
         from += BATCH_SIZE;
+        batchIndex += 1;
         setFetchProgress(`Mengambil data... (${allData.length} records)`);
-        
-        // If data count is less than batch size, we've reached the end
-        if (data.length < BATCH_SIZE) {
+        if (data.length < BATCH_SIZE) hasMore = false;
+        if (batchIndex >= MAX_BATCHES) {
+          toast({
+            title: 'Data terlalu banyak',
+            description: `Export dibatasi ${MAX_BATCHES * BATCH_SIZE} baris. Persempit filter tanggal.`,
+            variant: 'destructive',
+          });
           hasMore = false;
         }
       } else {
