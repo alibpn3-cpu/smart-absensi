@@ -52,6 +52,9 @@ export async function getAttendanceContext(
       ? extras.time_sync_verified_at
       : getTimeSyncVerifiedAt();
 
+  const client_tz_offset_minutes =
+    typeof Date !== 'undefined' ? new Date().getTimezoneOffset() : null;
+
   try {
     const { data, error } = await supabase.functions.invoke('attendance-context', {
       body: {
@@ -60,6 +63,7 @@ export async function getAttendanceContext(
         device_id,
         user_agent,
         client_timestamp,
+        client_tz_offset_minutes,
         gps,
         time_sync_verified_at,
       },
