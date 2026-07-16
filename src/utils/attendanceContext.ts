@@ -15,6 +15,8 @@ export interface GpsSnapshot {
   confidence_score: number | null;
   is_mocked: boolean;
   reason?: string | null;
+  platform?: 'ios' | 'android' | 'desktop' | 'unknown';
+  low_confidence?: boolean;
 }
 
 export interface AttendanceContext {
