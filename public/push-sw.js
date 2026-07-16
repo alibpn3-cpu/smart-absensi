@@ -24,7 +24,11 @@ self.addEventListener('push', (event) => {
     badge: payload.badge || '/icon-192.png',
     tag: payload.tag || undefined,
     data: { link: payload.link || '/', ...(payload.data || {}) },
-    requireInteraction: !!payload.requireInteraction,
+    // Force notification to stay visible until user interacts (Android/desktop).
+    requireInteraction: payload.requireInteraction !== false,
+    renotify: payload.renotify !== false && !!payload.tag,
+    silent: false,
+    vibrate: payload.vibrate || [200, 100, 200, 100, 200],
   };
 
   event.waitUntil(
