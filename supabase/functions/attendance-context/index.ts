@@ -129,6 +129,8 @@ Deno.serve(async (req) => {
   const device_id = (body.device_id || '').toString().trim();
   const user_agent = (body.user_agent || '').toString();
   const client_timestamp_raw = (body.client_timestamp || '').toString();
+  const client_tz_offset_minutes =
+    typeof body.client_tz_offset_minutes === 'number' ? body.client_tz_offset_minutes : null;
   const gps = body.gps || null;
   const time_sync_verified_at_raw = body.time_sync_verified_at || null;
 
@@ -146,33 +148,48 @@ Deno.serve(async (req) => {
   const device_label = parseUserAgent(user_agent);
   const ip_country = req.headers.get('cf-ipcountry') || null;
 
-  // Clock skew
+  // Clock skew (soft vs hard)
   let clock_skew_seconds: number | null = null;
   let clock_warning = false;
   if (client_timestamp_raw) {
     const clientMs = Date.parse(client_timestamp_raw);
     if (!isNaN(clientMs)) {
       clock_skew_seconds = Math.round(Math.abs(Date.now() - clientMs) / 1000);
-      if (clock_skew_seconds > CLOCK_SKEW_THRESHOLD_SECONDS) clock_warning = true;
+      if (clock_skew_seconds > CLOCK_SKEW_SOFT_SECONDS) clock_warning = true;
     }
   }
 
-  // Time-sync freshness: prior policy hard-flagged any missing/stale sync.
-  // That produced false positives on weak networks. Now:
-  //   - "time_sync_stale"           = soft flag (no recent server verification)
-  //   - "clock_manipulated_hard"    = ONLY when we measured skew > threshold
-  //                                   AND the client couldn't prove a fresh sync
+  // Time-sync freshness
   let time_sync_stale = false;
+  let time_sync_hard_stale = false;
   if (!time_sync_verified_at_raw) {
     time_sync_stale = true;
+    time_sync_hard_stale = true;
   } else {
     const ts = Date.parse(time_sync_verified_at_raw);
-    if (isNaN(ts) || Date.now() - ts > TIME_SYNC_MAX_AGE_MS) {
-      time_sync_stale = true;
-    }
+    if (isNaN(ts) || Date.now() - ts > TIME_SYNC_MAX_AGE_MS) time_sync_stale = true;
+    if (isNaN(ts) || Date.now() - ts > TIME_SYNC_HARD_MAX_AGE_MS) time_sync_hard_stale = true;
   }
+
+  // Hard flag ONLY when skew is truly extreme AND we can't prove recent
+  // server verification. Otherwise it's a soft "drift" flag.
   const clock_manipulated_hard =
-    time_sync_stale && clock_skew_seconds != null && clock_skew_seconds > CLOCK_SKEW_THRESHOLD_SECONDS;
+    time_sync_hard_stale &&
+    clock_skew_seconds != null &&
+    clock_skew_seconds > CLOCK_SKEW_HARD_SECONDS;
+  const clock_skew_high =
+    !clock_manipulated_hard &&
+    clock_skew_seconds != null &&
+    clock_skew_seconds > CLOCK_SKEW_HARD_SECONDS;
+  const clock_drift_soft =
+    !clock_manipulated_hard &&
+    !clock_skew_high &&
+    clock_skew_seconds != null &&
+    clock_skew_seconds > CLOCK_SKEW_SOFT_SECONDS;
+
+  // Timezone sanity — Indonesian devices should be WIB/WITA/WIT.
+  const unusual_timezone =
+    client_tz_offset_minutes != null && !VALID_TZ_OFFSETS.has(client_tz_offset_minutes);
 
 
   const supabase = createClient(
