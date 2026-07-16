@@ -84,17 +84,23 @@ function parseUserAgent(ua: string): string {
   return [model, browser, os].filter(Boolean).join(' • ');
 }
 
-function detectMockGps(gps: GpsSnapshot | null | undefined): boolean {
-  if (!gps) return false;
-  // client already computed a confidence score (0-100); <50 = suspicious
-  if (typeof gps.confidence_score === 'number' && gps.confidence_score < 50) return true;
-  if (gps.is_mocked) return true;
-  // classic fake-gps signature: perfect accuracy, no altitude, no speed
+function detectMockGps(gps: GpsSnapshot | null | undefined): 'hard' | 'low' | null {
+  if (!gps) return null;
+  if (gps.is_mocked) return 'hard';
+  const score = typeof gps.confidence_score === 'number' ? gps.confidence_score : 100;
   const accuracy = gps.accuracy ?? null;
   const altitude = gps.altitude ?? null;
   const speed = gps.speed ?? null;
-  if (accuracy !== null && accuracy < 3 && altitude === null && speed === null) return true;
-  return false;
+  // Platform-aware: iOS Safari never exposes altitude/speed on the web, so
+  // "no altitude + no speed" is NOT a signature there.
+  const platform = (gps.platform || '').toLowerCase();
+  const isAndroid = platform === 'android';
+  if (score < 35) return 'hard';
+  if (isAndroid && accuracy !== null && accuracy < 2 && altitude === null && speed === null) {
+    return 'hard';
+  }
+  if (score < 60 || gps.low_confidence) return 'low';
+  return null;
 }
 
 Deno.serve(async (req) => {
