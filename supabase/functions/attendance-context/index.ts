@@ -249,10 +249,14 @@ Deno.serve(async (req) => {
       else flags.push('new_device');
     }
 
-    if (clock_warning) flags.push('clock_manipulated');
     if (clock_manipulated_hard) flags.push('clock_manipulated_hard');
-    else if (time_sync_stale) flags.push('time_sync_stale');
-    if (detectMockGps(gps)) flags.push('suspected_mock_gps');
+    else if (clock_skew_high) flags.push('clock_skew_high');
+    else if (clock_drift_soft) flags.push('clock_drift_soft');
+    if (time_sync_stale && !clock_manipulated_hard) flags.push('time_sync_stale');
+    if (unusual_timezone) flags.push(`unusual_timezone:${client_tz_offset_minutes}`);
+    const mockLevel = detectMockGps(gps);
+    if (mockLevel === 'hard') flags.push('suspected_mock_gps');
+    else if (mockLevel === 'low') flags.push('gps_low_confidence');
 
     // IP vs GPS mismatch (only when we have a country code from CF)
     if (ip_country && ip_country !== 'ID' && ip_country !== 'XX') {
