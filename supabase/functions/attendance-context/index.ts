@@ -14,6 +14,8 @@ interface GpsSnapshot {
   confidence_score?: number | null;
   is_mocked?: boolean;
   reason?: string | null;
+  platform?: string | null;
+  low_confidence?: boolean;
 }
 
 interface ReqBody {
@@ -22,12 +24,20 @@ interface ReqBody {
   device_id?: string;
   user_agent?: string;
   client_timestamp?: string;
+  client_tz_offset_minutes?: number | null;
   gps?: GpsSnapshot | null;
   time_sync_verified_at?: string | null;
 }
 
-const CLOCK_SKEW_THRESHOLD_SECONDS = 120;
-const TIME_SYNC_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 hours (relaxed for weak networks)
+// Relaxed thresholds — the previous 120s window flagged everyone on weak
+// mining-site networks. 300s (5 min) still catches deliberate clock spoofing.
+const CLOCK_SKEW_SOFT_SECONDS = 120;
+const CLOCK_SKEW_HARD_SECONDS = 300;
+const TIME_SYNC_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6h
+const TIME_SYNC_HARD_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h grace before hard flag
+// Valid Indonesian timezones: WIB (UTC+7 = -420), WITA (UTC+8 = -480),
+// WIT (UTC+9 = -540). We allow a small window around each.
+const VALID_TZ_OFFSETS = new Set([-420, -480, -540]);
 
 
 function getClientIp(req: Request): string | null {
