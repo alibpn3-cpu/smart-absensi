@@ -359,6 +359,10 @@ const UserProfile = () => {
                 />
               </div>
 
+              <p className="text-[11px] leading-snug text-muted-foreground px-1">
+                Aktifkan <b>Push Notifikasi</b> di atas agar reminder tetap muncul walau aplikasi ditutup. Reminder akan dikirim pukul <b>21:00 waktu lokal Anda</b> (WIB/WITA) sesuai jam perangkat.
+              </p>
+
             </div>
 
             {/* Actions */}
