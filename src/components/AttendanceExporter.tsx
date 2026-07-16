@@ -346,9 +346,11 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     }
 
     const BATCH_SIZE = 1000;
+    const MAX_BATCHES = 200; // 200k rows safety cap
     let allData: any[] = [];
     let from = 0;
     let hasMore = true;
+    let batchIndex = 0;
 
     // Get work area UIDs once if filtering by work area
     let workAreaUids: string[] = [];
