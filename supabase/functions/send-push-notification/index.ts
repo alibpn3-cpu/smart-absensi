@@ -83,6 +83,9 @@ Deno.serve(async (req) => {
       title, body: messageBody,
       link: body.link || "/",
       tag: body.tag,
+      requireInteraction: body.requireInteraction,
+      renotify: body.renotify,
+      vibrate: body.vibrate,
       data: body.data || {},
     });
 
