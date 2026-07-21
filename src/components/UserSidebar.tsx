@@ -344,6 +344,18 @@ const UserSidebar: React.FC = () => {
                   </div>
                 </Button>
 
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between h-11"
+                  onClick={() => { setOpen(false); setShowHistory(true); }}
+                >
+                  <div className="flex items-center gap-3">
+                    <History className="h-4 w-4 text-primary" />
+                    <span>Riwayat Absensi</span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </Button>
+
                 {(featureFlags.leaveRequestEnabled || featureFlags.permissionRequestEnabled) && (
                   <Button
                     variant="ghost"
@@ -472,6 +484,21 @@ const UserSidebar: React.FC = () => {
           <NotificationsDialog
             open={showNotifications}
             onOpenChange={setShowNotifications}
+            staffUid={uid}
+          />
+        );
+      })()}
+
+      {/* Attendance History Dialog */}
+      {(() => {
+        const raw = typeof window !== 'undefined' ? localStorage.getItem('userSession') : null;
+        let uid = '';
+        try { uid = raw ? (JSON.parse(raw)?.uid || '') : ''; } catch {}
+        if (!uid) return null;
+        return (
+          <AttendanceHistoryDialog
+            open={showHistory}
+            onOpenChange={setShowHistory}
             staffUid={uid}
           />
         );
