@@ -56,87 +56,51 @@ const getScheduleFromMap = (
     : { clockIn: '08:00', clockOut: '17:00' };
 };
 
-// Get clock-in penalty based on late minutes and employee type
-const getClockInPenalty = (lateMinutes: number, employeeType: string): number => {
+// Unified clock-in penalty (same weights for staff & primary)
+const getClockInPenalty = (lateMinutes: number, _employeeType: string): number => {
   if (lateMinutes === 0) return 0;
-  
-  if (employeeType === 'primary') {
-    // Primary: max penalty -25 (25% of total)
-    if (lateMinutes <= 30) return -10;
-    if (lateMinutes <= 60) return -20;
-    return -25;
-  } else {
-    // Staff: max penalty -35 (50% weight but graduated)
-    if (lateMinutes <= 30) return -15;
-    if (lateMinutes <= 60) return -25;
-    return -35;
-  }
+  if (lateMinutes <= 30) return -15;
+  if (lateMinutes <= 60) return -25;
+  return -35;
 };
 
-// Get clock-out penalty based on clock-out time, employee type, and schedule
-const getClockOutPenalty = (checkOutTime: string | null, employeeType: string, minClockOutTime: string): number => {
-  // No clock out - maximum penalty
-  if (!checkOutTime) {
-    return employeeType === 'primary' ? -25 : -50;
-  }
-  
+// Unified clock-out penalty (same weights for staff & primary)
+const getClockOutPenalty = (checkOutTime: string | null, _employeeType: string, minClockOutTime: string): number => {
+  if (!checkOutTime) return -50; // no clock out
   const checkOutMinutes = parseTimeToMinutes(checkOutTime);
   const minClockOutMinutes = parseTimeToMinutes(minClockOutTime);
-  
-  if (employeeType === 'primary') {
-    if (checkOutMinutes >= minClockOutMinutes) return 0;
-    if (checkOutMinutes >= minClockOutMinutes - 60) return -10; // 1 hour early
-    if (checkOutMinutes >= minClockOutMinutes - 120) return -20; // 2 hours early
-    return -25; // > 2 hours early
-  } else {
-    if (checkOutMinutes >= minClockOutMinutes) return 0;
-    if (checkOutMinutes >= minClockOutMinutes - 60) return -15; // 1 hour early
-    if (checkOutMinutes >= minClockOutMinutes - 120) return -25; // 2 hours early
-    return -35; // > 2 hours early
-  }
+  if (checkOutMinutes >= minClockOutMinutes) return 0;
+  if (checkOutMinutes >= minClockOutMinutes - 60) return -15;
+  if (checkOutMinutes >= minClockOutMinutes - 120) return -25;
+  return -35;
 };
 
-// Calculate score using subtractive formula (start from 100)
+// Calculate score (P2H/Toolbox retired — kept as 0 for backward-compatible columns)
 const calculateScore = (
   checkInTime: string,
   checkOutTime: string | null,
   employeeType: string,
   schedule: WorkSchedule,
-  p2hChecked: boolean,
-  toolboxChecked: boolean
+  _p2hChecked: boolean,
+  _toolboxChecked: boolean
 ) => {
-  // Calculate late minutes using dynamic schedule
   const deadlineMinutes = parseTimeToMinutes(schedule.clockIn);
   const checkInMinutes = parseTimeToMinutes(checkInTime);
   const lateMinutes = Math.max(0, checkInMinutes - deadlineMinutes);
   const late = lateMinutes > 0;
 
-  // Get penalties
   const clockInPenalty = getClockInPenalty(lateMinutes, employeeType);
   const clockOutPenalty = getClockOutPenalty(checkOutTime, employeeType, schedule.clockOut);
-  
-  // P2H and Toolbox penalties (only for primary)
-  const p2hPenalty = employeeType === 'primary' && !p2hChecked ? -25 : 0;
-  const toolboxPenalty = employeeType === 'primary' && !toolboxChecked ? -25 : 0;
 
-  // Calculate raw score (start from 100, apply penalties)
   let rawScore = 100 + clockInPenalty + clockOutPenalty;
-  
-  if (employeeType === 'primary') {
-    rawScore += p2hPenalty + toolboxPenalty;
-  }
-  
-  // Ensure raw score is between 0 and 100
   rawScore = Math.max(0, Math.min(100, rawScore));
-  
-  // Convert to 0-5 star scale
   const finalScore = Math.round((rawScore / 100) * 5 * 10) / 10;
 
   return {
     clockInScore: clockInPenalty,
     clockOutScore: clockOutPenalty,
-    p2hScore: p2hPenalty,
-    toolboxScore: toolboxPenalty,
+    p2hScore: 0,
+    toolboxScore: 0,
     finalScore,
     isLate: late
   };
