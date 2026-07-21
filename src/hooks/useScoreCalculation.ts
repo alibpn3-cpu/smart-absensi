@@ -170,13 +170,11 @@ export const calculateScoreAsync = async (input: ScoreInput): Promise<ScoreResul
   const clockInPenalty = getClockInPenalty(lateMinutes, employeeType);
   const clockOutPenalty = getClockOutPenaltyWithSchedule(checkOutTime, employeeType, schedule.clockOut);
   
-  // P2H/Toolbox retired — kept in signature for backward compat, always 0
+  // P2H/Toolbox retired — always 0
   const p2hPenalty = 0;
   const toolboxPenalty = 0;
-  // remove weight branches
 
-  
-  // Ensure raw score is between 0 and 100
+  let rawScore = 100 + clockInPenalty + clockOutPenalty;
   rawScore = Math.max(0, Math.min(100, rawScore));
   
   // Convert to 0-5 star scale
