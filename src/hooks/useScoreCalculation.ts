@@ -231,18 +231,11 @@ export const calculateScore = (input: ScoreInput): ScoreResult => {
   const clockInPenalty = getClockInPenalty(lateMinutes, employeeType);
   const clockOutPenalty = getClockOutPenaltyWithSchedule(checkOutTime, employeeType, schedule.clockOut);
   
-  // P2H and Toolbox penalties (only for primary)
-  const p2hPenalty = employeeType === 'primary' && !p2hChecked ? -25 : 0;
-  const toolboxPenalty = employeeType === 'primary' && !toolboxChecked ? -25 : 0;
+  // P2H/Toolbox retired — always 0
+  const p2hPenalty = 0;
+  const toolboxPenalty = 0;
 
-  // Calculate raw score (start from 100, apply penalties)
   let rawScore = 100 + clockInPenalty + clockOutPenalty;
-  
-  if (employeeType === 'primary') {
-    rawScore += p2hPenalty + toolboxPenalty;
-  }
-  
-  // Ensure raw score is between 0 and 100
   rawScore = Math.max(0, Math.min(100, rawScore));
   
   // Convert to 0-5 star scale
