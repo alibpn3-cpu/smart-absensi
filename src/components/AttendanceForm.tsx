@@ -25,7 +25,7 @@ import DebugLogger from './DebugLogger';
 import LocationAccuracyIndicator from './LocationAccuracyIndicator';
 import ScoreCard from './ScoreCard';
 import ScorePopup from './ScorePopup';
-import P2HToolboxCard from './P2HToolboxCard';
+// P2HToolboxCard removed — P2H/Toolbox no longer part of daily scoring
 import AttendanceStatusCard from './AttendanceStatusCard';
 import ManagerDivisionStatus from './ManagerDivisionStatus';
 import CompanyLogoCard from './CompanyLogoCard';
@@ -2329,7 +2329,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         }}
         onDismiss={() => setShowClockInvalidDialog(false)}
       />
-      <div className="max-w-md mx-auto space-y-2 animate-fade-in">
+      <div className="max-w-md mx-auto animate-fade-in p-2 sm:p-3 rounded-3xl bg-gradient-to-b from-card/70 via-card/50 to-card/30 backdrop-blur-xl border border-border/40 shadow-2xl space-y-2">
 
         <OfflineQueueBadge />
         
@@ -2780,18 +2780,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         {/* ========== CARD 7: Ranking Card ========== */}
         {featureFlags.scoreEnabled && <RankingCard />}
 
-        {/* ========== USER MODE: P2H/Toolbox Card (if primary & already checked in) ========== */}
-        {featureFlags.scoreEnabled && 
-         selectedStaff?.employee_type === 'primary' && 
-         !sharedDeviceMode && 
-         regularAttendance?.check_in_time && 
-         !regularAttendance?.check_out_time && (
-          <P2HToolboxCard
-            staffUid={selectedStaff.uid}
-            staffName={selectedStaff.name}
-            onChecklistChange={handleChecklistChange}
-          />
-        )}
+        {/* P2H/Toolbox card removed — feature retired from scoring */}
 
         {/* ========== USER MODE: Attendance Status List (real-time from DB, no logout needed) ========== */}
         {isUserLoggedIn && !sharedDeviceMode && featureFlags.attendanceStatusListEnabled && showAttendanceStatus && (

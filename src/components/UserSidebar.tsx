@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   Menu, User, FileText, RefreshCw, Bug, MapPin, Camera, Satellite, Star,
-  LogOut, Info, Lock, Shield, ChevronRight, BarChart3, MapPinned, Bell
+  LogOut, Info, Lock, Shield, ChevronRight, BarChart3, MapPinned, Bell, History
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -16,6 +16,7 @@ import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import DebugLogger from './DebugLogger';
 import ChangePasswordDialog from './ChangePasswordDialog';
 import NotificationsDialog from './NotificationsDialog';
+import AttendanceHistoryDialog from './AttendanceHistoryDialog';
 
 interface UserSession {
   uid: string;
@@ -43,6 +44,7 @@ const UserSidebar: React.FC = () => {
   const [isSubAdmin, setIsSubAdmin] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const featureFlags = useFeatureFlags();
 
   // Load session uid + unread count on mount; subscribe to realtime
@@ -342,6 +344,18 @@ const UserSidebar: React.FC = () => {
                   </div>
                 </Button>
 
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between h-11"
+                  onClick={() => { setOpen(false); setShowHistory(true); }}
+                >
+                  <div className="flex items-center gap-3">
+                    <History className="h-4 w-4 text-primary" />
+                    <span>Riwayat Absensi</span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </Button>
+
                 {(featureFlags.leaveRequestEnabled || featureFlags.permissionRequestEnabled) && (
                   <Button
                     variant="ghost"
@@ -470,6 +484,21 @@ const UserSidebar: React.FC = () => {
           <NotificationsDialog
             open={showNotifications}
             onOpenChange={setShowNotifications}
+            staffUid={uid}
+          />
+        );
+      })()}
+
+      {/* Attendance History Dialog */}
+      {(() => {
+        const raw = typeof window !== 'undefined' ? localStorage.getItem('userSession') : null;
+        let uid = '';
+        try { uid = raw ? (JSON.parse(raw)?.uid || '') : ''; } catch {}
+        if (!uid) return null;
+        return (
+          <AttendanceHistoryDialog
+            open={showHistory}
+            onOpenChange={setShowHistory}
             staffUid={uid}
           />
         );
