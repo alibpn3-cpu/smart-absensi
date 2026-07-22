@@ -2329,7 +2329,7 @@ const AttendanceForm: React.FC<AttendanceFormProps> = ({ companyLogoUrl }) => {
         }}
         onDismiss={() => setShowClockInvalidDialog(false)}
       />
-      <div className="max-w-md mx-auto animate-fade-in p-2 sm:p-3 rounded-3xl bg-gradient-to-b from-card/70 via-card/50 to-card/30 backdrop-blur-xl border border-border/40 shadow-2xl space-y-2">
+      <div className="w-full max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto animate-fade-in px-2 sm:px-4 py-3 space-y-3">
 
         <OfflineQueueBadge />
         
