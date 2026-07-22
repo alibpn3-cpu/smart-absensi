@@ -389,14 +389,8 @@ const WorkScheduleManager = () => {
           </div>
         )}
 
-        <div className="mt-4 p-3 bg-muted/50 rounded-lg text-sm">
-          <strong>Catatan:</strong>
-          <ul className="list-disc list-inside mt-1 space-y-1 text-muted-foreground">
-            <li>Jika area kerja tidak ditemukan, sistem akan menggunakan jadwal DEFAULT</li>
-            <li>Jadwal DEFAULT tidak dapat dihapus</li>
-            <li>Perubahan jadwal akan berlaku untuk perhitungan score baru</li>
-          </ul>
-        </div>
+
+
       </CardContent>
     </Card>
   );
