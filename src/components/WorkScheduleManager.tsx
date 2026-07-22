@@ -313,9 +313,8 @@ const WorkScheduleManager = () => {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-sm text-muted-foreground mb-4">
-          Atur jam kerja untuk setiap lokasi dan tipe karyawan. Jadwal ini digunakan untuk menghitung keterlambatan dan pulang cepat pada score harian.
-        </div>
+
+
 
         {loading ? (
           <div className="text-center py-8 text-muted-foreground">Loading...</div>
