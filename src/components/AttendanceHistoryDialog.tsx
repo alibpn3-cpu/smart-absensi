@@ -20,8 +20,9 @@ interface Row {
   check_out_time: string | null;
   status: string | null;
   attendance_type: string | null;
-  work_area: string | null;
+  work_area_in: string | null;
 }
+
 
 const PAGE_SIZE = 10;
 
