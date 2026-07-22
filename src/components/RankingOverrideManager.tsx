@@ -422,10 +422,8 @@ const RankingOverrideManager = () => {
             </Button>
           )}
         </div>
-        
-        <p className="text-xs text-muted-foreground">
-          💡 Jika tidak ada data override untuk bulan tertentu, RankingCard akan menampilkan ranking otomatis dari daily_scores.
-        </p>
+
+
       </CardContent>
     </Card>
   );
