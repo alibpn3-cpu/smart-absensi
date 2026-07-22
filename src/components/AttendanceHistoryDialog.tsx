@@ -89,7 +89,7 @@ const AttendanceHistoryDialog: React.FC<Props> = ({ open, onOpenChange, staffUid
       setLoading(true);
       const { data, error } = await supabase
         .from('attendance_records')
-        .select('id,date,check_in_time,check_out_time,status,attendance_type,work_area')
+        .select('id,date,check_in_time,check_out_time,status,attendance_type')
         .eq('staff_uid', staffUid)
         .gte('date', from)
         .lte('date', to)
