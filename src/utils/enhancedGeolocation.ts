@@ -22,12 +22,17 @@ export interface EnhancedLocationOptions {
 
 const DEFAULT_OPTIONS: EnhancedLocationOptions = {
   enableHighAccuracy: true,
-  timeout: 10000,
+  timeout: 15000,
   maximumAge: 0,
-  multipleReadings: false, // Default to single reading for faster response
-  readingsCount: 1,
-  readingInterval: 300,
+  // Enable averaging by default — noticeably improves accuracy on older
+  // Android devices where a single GPS fix can be jittery. iOS also
+  // benefits because Safari returns progressively finer accuracy on
+  // subsequent reads within the same session.
+  multipleReadings: true,
+  readingsCount: 3,
+  readingInterval: 400,
 };
+
 
 // Cache for debouncing
 let locationCache: { result: LocationResult; timestamp: number } | null = null;

@@ -20,8 +20,9 @@ interface Row {
   check_out_time: string | null;
   status: string | null;
   attendance_type: string | null;
-  work_area: string | null;
 }
+
+
 
 const PAGE_SIZE = 10;
 
@@ -88,7 +89,7 @@ const AttendanceHistoryDialog: React.FC<Props> = ({ open, onOpenChange, staffUid
       setLoading(true);
       const { data, error } = await supabase
         .from('attendance_records')
-        .select('id,date,check_in_time,check_out_time,status,attendance_type,work_area')
+        .select('id,date,check_in_time,check_out_time,status,attendance_type')
         .eq('staff_uid', staffUid)
         .gte('date', from)
         .lte('date', to)
@@ -174,12 +175,8 @@ const AttendanceHistoryDialog: React.FC<Props> = ({ open, onOpenChange, staffUid
                           <Clock className="h-3 w-3" /> Out: <span className="font-medium">{fmtTime(r.check_out_time)}</span>
                         </div>
                       </div>
-                      {r.work_area && (
-                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-1">
-                          <MapPin className="h-3 w-3" />
-                          <span className="truncate">{r.work_area}</span>
-                        </div>
-                      )}
+
+
                       {noOut && (
                         <div className="mt-1">
                           <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-500/50">

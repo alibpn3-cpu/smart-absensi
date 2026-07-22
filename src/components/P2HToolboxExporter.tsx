@@ -269,9 +269,8 @@ const P2HToolboxExporter: React.FC = () => {
           {loading ? <FileSpreadsheet className="h-4 w-4 animate-pulse" /> : <Download className="h-4 w-4" />}
           {loading ? 'Mengekspor...' : 'Export Excel'}
         </Button>
-        <p className="text-xs text-muted-foreground">
-          Pilih rentang bulan & jenis kegiatan. Kolom foto berupa hyperlink — klik di Excel untuk membuka foto evidence.
-        </p>
+
+
       </CardContent>
     </Card>
   );

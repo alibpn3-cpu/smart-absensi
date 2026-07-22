@@ -1376,13 +1376,8 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
             )}
           </div>
 
-          {/* Export Info */}
-          <div className="text-center text-sm text-muted-foreground">
-            <p>📊 Excel: Format lengkap dengan hyperlink foto dan koordinat</p>
-            <p>📄 PDF: Format cetak dengan tabel rapi dan header bold</p>
-            <p>📋 CSV: Format teks untuk import ke aplikasi lain</p>
-            <p>🌐 HTML: Format web dengan styling modern</p>
-          </div>
+
+
         </div>
       </CardContent>
     </Card>
