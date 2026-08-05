@@ -7,6 +7,7 @@ import Autoplay from 'embla-carousel-autoplay';
 import { Trophy, Medal, Award, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { isHiddenForCurrentUser } from '@/utils/areaVisibility';
 import { cn } from '@/lib/utils';
 
 // Tier thresholds based on total stars
