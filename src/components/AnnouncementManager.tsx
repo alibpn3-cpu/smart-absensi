@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Megaphone, Plus, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { getDisabledAreas, setAreaDisabled } from "@/utils/areaVisibility";
 import { toast } from "sonner";
 
 interface Props {
@@ -44,6 +45,8 @@ export default function AnnouncementManager({ workArea, createdByUid, createdByN
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [birthdayEnabled, setBirthdayEnabled] = useState(true);
+  const [adsEnabled, setAdsEnabled] = useState(true);
+  const [rankingEnabled, setRankingEnabled] = useState(true);
 
   const load = async () => {
     setLoading(true);
@@ -54,42 +57,23 @@ export default function AnnouncementManager({ workArea, createdByUid, createdByN
       .order("created_at", { ascending: false });
     setItems((data || []) as any);
 
-    // Load birthday-disabled flag for this area
-    const { data: setting } = await supabase
-      .from("app_settings")
-      .select("setting_value")
-      .eq("setting_key", BIRTHDAY_KEY)
-      .maybeSingle();
-    try {
-      const arr: string[] = setting?.setting_value ? JSON.parse(setting.setting_value) : [];
-      setBirthdayEnabled(!arr.includes(workArea));
-    } catch { setBirthdayEnabled(true); }
+    // Load per-area visibility flags
+    const norm = (v: string) => v.trim().toUpperCase();
+    const [bd, ad, rk] = await Promise.all([
+      getDisabledAreas('birthday'),
+      getDisabledAreas('ads'),
+      getDisabledAreas('ranking'),
+    ]);
+    setBirthdayEnabled(!bd.map(norm).includes(norm(workArea)));
+    setAdsEnabled(!ad.map(norm).includes(norm(workArea)));
+    setRankingEnabled(!rk.map(norm).includes(norm(workArea)));
+
 
     setLoading(false);
   };
 
   useEffect(() => { load(); }, [workArea]);
 
-  const toggleBirthday = async (enabled: boolean) => {
-    setBirthdayEnabled(enabled);
-    const { data: setting } = await supabase
-      .from("app_settings")
-      .select("setting_value")
-      .eq("setting_key", BIRTHDAY_KEY)
-      .maybeSingle();
-    let arr: string[] = [];
-    try { arr = setting?.setting_value ? JSON.parse(setting.setting_value) : []; } catch {}
-    const next = enabled
-      ? arr.filter((a) => a !== workArea)
-      : Array.from(new Set([...arr, workArea]));
-    const payload = { setting_key: BIRTHDAY_KEY, setting_value: JSON.stringify(next) };
-    if (setting) {
-      await supabase.from("app_settings").update({ setting_value: payload.setting_value }).eq("setting_key", BIRTHDAY_KEY);
-    } else {
-      await supabase.from("app_settings").insert(payload);
-    }
-    toast.success(enabled ? "Birthday card diaktifkan" : "Birthday card disembunyikan");
-  };
 
   const openCreate = () => {
     setEditId(null);
@@ -247,18 +231,32 @@ export default function AnnouncementManager({ workArea, createdByUid, createdByN
         )}
       </CardContent>
 
-      {/* Pengaturan Area: toggle birthday card */}
-      <CardContent className="border-t pt-4">
-        <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 rounded-lg">
-          <div className="min-w-0">
-            <div className="text-sm font-medium">Tampilkan Birthday Card</div>
-            <div className="text-xs text-muted-foreground">
-              Jika dimatikan, user di area <strong>{workArea}</strong> tidak akan melihat card ulang tahun di halaman utama.
+      {/* Pengaturan Area: toggle card per area */}
+      <CardContent className="border-t pt-4 space-y-2">
+        {([
+          { key: 'birthday' as const, label: 'Tampilkan Birthday Card', state: birthdayEnabled, set: setBirthdayEnabled },
+          { key: 'ads' as const, label: 'Tampilkan Iklan (Pop-up)', state: adsEnabled, set: setAdsEnabled },
+          { key: 'ranking' as const, label: 'Tampilkan Ranking Bulanan', state: rankingEnabled, set: setRankingEnabled },
+        ]).map((row) => (
+          <div key={row.key} className="flex items-center justify-between gap-3 p-3 bg-muted/40 rounded-lg">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">{row.label}</div>
+              <div className="text-xs text-muted-foreground">
+                Jika dimatikan, user di area <strong>{workArea}</strong> tidak akan melihatnya.
+              </div>
             </div>
+            <Switch
+              checked={row.state}
+              onCheckedChange={async (v) => {
+                row.set(v);
+                await setAreaDisabled(row.key, workArea, !v);
+                toast.success(v ? 'Ditampilkan kembali' : 'Disembunyikan untuk area ini');
+              }}
+            />
           </div>
-          <Switch checked={birthdayEnabled} onCheckedChange={toggleBirthday} />
-        </div>
+        ))}
       </CardContent>
+
     </Card>
   );
 }

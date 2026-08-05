@@ -7,6 +7,7 @@ import Autoplay from 'embla-carousel-autoplay';
 import { Trophy, Medal, Award, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { isHiddenForCurrentUser } from '@/utils/areaVisibility';
 import { cn } from '@/lib/utils';
 
 // Tier thresholds based on total stars
@@ -73,6 +74,11 @@ const RankingCard = () => {
   // Generate available years (current year - 2 to current year)
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 3 }, (_, i) => currentYear - 2 + i);
+
+  const [hiddenForArea, setHiddenForArea] = useState(false);
+  useEffect(() => {
+    isHiddenForCurrentUser('ranking').then(setHiddenForArea).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!mainApi) return;
@@ -380,6 +386,7 @@ const RankingCard = () => {
       </Card>
     );
   }
+  if (hiddenForArea) return null;
 
   return (
     <Card className="border-0 shadow-lg overflow-hidden">

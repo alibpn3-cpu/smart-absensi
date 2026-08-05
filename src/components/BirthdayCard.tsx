@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Cake } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { isHiddenForCurrentUser } from '@/utils/areaVisibility';
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel';
 import Autoplay from 'embla-carousel-autoplay';
 import { cn } from '@/lib/utils';
@@ -25,23 +26,12 @@ const BirthdayCard = () => {
 
   useEffect(() => {
     (async () => {
-      // Check if user's work_area is in the disabled list (set by site admin)
-      try {
-        const raw = localStorage.getItem('userSession');
-        const userArea: string | null = raw ? (JSON.parse(raw)?.work_area || null) : null;
-        if (userArea) {
-          const { data: setting } = await supabase
-            .from('app_settings')
-            .select('setting_value')
-            .eq('setting_key', 'birthday_disabled_areas')
-            .maybeSingle();
-          const arr: string[] = setting?.setting_value ? JSON.parse(setting.setting_value) : [];
-          if (arr.includes(userArea)) { setDisabled(true); return; }
-        }
-      } catch {}
+      // Site admin can hide this card per work area / division
+      if (await isHiddenForCurrentUser('birthday')) { setDisabled(true); return; }
       fetchBirthdays();
     })();
   }, []);
+
 
   useEffect(() => {
     if (!api) return;
