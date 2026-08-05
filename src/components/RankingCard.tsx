@@ -380,6 +380,7 @@ const RankingCard = () => {
       </Card>
     );
   }
+  if (hiddenForArea) return null;
 
   return (
     <Card className="border-0 shadow-lg overflow-hidden">
