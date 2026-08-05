@@ -59,9 +59,18 @@ const RequestApprovalDialog: React.FC<RequestApprovalDialogProps> = ({
       if (currentReq) {
         const supervisorFinal = approverRole === 'supervisor' ? action : currentReq.supervisor_status;
         const hcgaFinal = approverRole === 'hcga' ? action : currentReq.hcga_status;
-        // Supervisor-only mode: if no HC&GA approver assigned on the request,
-        // supervisor's decision finalizes the request.
-        const supervisorOnly = !currentReq.hcga_approver_uid;
+
+        // Supervisor-only mode: either the request has no HC&GA approver, or the
+        // employee is flagged `leave_supervisor_only` in Employee Management.
+        let supervisorOnly = !currentReq.hcga_approver_uid;
+        if (!supervisorOnly) {
+          const { data: staff } = await supabase
+            .from('staff_users')
+            .select('leave_supervisor_only')
+            .eq('uid', currentReq.staff_uid)
+            .maybeSingle();
+          if ((staff as any)?.leave_supervisor_only) supervisorOnly = true;
+        }
 
         const finalizeApproved = supervisorOnly
           ? supervisorFinal === 'approved'
@@ -73,23 +82,32 @@ const RequestApprovalDialog: React.FC<RequestApprovalDialogProps> = ({
           if (supervisorOnly && approverRole === 'supervisor') {
             updateData.hcga_status = 'skipped';
           }
-          // Update leave balance
+          // Update leave balance (create the row if it doesn't exist yet)
           if (requestType === 'leave') {
             const { data: balance } = await supabase.from('leave_balances')
-              .select('used_days')
+              .select('id, total_days, used_days')
               .eq('staff_uid', currentReq.staff_uid)
               .eq('year', currentReq.leave_year)
-              .single();
+              .maybeSingle();
             if (balance) {
-              await supabase.from('leave_balances')
-                .update({ used_days: balance.used_days + currentReq.days_requested })
-                .eq('staff_uid', currentReq.staff_uid)
-                .eq('year', currentReq.leave_year);
+              const { error: balErr } = await supabase.from('leave_balances')
+                .update({ used_days: (balance.used_days || 0) + currentReq.days_requested })
+                .eq('id', balance.id);
+              if (balErr) console.error('Gagal update saldo cuti:', balErr);
+            } else {
+              const { error: insErr } = await supabase.from('leave_balances').insert({
+                staff_uid: currentReq.staff_uid,
+                year: currentReq.leave_year,
+                total_days: 12,
+                used_days: currentReq.days_requested,
+              });
+              if (insErr) console.error('Gagal membuat saldo cuti:', insErr);
             }
           }
         } else if (supervisorFinal === 'rejected' || hcgaFinal === 'rejected') {
           updateData.status = 'rejected';
         }
+
 
         const { error } = await supabase.from(table).update(updateData).eq('id', requestId);
         if (error) throw error;
