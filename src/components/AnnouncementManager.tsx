@@ -56,16 +56,17 @@ export default function AnnouncementManager({ workArea, createdByUid, createdByN
       .order("created_at", { ascending: false });
     setItems((data || []) as any);
 
-    // Load birthday-disabled flag for this area
-    const { data: setting } = await supabase
-      .from("app_settings")
-      .select("setting_value")
-      .eq("setting_key", BIRTHDAY_KEY)
-      .maybeSingle();
-    try {
-      const arr: string[] = setting?.setting_value ? JSON.parse(setting.setting_value) : [];
-      setBirthdayEnabled(!arr.includes(workArea));
-    } catch { setBirthdayEnabled(true); }
+    // Load per-area visibility flags
+    const norm = (v: string) => v.trim().toUpperCase();
+    const [bd, ad, rk] = await Promise.all([
+      getDisabledAreas('birthday'),
+      getDisabledAreas('ads'),
+      getDisabledAreas('ranking'),
+    ]);
+    setBirthdayEnabled(!bd.map(norm).includes(norm(workArea)));
+    setAdsEnabled(!ad.map(norm).includes(norm(workArea)));
+    setRankingEnabled(!rk.map(norm).includes(norm(workArea)));
+
 
     setLoading(false);
   };
