@@ -93,6 +93,12 @@ const AdPopup = () => {
 
 
   const fetchAds = async () => {
+    // Site admin can hide ads for a specific work area / division
+    if (await isHiddenForCurrentUser('ads')) {
+      setAds([]);
+      return;
+    }
+
     const { data, error } = await supabase
       .from('ad_images')
       .select('id, image_url, display_order')
