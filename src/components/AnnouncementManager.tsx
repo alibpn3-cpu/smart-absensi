@@ -247,18 +247,32 @@ export default function AnnouncementManager({ workArea, createdByUid, createdByN
         )}
       </CardContent>
 
-      {/* Pengaturan Area: toggle birthday card */}
-      <CardContent className="border-t pt-4">
-        <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 rounded-lg">
-          <div className="min-w-0">
-            <div className="text-sm font-medium">Tampilkan Birthday Card</div>
-            <div className="text-xs text-muted-foreground">
-              Jika dimatikan, user di area <strong>{workArea}</strong> tidak akan melihat card ulang tahun di halaman utama.
+      {/* Pengaturan Area: toggle card per area */}
+      <CardContent className="border-t pt-4 space-y-2">
+        {([
+          { key: 'birthday' as const, label: 'Tampilkan Birthday Card', state: birthdayEnabled, set: setBirthdayEnabled },
+          { key: 'ads' as const, label: 'Tampilkan Iklan (Pop-up)', state: adsEnabled, set: setAdsEnabled },
+          { key: 'ranking' as const, label: 'Tampilkan Ranking Bulanan', state: rankingEnabled, set: setRankingEnabled },
+        ]).map((row) => (
+          <div key={row.key} className="flex items-center justify-between gap-3 p-3 bg-muted/40 rounded-lg">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">{row.label}</div>
+              <div className="text-xs text-muted-foreground">
+                Jika dimatikan, user di area <strong>{workArea}</strong> tidak akan melihatnya.
+              </div>
             </div>
+            <Switch
+              checked={row.state}
+              onCheckedChange={async (v) => {
+                row.set(v);
+                await setAreaDisabled(row.key, workArea, !v);
+                toast.success(v ? 'Ditampilkan kembali' : 'Disembunyikan untuk area ini');
+              }}
+            />
           </div>
-          <Switch checked={birthdayEnabled} onCheckedChange={toggleBirthday} />
-        </div>
+        ))}
       </CardContent>
+
     </Card>
   );
 }
