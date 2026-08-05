@@ -44,6 +44,8 @@ export default function AnnouncementManager({ workArea, createdByUid, createdByN
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [birthdayEnabled, setBirthdayEnabled] = useState(true);
+  const [adsEnabled, setAdsEnabled] = useState(true);
+  const [rankingEnabled, setRankingEnabled] = useState(true);
 
   const load = async () => {
     setLoading(true);
