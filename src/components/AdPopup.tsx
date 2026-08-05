@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { isHiddenForCurrentUser } from '@/utils/areaVisibility';
 
 interface AdImage {
   id: string;
