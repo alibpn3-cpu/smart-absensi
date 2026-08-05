@@ -128,7 +128,7 @@ const RequestApprovalDialog: React.FC<RequestApprovalDialogProps> = ({
         });
 
         // If supervisor approved AND HC&GA approver exists, notify HC&GA for next approval
-        if (approverRole === 'supervisor' && action === 'approved' && currentReq.hcga_approver_uid) {
+        if (approverRole === 'supervisor' && action === 'approved' && currentReq.hcga_approver_uid && !supervisorOnly) {
           notifyApproverNewRequest({
             requestId,
             requestNumber,
