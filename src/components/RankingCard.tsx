@@ -74,6 +74,11 @@ const RankingCard = () => {
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 3 }, (_, i) => currentYear - 2 + i);
 
+  const [hiddenForArea, setHiddenForArea] = useState(false);
+  useEffect(() => {
+    isHiddenForCurrentUser('ranking').then(setHiddenForArea).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!mainApi) return;
 
