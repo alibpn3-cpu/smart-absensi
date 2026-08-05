@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Cake } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { isHiddenForCurrentUser } from '@/utils/areaVisibility';
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel';
 import Autoplay from 'embla-carousel-autoplay';
 import { cn } from '@/lib/utils';
