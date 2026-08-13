@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,6 +58,7 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
   const [exportFormat, setExportFormat] = useState<'excel' | 'pdf' | 'csv' | 'html'>('excel');
   const [skipBlankDates, setSkipBlankDates] = useState(false);
   const [schedules, setSchedules] = useState<WorkAreaSchedule[]>([]);
+  const schedulesRef = useRef<WorkAreaSchedule[]>([]);
   const [fetchProgress, setFetchProgress] = useState('');
 
   useEffect(() => {
@@ -111,6 +112,7 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     const { data } = await supabase
       .from('work_area_schedules')
       .select('*');
+    schedulesRef.current = (data || []) as WorkAreaSchedule[];
     setSchedules(data || []);
   };
 
@@ -132,13 +134,15 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     const upperArea = (workArea || '').toUpperCase();
     const empType = (employeeType || 'staff').toLowerCase();
 
-    const exact = schedules.find(s =>
+    const src = schedulesRef.current.length ? schedulesRef.current : schedules;
+
+    const exact = src.find(s =>
       (s.work_area || '').toUpperCase() === upperArea &&
       (s.employee_type || '').toLowerCase() === empType
     );
     if (exact) return exact;
 
-    const partial = schedules.find(s => {
+    const partial = src.find(s => {
       const area = (s.work_area || '').toUpperCase();
       if (!area || area === 'DEFAULT') return false;
       return (s.employee_type || '').toLowerCase() === empType &&
@@ -146,7 +150,7 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     });
     if (partial) return partial;
 
-    const def = schedules.find(s =>
+    const def = src.find(s =>
       (s.work_area || '').toUpperCase() === 'DEFAULT' &&
       (s.employee_type || '').toLowerCase() === empType
     );
@@ -1204,7 +1208,10 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    // Always pull the latest work-area schedules so late/early columns reflect
+    // any change made in "Pengaturan Jam Kerja per Lokasi".
+    await fetchSchedules();
     switch (exportFormat) {
       case 'pdf': exportToPDF(); break;
       case 'csv': exportToCSV(); break;
