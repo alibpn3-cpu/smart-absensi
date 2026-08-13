@@ -106,6 +106,7 @@ const Dashboard = () => {
   })();
   const [filterLocation, setFilterLocation] = useState<string>(initialSiteArea);
   const [locations, setLocations] = useState<string[]>([]);
+  const [siteAdminViewArea, setSiteAdminViewArea] = useState<string>('');
   
   const [loading, setLoading] = useState(true);
   
