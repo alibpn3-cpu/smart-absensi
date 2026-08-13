@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,6 +58,7 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
   const [exportFormat, setExportFormat] = useState<'excel' | 'pdf' | 'csv' | 'html'>('excel');
   const [skipBlankDates, setSkipBlankDates] = useState(false);
   const [schedules, setSchedules] = useState<WorkAreaSchedule[]>([]);
+  const schedulesRef = useRef<WorkAreaSchedule[]>([]);
   const [fetchProgress, setFetchProgress] = useState('');
 
   useEffect(() => {
@@ -111,6 +112,7 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     const { data } = await supabase
       .from('work_area_schedules')
       .select('*');
+    schedulesRef.current = (data || []) as WorkAreaSchedule[];
     setSchedules(data || []);
   };
 
@@ -126,21 +128,46 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     return 'Asia/Makassar';
   };
 
+  // Resolve schedule row for a work area + employee type.
+  // Priority: exact match -> partial area match -> DEFAULT row -> null
+  const resolveSchedule = (workArea: string | undefined, employeeType: string | undefined) => {
+    const upperArea = (workArea || '').toUpperCase();
+    const empType = (employeeType || 'staff').toLowerCase();
+
+    const src = schedulesRef.current.length ? schedulesRef.current : schedules;
+
+    const exact = src.find(s =>
+      (s.work_area || '').toUpperCase() === upperArea &&
+      (s.employee_type || '').toLowerCase() === empType
+    );
+    if (exact) return exact;
+
+    const partial = src.find(s => {
+      const area = (s.work_area || '').toUpperCase();
+      if (!area || area === 'DEFAULT') return false;
+      return (s.employee_type || '').toLowerCase() === empType &&
+        (upperArea.includes(area) || area.includes(upperArea));
+    });
+    if (partial) return partial;
+
+    const def = src.find(s =>
+      (s.work_area || '').toUpperCase() === 'DEFAULT' &&
+      (s.employee_type || '').toLowerCase() === empType
+    );
+    return def || null;
+  };
+
   // Get On Duty time based on work area and employee type
   const getOnDuty = (workArea: string | undefined, employeeType: string | undefined): string => {
     const upperArea = (workArea || '').toUpperCase();
     const empType = (employeeType || 'staff').toLowerCase();
-    
-    // Check if schedule exists in database first
-    const schedule = schedules.find(s => 
-      s.work_area.toUpperCase() === upperArea && 
-      s.employee_type.toLowerCase() === empType
-    );
-    if (schedule) {
+
+    const schedule = resolveSchedule(workArea, employeeType);
+    if (schedule?.clock_in_time) {
       return formatScheduleTime(schedule.clock_in_time);
     }
     
-    // Fallback defaults
+    // Fallback defaults (only when no schedule configured at all)
     if (upperArea.includes('HEAD OFFICE') || upperArea.includes('CIKARANG') || upperArea.includes('JAKARTA')) {
       return '08:30:00'; // WIB
     }
@@ -157,17 +184,13 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
   const getOffDuty = (workArea: string | undefined, employeeType: string | undefined): string => {
     const upperArea = (workArea || '').toUpperCase();
     const empType = (employeeType || 'staff').toLowerCase();
-    
-    // Check if schedule exists in database first
-    const schedule = schedules.find(s => 
-      s.work_area.toUpperCase() === upperArea && 
-      s.employee_type.toLowerCase() === empType
-    );
-    if (schedule) {
+
+    const schedule = resolveSchedule(workArea, employeeType);
+    if (schedule?.clock_out_time) {
       return formatScheduleTime(schedule.clock_out_time);
     }
     
-    // Fallback defaults
+    // Fallback defaults (only when no schedule configured at all)
     if (upperArea.includes('HEAD OFFICE') || upperArea.includes('CIKARANG') || upperArea.includes('JAKARTA')) {
       return '17:30:00'; // WIB
     }
@@ -179,6 +202,7 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     }
     return '17:00:00';
   };
+
 
   // Format schedule time to HH:mm:ss
   const formatScheduleTime = (time: string): string => {
@@ -1184,7 +1208,10 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    // Always pull the latest work-area schedules so late/early columns reflect
+    // any change made in "Pengaturan Jam Kerja per Lokasi".
+    await fetchSchedules();
     switch (exportFormat) {
       case 'pdf': exportToPDF(); break;
       case 'csv': exportToCSV(); break;
