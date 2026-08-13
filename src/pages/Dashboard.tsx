@@ -106,6 +106,7 @@ const Dashboard = () => {
   })();
   const [filterLocation, setFilterLocation] = useState<string>(initialSiteArea);
   const [locations, setLocations] = useState<string[]>([]);
+  const [siteAdminViewArea, setSiteAdminViewArea] = useState<string>('');
   
   const [loading, setLoading] = useState(true);
   
@@ -525,6 +526,13 @@ const Dashboard = () => {
                 </TabsTrigger>
               </>
             )}
+            {isSuperAdmin && (
+              <TabsTrigger value="siteadmin" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+                <Megaphone className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Site Admin</span>
+                <span className="sm:hidden">Site</span>
+              </TabsTrigger>
+            )}
             {/* Settings - superadmin only */}
             {isSuperAdmin && (
               <TabsTrigger value="settings" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
@@ -888,6 +896,41 @@ const Dashboard = () => {
                 />
               </TabsContent>
             </>
+          )}
+
+          {isSuperAdmin && (
+            <TabsContent value="siteadmin" className="space-y-6">
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="text-title-primary text-base">Kelola Sebagai Site Admin</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Label className="text-sm mb-2 block">Pilih Work Area / Site</Label>
+                  <Select value={siteAdminViewArea} onValueChange={setSiteAdminViewArea}>
+                    <SelectTrigger className="w-full sm:w-96">
+                      <SelectValue placeholder="Pilih area untuk dikelola" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.filter(Boolean).map((loc) => (
+                        <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+              {siteAdminViewArea ? (
+                <AnnouncementManager
+                  key={siteAdminViewArea}
+                  workArea={siteAdminViewArea}
+                  createdByUid="superadmin"
+                  createdByName="Superadmin"
+                />
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  Pilih work area terlebih dahulu untuk melihat & mengedit pengumuman serta visibilitas card (Ulang Tahun / Iklan / Ranking) area tersebut.
+                </div>
+              )}
+            </TabsContent>
           )}
 
           <TabsContent value="geofence">

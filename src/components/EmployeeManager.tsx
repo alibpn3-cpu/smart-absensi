@@ -209,6 +209,7 @@ const EmployeeManager = () => {
   const [batchLoading, setBatchLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [workAreaFilter, setWorkAreaFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [isMismatchDialogOpen, setIsMismatchDialogOpen] = useState(false);
   const [mismatchData, setMismatchData] = useState<Array<{
     userName: string;
@@ -235,7 +236,7 @@ const EmployeeManager = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, workAreaFilter]);
+  }, [searchTerm, workAreaFilter, typeFilter]);
 
   const logActivity = async (actionType: string, targetName: string, details?: any) => {
     try {
@@ -899,7 +900,8 @@ const EmployeeManager = () => {
     const filteredEmployees = employees.filter(emp => {
       const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
-      return matchesSearch && matchesWorkArea;
+      const matchesType = typeFilter === 'all' || (emp.employee_type || 'staff') === typeFilter;
+      return matchesSearch && matchesWorkArea && matchesType;
     });
 
     if (selectedEmployees.size === filteredEmployees.length) {
@@ -1829,6 +1831,23 @@ const EmployeeManager = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Employee Type Filter */}
+            <div className="w-full sm:w-56">
+              <Label htmlFor="filter-emp-type" className="text-sm mb-2 block">
+                Filter Tipe Karyawan
+              </Label>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger id="filter-emp-type">
+                  <SelectValue placeholder="Pilih tipe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Tipe</SelectItem>
+                  <SelectItem value="staff">Staff</SelectItem>
+                  <SelectItem value="primary">Primary (Operator)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           
           {/* Total Count and Actions */}
@@ -1840,7 +1859,8 @@ const EmployeeManager = () => {
                   checked={selectedEmployees.size > 0 && selectedEmployees.size === employees.filter(emp => {
                     const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
                     const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
-                    return matchesSearch && matchesWorkArea;
+                    const matchesType = typeFilter === 'all' || (emp.employee_type || 'staff') === typeFilter;
+                    return matchesSearch && matchesWorkArea && matchesType;
                   }).length}
                   onCheckedChange={toggleSelectAll}
                 />
@@ -1856,7 +1876,8 @@ const EmployeeManager = () => {
                     {employees.filter(emp => {
                       const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
                       const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
-                      return matchesSearch && matchesWorkArea;
+                      const matchesType = typeFilter === 'all' || (emp.employee_type || 'staff') === typeFilter;
+                      return matchesSearch && matchesWorkArea && matchesType;
                     }).length}
                   </strong> dari {employees.length}
                 </span>
@@ -1930,7 +1951,8 @@ const EmployeeManager = () => {
           const filteredEmployees = employees.filter(emp => {
             const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
-            return matchesSearch && matchesWorkArea;
+            const matchesType = typeFilter === 'all' || (emp.employee_type || 'staff') === typeFilter;
+            return matchesSearch && matchesWorkArea && matchesType;
           });
           
           const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
