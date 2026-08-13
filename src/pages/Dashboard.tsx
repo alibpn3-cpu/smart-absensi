@@ -898,6 +898,41 @@ const Dashboard = () => {
             </>
           )}
 
+          {isSuperAdmin && (
+            <TabsContent value="siteadmin" className="space-y-6">
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="text-title-primary text-base">Kelola Sebagai Site Admin</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Label className="text-sm mb-2 block">Pilih Work Area / Site</Label>
+                  <Select value={siteAdminViewArea} onValueChange={setSiteAdminViewArea}>
+                    <SelectTrigger className="w-full sm:w-96">
+                      <SelectValue placeholder="Pilih area untuk dikelola" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.filter(Boolean).map((loc) => (
+                        <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+              {siteAdminViewArea ? (
+                <AnnouncementManager
+                  key={siteAdminViewArea}
+                  workArea={siteAdminViewArea}
+                  createdByUid="superadmin"
+                  createdByName="Superadmin"
+                />
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  Pilih work area terlebih dahulu untuk melihat & mengedit pengumuman serta visibilitas card (Ulang Tahun / Iklan / Ranking) area tersebut.
+                </div>
+              )}
+            </TabsContent>
+          )}
+
           <TabsContent value="geofence">
             <React.Suspense fallback={<div className="text-center py-8">Loading map...</div>}>
               <PolygonGeofenceManager />
