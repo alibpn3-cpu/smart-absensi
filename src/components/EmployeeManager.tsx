@@ -900,7 +900,8 @@ const EmployeeManager = () => {
     const filteredEmployees = employees.filter(emp => {
       const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesWorkArea = workAreaFilter === 'all' || emp.work_area === workAreaFilter;
-      return matchesSearch && matchesWorkArea;
+      const matchesType = typeFilter === 'all' || (emp.employee_type || 'staff') === typeFilter;
+      return matchesSearch && matchesWorkArea && matchesType;
     });
 
     if (selectedEmployees.size === filteredEmployees.length) {
