@@ -209,6 +209,7 @@ const EmployeeManager = () => {
   const [batchLoading, setBatchLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [workAreaFilter, setWorkAreaFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [isMismatchDialogOpen, setIsMismatchDialogOpen] = useState(false);
   const [mismatchData, setMismatchData] = useState<Array<{
     userName: string;
