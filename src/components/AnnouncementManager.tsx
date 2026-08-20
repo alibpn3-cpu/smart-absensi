@@ -47,6 +47,7 @@ export default function AnnouncementManager({ workArea, createdByUid, createdByN
   const [birthdayEnabled, setBirthdayEnabled] = useState(true);
   const [adsEnabled, setAdsEnabled] = useState(true);
   const [rankingEnabled, setRankingEnabled] = useState(true);
+  const [leaveEnabled, setLeaveEnabled] = useState(true);
 
   const load = async () => {
     setLoading(true);
