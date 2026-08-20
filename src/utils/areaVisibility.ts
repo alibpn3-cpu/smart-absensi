@@ -10,6 +10,7 @@ export const VISIBILITY_KEYS = {
   birthday: 'birthday_disabled_areas',
   ads: 'ads_disabled_areas',
   ranking: 'ranking_disabled_areas',
+  leave: 'leave_disabled_areas',
 } as const;
 
 export type VisibilityFeature = keyof typeof VISIBILITY_KEYS;
