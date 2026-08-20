@@ -46,6 +46,12 @@ const UserSidebar: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const featureFlags = useFeatureFlags();
+  const [leaveHiddenForArea, setLeaveHiddenForArea] = useState(false);
+
+  // Site admin can hide the leave/permission menu per work area / division
+  useEffect(() => {
+    isHiddenForCurrentUser('leave').then(setLeaveHiddenForArea).catch(() => {});
+  }, []);
 
   // Load session uid + unread count on mount; subscribe to realtime
   useEffect(() => {
