@@ -1,0 +1,1 @@
+SELECT cron.unschedule('remind-clock-in-daily');
