@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { getMonthlyAccumulatedScore } from '@/hooks/useScoreCalculation';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
+import { isHiddenForCurrentUser } from '@/utils/areaVisibility';
 import DebugLogger from './DebugLogger';
 import ChangePasswordDialog from './ChangePasswordDialog';
 import NotificationsDialog from './NotificationsDialog';
@@ -362,7 +363,7 @@ const UserSidebar: React.FC = () => {
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </Button>
 
-                {(featureFlags.leaveRequestEnabled || featureFlags.permissionRequestEnabled) && (
+                {!leaveHiddenForArea && (featureFlags.leaveRequestEnabled || featureFlags.permissionRequestEnabled) && (
                   <Button
                     variant="ghost"
                     className="w-full justify-between h-11"
