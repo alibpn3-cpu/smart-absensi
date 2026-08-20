@@ -60,14 +60,16 @@ export default function AnnouncementManager({ workArea, createdByUid, createdByN
 
     // Load per-area visibility flags
     const norm = (v: string) => v.trim().toUpperCase();
-    const [bd, ad, rk] = await Promise.all([
+    const [bd, ad, rk, lv] = await Promise.all([
       getDisabledAreas('birthday'),
       getDisabledAreas('ads'),
       getDisabledAreas('ranking'),
+      getDisabledAreas('leave'),
     ]);
     setBirthdayEnabled(!bd.map(norm).includes(norm(workArea)));
     setAdsEnabled(!ad.map(norm).includes(norm(workArea)));
     setRankingEnabled(!rk.map(norm).includes(norm(workArea)));
+    setLeaveEnabled(!lv.map(norm).includes(norm(workArea)));
 
 
     setLoading(false);
