@@ -47,6 +47,7 @@ export default function AnnouncementManager({ workArea, createdByUid, createdByN
   const [birthdayEnabled, setBirthdayEnabled] = useState(true);
   const [adsEnabled, setAdsEnabled] = useState(true);
   const [rankingEnabled, setRankingEnabled] = useState(true);
+  const [leaveEnabled, setLeaveEnabled] = useState(true);
 
   const load = async () => {
     setLoading(true);
@@ -59,14 +60,16 @@ export default function AnnouncementManager({ workArea, createdByUid, createdByN
 
     // Load per-area visibility flags
     const norm = (v: string) => v.trim().toUpperCase();
-    const [bd, ad, rk] = await Promise.all([
+    const [bd, ad, rk, lv] = await Promise.all([
       getDisabledAreas('birthday'),
       getDisabledAreas('ads'),
       getDisabledAreas('ranking'),
+      getDisabledAreas('leave'),
     ]);
     setBirthdayEnabled(!bd.map(norm).includes(norm(workArea)));
     setAdsEnabled(!ad.map(norm).includes(norm(workArea)));
     setRankingEnabled(!rk.map(norm).includes(norm(workArea)));
+    setLeaveEnabled(!lv.map(norm).includes(norm(workArea)));
 
 
     setLoading(false);
@@ -237,6 +240,7 @@ export default function AnnouncementManager({ workArea, createdByUid, createdByN
           { key: 'birthday' as const, label: 'Tampilkan Birthday Card', state: birthdayEnabled, set: setBirthdayEnabled },
           { key: 'ads' as const, label: 'Tampilkan Iklan (Pop-up)', state: adsEnabled, set: setAdsEnabled },
           { key: 'ranking' as const, label: 'Tampilkan Ranking Bulanan', state: rankingEnabled, set: setRankingEnabled },
+          { key: 'leave' as const, label: 'Tampilkan Menu Cuti & Ijin', state: leaveEnabled, set: setLeaveEnabled },
         ]).map((row) => (
           <div key={row.key} className="flex items-center justify-between gap-3 p-3 bg-muted/40 rounded-lg">
             <div className="min-w-0">
