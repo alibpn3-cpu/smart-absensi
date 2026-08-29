@@ -888,7 +888,12 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
           clockOut: formatTimeHMS(record.check_out_time, emp?.work_area),
           lateIn: calculateLateClockIn(record.check_in_time, onDuty, emp?.work_area),
           earlyOut: calculateEarlyClockOut(record.check_out_time, offDuty, emp?.work_area),
-          totalJam: formatHoursHMS(record.hours_worked, record.check_in_time, record.check_out_time),
+          totalJam: hrs.total === null ? '' : secToHMS(hrs.total),
+          jamReguler: secToHMS(hrs.regular),
+          jamLembur: secToHMS(hrs.overtime),
+          totalJamDesimal: hrs.total === null ? '' : Math.round((hrs.total / 3600) * 100) / 100,
+          totalJamBulat: secToRoundedHours(hrs.total),
+
           geofenceIn: checkinGeofenceName || '-',
           alamatIn: record.checkin_location_address || '-',
           koordinatIn: record.checkin_location_lat && record.checkin_location_lng 
