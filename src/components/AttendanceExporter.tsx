@@ -1025,7 +1025,75 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         to: `${lastColumn}${attendanceData.length + 1}`
       };
 
+      // ---- Rekap sheet: total jam per karyawan ----
+      const rekapSheet = workbook.addWorksheet('Rekap Jam');
+      rekapSheet.columns = [
+        { header: 'No', key: 'no', width: 5 },
+        { header: 'UID', key: 'uid', width: 12 },
+        { header: 'Nama', key: 'nama', width: 24 },
+        { header: 'Jabatan', key: 'jabatan', width: 20 },
+        { header: 'Area Kerja', key: 'area', width: 22 },
+        { header: 'Hari Hadir', key: 'hari', width: 12 },
+        { header: 'Total Jam (Desimal)', key: 'total', width: 18 },
+        { header: 'Jam Reguler', key: 'reguler', width: 14 },
+        { header: 'Jam Lembur', key: 'lembur', width: 14 },
+        { header: 'Total Jam (Bulat 0,5)', key: 'bulat', width: 20 },
+      ];
+
+      const rekapMap = new Map<string, any>();
+      attendanceData.forEach((record: any) => {
+        if (record._isEmpty) return;
+        const emp = allEmployees.find((s: any) => s.uid === record.staff_uid);
+        const onD = getOnDuty(emp?.work_area, emp?.employee_type);
+        const offD = getOffDuty(emp?.work_area, emp?.employee_type);
+        const h = splitWorkHours(record, onD, offD);
+        const key = record.staff_uid;
+        if (!rekapMap.has(key)) {
+          rekapMap.set(key, {
+            uid: record.staff_uid,
+            nama: record.staff_name || emp?.name || '-',
+            jabatan: emp?.position || '-',
+            area: emp?.work_area || '-',
+            hari: 0, total: 0, reguler: 0, lembur: 0,
+          });
+        }
+        const agg = rekapMap.get(key);
+        if (record.check_in_time) agg.hari += 1;
+        if (h.total !== null) {
+          agg.total += h.total;
+          agg.reguler += h.regular || 0;
+          agg.lembur += h.overtime || 0;
+        }
+      });
+
+      Array.from(rekapMap.values())
+        .sort((a, b) => a.nama.localeCompare(b.nama))
+        .forEach((agg, i) => {
+          rekapSheet.addRow({
+            no: i + 1,
+            uid: agg.uid,
+            nama: agg.nama,
+            jabatan: agg.jabatan,
+            area: agg.area,
+            hari: agg.hari,
+            total: Math.round((agg.total / 3600) * 100) / 100,
+            reguler: Math.round((agg.reguler / 3600) * 100) / 100,
+            lembur: Math.round((agg.lembur / 3600) * 100) / 100,
+            bulat: Math.round(agg.total / 1800) / 2,
+          });
+        });
+
+      const rekapHeader = rekapSheet.getRow(1);
+      rekapHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      rekapHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } };
+      rekapHeader.alignment = { vertical: 'middle', horizontal: 'center' };
+      rekapSheet.eachRow((row) => row.eachCell((c) => {
+        c.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      }));
+      rekapSheet.views = [{ state: 'frozen', ySplit: 1 }];
+
       // Generate filename
+
       const startDate = new Date(filters.startDate).toLocaleDateString('id-ID').replace(/\//g, '-');
       const endDate = new Date(filters.endDate).toLocaleDateString('id-ID').replace(/\//g, '-');
       const statusText = filters.status === 'all' ? 'Semua' : filters.status.toUpperCase();
