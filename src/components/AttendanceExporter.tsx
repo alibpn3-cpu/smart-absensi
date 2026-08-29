@@ -1435,6 +1435,23 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
               </Select>
             </div>
 
+            {/* Attendance Type Filter (Reguler / Lembur) */}
+            <div className="space-y-2">
+              <Label htmlFor="attendanceType">Jenis Absensi</Label>
+              <Select value={filters.attendanceType} onValueChange={(value) => setFilters({...filters, attendanceType: value})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua</SelectItem>
+                  <SelectItem value="regular">Reguler / Shift</SelectItem>
+                  <SelectItem value="overtime">Lembur</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+
+
             {/* Work Area Filter */}
             <div className="space-y-2">
               <Label htmlFor="workArea">Area Tugas</Label>
