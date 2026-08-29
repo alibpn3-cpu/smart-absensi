@@ -20,7 +20,9 @@ interface ExportFilters {
   status: string;
   employeeUid: string;
   workArea: string;
+  attendanceType: string;
 }
+
 
 interface StaffUser {
   uid: string;
@@ -48,7 +50,9 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     endDate: '',
     status: 'all',
     employeeUid: 'all',
-    workArea: forcedWorkArea || 'all'
+    workArea: forcedWorkArea || 'all',
+    attendanceType: 'all'
+
   });
   const [employees, setEmployees] = useState<StaffUser[]>([]);
   const [allEmployees, setAllEmployees] = useState<StaffUser[]>([]);
@@ -346,6 +350,62 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     }
   };
 
+  // ---- Overtime / working-hours helpers -------------------------------
+  // Rule: without clock-out the value is EMPTY (not 0, not '-'), because the
+  // shift duration is unknown and must not be treated as payable time.
+  const workedSeconds = (record: any): number | null => {
+    if (!record?.check_in_time || !record?.check_out_time) return null;
+    try {
+      const start = new Date(String(record.check_in_time).replace(' ', 'T'));
+      const end = new Date(String(record.check_out_time).replace(' ', 'T'));
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+      const diff = Math.floor((end.getTime() - start.getTime()) / 1000);
+      if (diff <= 0) return null;
+      return diff;
+    } catch {
+      return null;
+    }
+  };
+
+  const scheduleSeconds = (onDuty: string, offDuty: string): number => {
+    const parse = (t: string) => {
+      const [h, m, s] = (t || '').split(':').map(Number);
+      if (isNaN(h) || isNaN(m)) return null;
+      return h * 3600 + m * 60 + (s || 0);
+    };
+    const a = parse(onDuty);
+    const b = parse(offDuty);
+    if (a === null || b === null) return 8 * 3600;
+    let d = b - a;
+    if (d <= 0) d += 24 * 3600; // crosses midnight (night shift)
+    return d;
+  };
+
+  const splitWorkHours = (record: any, onDuty: string, offDuty: string) => {
+    const total = workedSeconds(record);
+    if (total === null) return { regular: null, overtime: null, total: null };
+    if (record.attendance_type === 'overtime') {
+      return { regular: 0, overtime: total, total };
+    }
+    const sched = scheduleSeconds(onDuty, offDuty);
+    return { regular: Math.min(total, sched), overtime: Math.max(0, total - sched), total };
+  };
+
+  const secToHMS = (sec: number | null): string => {
+    if (sec === null || sec === undefined) return '';
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  // Rounded to nearest 0.5 hour, empty when unknown
+  const secToRoundedHours = (sec: number | null): number | '' => {
+    if (sec === null || sec === undefined) return '';
+    return Math.round(sec / 1800) / 2;
+  };
+
+
   // Generate all dates in a range
   const generateDateRange = (start: string, end: string): string[] => {
     const dates: string[] = [];
@@ -415,6 +475,15 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         query = query.in('staff_uid', workAreaUids);
       }
 
+      // Apply attendance type filter (regular / overtime)
+      if (filters.attendanceType === 'overtime') {
+        query = query.eq('attendance_type', 'overtime');
+      } else if (filters.attendanceType === 'regular') {
+        query = query.or('attendance_type.is.null,attendance_type.neq.overtime');
+      }
+
+
+
       const { data, error } = await query;
 
       if (error) {
@@ -462,10 +531,13 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     const attendanceData = await fetchAttendanceData();
     if (!attendanceData) return null;
     
-    // If skipBlankDates is true, just return the raw data
-    if (skipBlankDates) {
+    // If skipBlankDates is true, or a specific attendance type is selected
+    // (blank filler rows are meaningless for a regular/overtime-only report),
+    // just return the raw data
+    if (skipBlankDates || filters.attendanceType !== 'all') {
       return attendanceData;
     }
+
     
     // Generate all dates in range
     const allDates = generateDateRange(filters.startDate, filters.endDate);
@@ -668,6 +740,11 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         { header: 'Late Clock In', key: 'lateIn', width: 12 },
         { header: 'Early Clock Out', key: 'earlyOut', width: 12 },
         { header: 'Total Jam Kerja', key: 'totalJam', width: 12 },
+        { header: 'Jam Reguler', key: 'jamReguler', width: 12 },
+        { header: 'Jam Lembur', key: 'jamLembur', width: 12 },
+        { header: 'Total Jam (Desimal)', key: 'totalJamDesimal', width: 16 },
+        { header: 'Total Jam (Bulat 0,5)', key: 'totalJamBulat', width: 18 },
+
         { header: 'Geofence Clock-In', key: 'geofenceIn', width: 20 },
         { header: 'Alamat Clock-In', key: 'alamatIn', width: 35 },
         { header: 'Koordinat Clock-In', key: 'koordinatIn', width: 20 },
@@ -790,7 +867,10 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
           ? `${jokiOutPrefix}${flagOutBase ? ' • ' + labelFlag(flagOutBase) : ''}`
           : labelFlag(flagOutBase);
 
+        const hrs = splitWorkHours(record, onDuty, offDuty);
+
         const row = worksheet.addRow({
+
           no: index + 1,
           uid: record.staff_uid,
           nama: record.staff_name,
@@ -808,7 +888,12 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
           clockOut: formatTimeHMS(record.check_out_time, emp?.work_area),
           lateIn: calculateLateClockIn(record.check_in_time, onDuty, emp?.work_area),
           earlyOut: calculateEarlyClockOut(record.check_out_time, offDuty, emp?.work_area),
-          totalJam: formatHoursHMS(record.hours_worked, record.check_in_time, record.check_out_time),
+          totalJam: hrs.total === null ? '' : secToHMS(hrs.total),
+          jamReguler: secToHMS(hrs.regular),
+          jamLembur: secToHMS(hrs.overtime),
+          totalJamDesimal: hrs.total === null ? '' : Math.round((hrs.total / 3600) * 100) / 100,
+          totalJamBulat: secToRoundedHours(hrs.total),
+
           geofenceIn: checkinGeofenceName || '-',
           alamatIn: record.checkin_location_address || '-',
           koordinatIn: record.checkin_location_lat && record.checkin_location_lng 
@@ -940,7 +1025,75 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         to: `${lastColumn}${attendanceData.length + 1}`
       };
 
+      // ---- Rekap sheet: total jam per karyawan ----
+      const rekapSheet = workbook.addWorksheet('Rekap Jam');
+      rekapSheet.columns = [
+        { header: 'No', key: 'no', width: 5 },
+        { header: 'UID', key: 'uid', width: 12 },
+        { header: 'Nama', key: 'nama', width: 24 },
+        { header: 'Jabatan', key: 'jabatan', width: 20 },
+        { header: 'Area Kerja', key: 'area', width: 22 },
+        { header: 'Hari Hadir', key: 'hari', width: 12 },
+        { header: 'Total Jam (Desimal)', key: 'total', width: 18 },
+        { header: 'Jam Reguler', key: 'reguler', width: 14 },
+        { header: 'Jam Lembur', key: 'lembur', width: 14 },
+        { header: 'Total Jam (Bulat 0,5)', key: 'bulat', width: 20 },
+      ];
+
+      const rekapMap = new Map<string, any>();
+      attendanceData.forEach((record: any) => {
+        if (record._isEmpty) return;
+        const emp = allEmployees.find((s: any) => s.uid === record.staff_uid);
+        const onD = getOnDuty(emp?.work_area, emp?.employee_type);
+        const offD = getOffDuty(emp?.work_area, emp?.employee_type);
+        const h = splitWorkHours(record, onD, offD);
+        const key = record.staff_uid;
+        if (!rekapMap.has(key)) {
+          rekapMap.set(key, {
+            uid: record.staff_uid,
+            nama: record.staff_name || emp?.name || '-',
+            jabatan: emp?.position || '-',
+            area: emp?.work_area || '-',
+            hari: 0, total: 0, reguler: 0, lembur: 0,
+          });
+        }
+        const agg = rekapMap.get(key);
+        if (record.check_in_time) agg.hari += 1;
+        if (h.total !== null) {
+          agg.total += h.total;
+          agg.reguler += h.regular || 0;
+          agg.lembur += h.overtime || 0;
+        }
+      });
+
+      Array.from(rekapMap.values())
+        .sort((a, b) => a.nama.localeCompare(b.nama))
+        .forEach((agg, i) => {
+          rekapSheet.addRow({
+            no: i + 1,
+            uid: agg.uid,
+            nama: agg.nama,
+            jabatan: agg.jabatan,
+            area: agg.area,
+            hari: agg.hari,
+            total: Math.round((agg.total / 3600) * 100) / 100,
+            reguler: Math.round((agg.reguler / 3600) * 100) / 100,
+            lembur: Math.round((agg.lembur / 3600) * 100) / 100,
+            bulat: Math.round(agg.total / 1800) / 2,
+          });
+        });
+
+      const rekapHeader = rekapSheet.getRow(1);
+      rekapHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      rekapHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } };
+      rekapHeader.alignment = { vertical: 'middle', horizontal: 'center' };
+      rekapSheet.eachRow((row) => row.eachCell((c) => {
+        c.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      }));
+      rekapSheet.views = [{ state: 'frozen', ySplit: 1 }];
+
       // Generate filename
+
       const startDate = new Date(filters.startDate).toLocaleDateString('id-ID').replace(/\//g, '-');
       const endDate = new Date(filters.endDate).toLocaleDateString('id-ID').replace(/\//g, '-');
       const statusText = filters.status === 'all' ? 'Semua' : filters.status.toUpperCase();
@@ -1023,7 +1176,14 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         checkOut: isEmpty ? '-' : formatTimeHMS(record.check_out_time, emp?.work_area),
         lateClockIn: isEmpty ? '-' : calculateLateClockIn(record.check_in_time, onDuty, emp?.work_area),
         earlyClockOut: isEmpty ? '-' : calculateEarlyClockOut(record.check_out_time, offDuty, emp?.work_area),
-        hoursWorked: isEmpty ? '-' : formatHoursHMS(record.hours_worked, record.check_in_time, record.check_out_time),
+        hoursWorked: isEmpty ? '' : secToHMS(splitWorkHours(record, onDuty, offDuty).total),
+        regularHours: isEmpty ? '' : secToHMS(splitWorkHours(record, onDuty, offDuty).regular),
+        overtimeHours: isEmpty ? '' : secToHMS(splitWorkHours(record, onDuty, offDuty).overtime),
+        totalHoursDecimal: isEmpty || splitWorkHours(record, onDuty, offDuty).total === null
+          ? ''
+          : Math.round((splitWorkHours(record, onDuty, offDuty).total! / 3600) * 100) / 100,
+        totalHoursRounded: isEmpty ? '' : secToRoundedHours(splitWorkHours(record, onDuty, offDuty).total),
+
         checkinAddress: isEmpty ? '-' : (record.checkin_location_address || '-'),
         checkoutAddress: isEmpty ? '-' : (record.checkout_location_address || '-'),
         p2h: checklist?.p2h_checked ? 'Ya' : 'Tidak',
@@ -1059,9 +1219,10 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
       
       // Table with new columns
       autoTable(doc, {
-        head: [['No', 'Nama', 'Hari', 'Tanggal', 'Status In', 'Jenis', 'On Duty', 'Clock In', 'Late', 'Off Duty', 'Clock Out', 'Early', 'Jam Kerja']],
+        head: [['No', 'Nama', 'Hari', 'Tanggal', 'Status In', 'Jenis', 'On Duty', 'Clock In', 'Late', 'Off Duty', 'Clock Out', 'Early', 'Jam Kerja', 'Jam Reguler', 'Jam Lembur', 'Bulat 0,5']],
         body: data.map((r) => [
-          r.no, r.name, r.day, r.date, r.statusIn, r.attendanceType, r.onDuty, r.checkIn, r.lateClockIn, r.offDuty, r.checkOut, r.earlyClockOut, r.hoursWorked
+          r.no, r.name, r.day, r.date, r.statusIn, r.attendanceType, r.onDuty, r.checkIn, r.lateClockIn, r.offDuty, r.checkOut, r.earlyClockOut, r.hoursWorked, r.regularHours, r.overtimeHours, r.totalHoursRounded
+
         ]),
         startY: 32,
         styles: { fontSize: 7, cellPadding: 1.5 },
@@ -1097,9 +1258,10 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
       if (!data) { setLoading(false); return; }
 
       const BOM = '\uFEFF';
-      const headers = ['No', 'UID', 'Nama', 'Jabatan', 'Area Kerja', 'Divisi', 'Hari', 'Tanggal', 'Status In', 'Status Out', 'Jenis Absensi', 'On Duty', 'Off Duty', 'Clock In', 'Clock Out', 'Late Clock In', 'Early Clock Out', 'Jam Kerja', 'Lokasi Clock In', 'Lokasi Clock Out', 'P2H', 'Toolbox', 'Alasan Clock In', 'Alasan Clock Out', 'Alasan Extend In', 'Alasan Extend Out'];
+      const headers = ['No', 'UID', 'Nama', 'Jabatan', 'Area Kerja', 'Divisi', 'Hari', 'Tanggal', 'Status In', 'Status Out', 'Jenis Absensi', 'On Duty', 'Off Duty', 'Clock In', 'Clock Out', 'Late Clock In', 'Early Clock Out', 'Jam Kerja', 'Jam Reguler', 'Jam Lembur', 'Total Jam (Desimal)', 'Total Jam (Bulat 0,5)', 'Lokasi Clock In', 'Lokasi Clock Out', 'P2H', 'Toolbox', 'Alasan Clock In', 'Alasan Clock Out', 'Alasan Extend In', 'Alasan Extend Out'];
       const rows = data.map((r) => [
-        r.no, r.uid, r.name, r.position, r.workArea, r.division, r.day, r.date, r.statusIn, r.statusOut, r.attendanceType, r.onDuty, r.offDuty, r.checkIn, r.checkOut, r.lateClockIn, r.earlyClockOut, r.hoursWorked, r.checkinAddress, r.checkoutAddress, r.p2h, r.toolbox, r.checkinReason, r.checkoutReason, r.extendInReason, r.extendOutReason
+        r.no, r.uid, r.name, r.position, r.workArea, r.division, r.day, r.date, r.statusIn, r.statusOut, r.attendanceType, r.onDuty, r.offDuty, r.checkIn, r.checkOut, r.lateClockIn, r.earlyClockOut, r.hoursWorked, r.regularHours, r.overtimeHours, r.totalHoursDecimal, r.totalHoursRounded, r.checkinAddress, r.checkoutAddress, r.p2h, r.toolbox, r.checkinReason, r.checkoutReason, r.extendInReason, r.extendOutReason
+
       ]);
       
       const csvContent = BOM + [
@@ -1140,6 +1302,10 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
           <td>${r.checkOut}</td>
           <td class="${r.earlyClockOut !== '-' ? 'early' : ''}">${r.earlyClockOut}</td>
           <td>${r.hoursWorked}</td>
+          <td>${r.regularHours}</td>
+          <td>${r.overtimeHours}</td>
+          <td>${r.totalHoursRounded}</td>
+
           <td>${r.checkinAddress}</td>
         </tr>
       `).join('');
@@ -1183,7 +1349,7 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     <table>
       <thead>
         <tr>
-          <th>No</th><th>Nama</th><th>Hari</th><th>Tanggal</th><th>Status</th><th>Jenis</th><th>On Duty</th><th>Clock In</th><th>Late</th><th>Off Duty</th><th>Clock Out</th><th>Early</th><th>Jam Kerja</th><th>Lokasi</th>
+          <th>No</th><th>Nama</th><th>Hari</th><th>Tanggal</th><th>Status</th><th>Jenis</th><th>On Duty</th><th>Clock In</th><th>Late</th><th>Off Duty</th><th>Clock Out</th><th>Early</th><th>Jam Kerja</th><th>Jam Reguler</th><th>Jam Lembur</th><th>Bulat 0,5</th><th>Lokasi</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
@@ -1231,7 +1397,7 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
       <CardContent>
         <div className="space-y-6">
           {/* Filter Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {/* Date Range */}
             <div className="space-y-2">
               <Label htmlFor="startDate">Tanggal Mulai</Label>
@@ -1268,6 +1434,23 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Attendance Type Filter (Reguler / Lembur) */}
+            <div className="space-y-2">
+              <Label htmlFor="attendanceType">Jenis Absensi</Label>
+              <Select value={filters.attendanceType} onValueChange={(value) => setFilters({...filters, attendanceType: value})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua</SelectItem>
+                  <SelectItem value="regular">Reguler / Shift</SelectItem>
+                  <SelectItem value="overtime">Lembur</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+
 
             {/* Work Area Filter */}
             <div className="space-y-2">
