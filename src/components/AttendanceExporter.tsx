@@ -50,7 +50,9 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     endDate: '',
     status: 'all',
     employeeUid: 'all',
-    workArea: forcedWorkArea || 'all'
+    workArea: forcedWorkArea || 'all',
+    attendanceType: 'all'
+
   });
   const [employees, setEmployees] = useState<StaffUser[]>([]);
   const [allEmployees, setAllEmployees] = useState<StaffUser[]>([]);
