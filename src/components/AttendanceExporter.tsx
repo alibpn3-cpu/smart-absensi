@@ -20,7 +20,9 @@ interface ExportFilters {
   status: string;
   employeeUid: string;
   workArea: string;
+  attendanceType: string;
 }
+
 
 interface StaffUser {
   uid: string;
