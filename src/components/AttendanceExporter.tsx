@@ -1219,9 +1219,10 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
       
       // Table with new columns
       autoTable(doc, {
-        head: [['No', 'Nama', 'Hari', 'Tanggal', 'Status In', 'Jenis', 'On Duty', 'Clock In', 'Late', 'Off Duty', 'Clock Out', 'Early', 'Jam Kerja']],
+        head: [['No', 'Nama', 'Hari', 'Tanggal', 'Status In', 'Jenis', 'On Duty', 'Clock In', 'Late', 'Off Duty', 'Clock Out', 'Early', 'Jam Kerja', 'Jam Reguler', 'Jam Lembur', 'Bulat 0,5']],
         body: data.map((r) => [
-          r.no, r.name, r.day, r.date, r.statusIn, r.attendanceType, r.onDuty, r.checkIn, r.lateClockIn, r.offDuty, r.checkOut, r.earlyClockOut, r.hoursWorked
+          r.no, r.name, r.day, r.date, r.statusIn, r.attendanceType, r.onDuty, r.checkIn, r.lateClockIn, r.offDuty, r.checkOut, r.earlyClockOut, r.hoursWorked, r.regularHours, r.overtimeHours, r.totalHoursRounded
+
         ]),
         startY: 32,
         styles: { fontSize: 7, cellPadding: 1.5 },
