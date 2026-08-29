@@ -1258,9 +1258,10 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
       if (!data) { setLoading(false); return; }
 
       const BOM = '\uFEFF';
-      const headers = ['No', 'UID', 'Nama', 'Jabatan', 'Area Kerja', 'Divisi', 'Hari', 'Tanggal', 'Status In', 'Status Out', 'Jenis Absensi', 'On Duty', 'Off Duty', 'Clock In', 'Clock Out', 'Late Clock In', 'Early Clock Out', 'Jam Kerja', 'Lokasi Clock In', 'Lokasi Clock Out', 'P2H', 'Toolbox', 'Alasan Clock In', 'Alasan Clock Out', 'Alasan Extend In', 'Alasan Extend Out'];
+      const headers = ['No', 'UID', 'Nama', 'Jabatan', 'Area Kerja', 'Divisi', 'Hari', 'Tanggal', 'Status In', 'Status Out', 'Jenis Absensi', 'On Duty', 'Off Duty', 'Clock In', 'Clock Out', 'Late Clock In', 'Early Clock Out', 'Jam Kerja', 'Jam Reguler', 'Jam Lembur', 'Total Jam (Desimal)', 'Total Jam (Bulat 0,5)', 'Lokasi Clock In', 'Lokasi Clock Out', 'P2H', 'Toolbox', 'Alasan Clock In', 'Alasan Clock Out', 'Alasan Extend In', 'Alasan Extend Out'];
       const rows = data.map((r) => [
-        r.no, r.uid, r.name, r.position, r.workArea, r.division, r.day, r.date, r.statusIn, r.statusOut, r.attendanceType, r.onDuty, r.offDuty, r.checkIn, r.checkOut, r.lateClockIn, r.earlyClockOut, r.hoursWorked, r.checkinAddress, r.checkoutAddress, r.p2h, r.toolbox, r.checkinReason, r.checkoutReason, r.extendInReason, r.extendOutReason
+        r.no, r.uid, r.name, r.position, r.workArea, r.division, r.day, r.date, r.statusIn, r.statusOut, r.attendanceType, r.onDuty, r.offDuty, r.checkIn, r.checkOut, r.lateClockIn, r.earlyClockOut, r.hoursWorked, r.regularHours, r.overtimeHours, r.totalHoursDecimal, r.totalHoursRounded, r.checkinAddress, r.checkoutAddress, r.p2h, r.toolbox, r.checkinReason, r.checkoutReason, r.extendInReason, r.extendOutReason
+
       ]);
       
       const csvContent = BOM + [
