@@ -1176,7 +1176,14 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         checkOut: isEmpty ? '-' : formatTimeHMS(record.check_out_time, emp?.work_area),
         lateClockIn: isEmpty ? '-' : calculateLateClockIn(record.check_in_time, onDuty, emp?.work_area),
         earlyClockOut: isEmpty ? '-' : calculateEarlyClockOut(record.check_out_time, offDuty, emp?.work_area),
-        hoursWorked: isEmpty ? '-' : formatHoursHMS(record.hours_worked, record.check_in_time, record.check_out_time),
+        hoursWorked: isEmpty ? '' : secToHMS(splitWorkHours(record, onDuty, offDuty).total),
+        regularHours: isEmpty ? '' : secToHMS(splitWorkHours(record, onDuty, offDuty).regular),
+        overtimeHours: isEmpty ? '' : secToHMS(splitWorkHours(record, onDuty, offDuty).overtime),
+        totalHoursDecimal: isEmpty || splitWorkHours(record, onDuty, offDuty).total === null
+          ? ''
+          : Math.round((splitWorkHours(record, onDuty, offDuty).total! / 3600) * 100) / 100,
+        totalHoursRounded: isEmpty ? '' : secToRoundedHours(splitWorkHours(record, onDuty, offDuty).total),
+
         checkinAddress: isEmpty ? '-' : (record.checkin_location_address || '-'),
         checkoutAddress: isEmpty ? '-' : (record.checkout_location_address || '-'),
         p2h: checklist?.p2h_checked ? 'Ya' : 'Tidak',
