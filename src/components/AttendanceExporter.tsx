@@ -1302,6 +1302,10 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
           <td>${r.checkOut}</td>
           <td class="${r.earlyClockOut !== '-' ? 'early' : ''}">${r.earlyClockOut}</td>
           <td>${r.hoursWorked}</td>
+          <td>${r.regularHours}</td>
+          <td>${r.overtimeHours}</td>
+          <td>${r.totalHoursRounded}</td>
+
           <td>${r.checkinAddress}</td>
         </tr>
       `).join('');
