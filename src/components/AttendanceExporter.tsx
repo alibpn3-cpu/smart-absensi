@@ -346,6 +346,62 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     }
   };
 
+  // ---- Overtime / working-hours helpers -------------------------------
+  // Rule: without clock-out the value is EMPTY (not 0, not '-'), because the
+  // shift duration is unknown and must not be treated as payable time.
+  const workedSeconds = (record: any): number | null => {
+    if (!record?.check_in_time || !record?.check_out_time) return null;
+    try {
+      const start = new Date(String(record.check_in_time).replace(' ', 'T'));
+      const end = new Date(String(record.check_out_time).replace(' ', 'T'));
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+      const diff = Math.floor((end.getTime() - start.getTime()) / 1000);
+      if (diff <= 0) return null;
+      return diff;
+    } catch {
+      return null;
+    }
+  };
+
+  const scheduleSeconds = (onDuty: string, offDuty: string): number => {
+    const parse = (t: string) => {
+      const [h, m, s] = (t || '').split(':').map(Number);
+      if (isNaN(h) || isNaN(m)) return null;
+      return h * 3600 + m * 60 + (s || 0);
+    };
+    const a = parse(onDuty);
+    const b = parse(offDuty);
+    if (a === null || b === null) return 8 * 3600;
+    let d = b - a;
+    if (d <= 0) d += 24 * 3600; // crosses midnight (night shift)
+    return d;
+  };
+
+  const splitWorkHours = (record: any, onDuty: string, offDuty: string) => {
+    const total = workedSeconds(record);
+    if (total === null) return { regular: null, overtime: null, total: null };
+    if (record.attendance_type === 'overtime') {
+      return { regular: 0, overtime: total, total };
+    }
+    const sched = scheduleSeconds(onDuty, offDuty);
+    return { regular: Math.min(total, sched), overtime: Math.max(0, total - sched), total };
+  };
+
+  const secToHMS = (sec: number | null): string => {
+    if (sec === null || sec === undefined) return '';
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  // Rounded to nearest 0.5 hour, empty when unknown
+  const secToRoundedHours = (sec: number | null): number | '' => {
+    if (sec === null || sec === undefined) return '';
+    return Math.round(sec / 1800) / 2;
+  };
+
+
   // Generate all dates in a range
   const generateDateRange = (start: string, end: string): string[] => {
     const dates: string[] = [];
