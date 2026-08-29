@@ -1349,7 +1349,7 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     <table>
       <thead>
         <tr>
-          <th>No</th><th>Nama</th><th>Hari</th><th>Tanggal</th><th>Status</th><th>Jenis</th><th>On Duty</th><th>Clock In</th><th>Late</th><th>Off Duty</th><th>Clock Out</th><th>Early</th><th>Jam Kerja</th><th>Lokasi</th>
+          <th>No</th><th>Nama</th><th>Hari</th><th>Tanggal</th><th>Status</th><th>Jenis</th><th>On Duty</th><th>Clock In</th><th>Late</th><th>Off Duty</th><th>Clock Out</th><th>Early</th><th>Jam Kerja</th><th>Jam Reguler</th><th>Jam Lembur</th><th>Bulat 0,5</th><th>Lokasi</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
