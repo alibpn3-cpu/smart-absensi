@@ -740,6 +740,11 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         { header: 'Late Clock In', key: 'lateIn', width: 12 },
         { header: 'Early Clock Out', key: 'earlyOut', width: 12 },
         { header: 'Total Jam Kerja', key: 'totalJam', width: 12 },
+        { header: 'Jam Reguler', key: 'jamReguler', width: 12 },
+        { header: 'Jam Lembur', key: 'jamLembur', width: 12 },
+        { header: 'Total Jam (Desimal)', key: 'totalJamDesimal', width: 16 },
+        { header: 'Total Jam (Bulat 0,5)', key: 'totalJamBulat', width: 18 },
+
         { header: 'Geofence Clock-In', key: 'geofenceIn', width: 20 },
         { header: 'Alamat Clock-In', key: 'alamatIn', width: 35 },
         { header: 'Koordinat Clock-In', key: 'koordinatIn', width: 20 },
