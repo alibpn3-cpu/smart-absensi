@@ -475,6 +475,15 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
         query = query.in('staff_uid', workAreaUids);
       }
 
+      // Apply attendance type filter (regular / overtime)
+      if (filters.attendanceType === 'overtime') {
+        query = query.eq('attendance_type', 'overtime');
+      } else if (filters.attendanceType === 'regular') {
+        query = query.or('attendance_type.is.null,attendance_type.neq.overtime');
+      }
+
+
+
       const { data, error } = await query;
 
       if (error) {
