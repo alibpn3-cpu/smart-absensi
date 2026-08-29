@@ -531,10 +531,13 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     const attendanceData = await fetchAttendanceData();
     if (!attendanceData) return null;
     
-    // If skipBlankDates is true, just return the raw data
-    if (skipBlankDates) {
+    // If skipBlankDates is true, or a specific attendance type is selected
+    // (blank filler rows are meaningless for a regular/overtime-only report),
+    // just return the raw data
+    if (skipBlankDates || filters.attendanceType !== 'all') {
       return attendanceData;
     }
+
     
     // Generate all dates in range
     const allDates = generateDateRange(filters.startDate, filters.endDate);
