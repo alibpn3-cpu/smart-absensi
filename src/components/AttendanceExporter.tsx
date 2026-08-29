@@ -867,7 +867,10 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
           ? `${jokiOutPrefix}${flagOutBase ? ' • ' + labelFlag(flagOutBase) : ''}`
           : labelFlag(flagOutBase);
 
+        const hrs = splitWorkHours(record, onDuty, offDuty);
+
         const row = worksheet.addRow({
+
           no: index + 1,
           uid: record.staff_uid,
           nama: record.staff_name,
