@@ -274,7 +274,7 @@ const SubAdminReports: React.FC = () => {
         uid: r.staff_uid,
         nama: r.staff_name,
         status: (r.status || '-').toUpperCase(),
-        jenis: r.attendance_type === 'overtime' ? 'LEMBUR' : 'REGULAR',
+        jenis: r.attendance_type === 'overtime' ? 'LEMBUR' : (r.attendance_type === 'shift' ? 'SHIFT' : ''),
         in: fmtTime(r.check_in_time),
         out: fmtTime(r.check_out_time),
         locIn: r.checkin_location_address || '-',
@@ -354,7 +354,7 @@ const SubAdminReports: React.FC = () => {
               <Filter className="h-4 w-4" /> Filter
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <div>
               <Label>Tanggal Mulai</Label>
               <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
