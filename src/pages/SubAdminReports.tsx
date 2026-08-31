@@ -92,6 +92,7 @@ const SubAdminReports: React.FC = () => {
   const [startDate, setStartDate] = useState(firstDay);
   const [endDate, setEndDate] = useState(lastDay);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [attendanceTypeFilter, setAttendanceTypeFilter] = useState<string>('all');
   const [employeeFilter, setEmployeeFilter] = useState<string>('all');
   const [nameSearch, setNameSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -151,6 +152,8 @@ const SubAdminReports: React.FC = () => {
           .range(from, from + BATCH - 1);
 
         if (statusFilter !== 'all') q = q.eq('status', statusFilter);
+        if (attendanceTypeFilter === 'overtime') q = q.eq('attendance_type', 'overtime');
+        else if (attendanceTypeFilter === 'regular') q = q.or('attendance_type.is.null,attendance_type.neq.overtime');
         if (employeeFilter !== 'all') q = q.eq('staff_uid', employeeFilter);
 
         const { data, error } = await q;
