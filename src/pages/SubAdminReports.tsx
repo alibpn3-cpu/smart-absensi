@@ -376,6 +376,17 @@ const SubAdminReports: React.FC = () => {
               </Select>
             </div>
             <div>
+              <Label>Jenis Absensi</Label>
+              <Select value={attendanceTypeFilter} onValueChange={setAttendanceTypeFilter}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua</SelectItem>
+                  <SelectItem value="regular">Reguler</SelectItem>
+                  <SelectItem value="overtime">Lembur</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Karyawan</Label>
               <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -391,9 +402,9 @@ const SubAdminReports: React.FC = () => {
               <Label>Cari Nama</Label>
               <Input placeholder="Ketik nama…" value={nameSearch} onChange={(e) => { setNameSearch(e.target.value); setPage(1); }} />
             </div>
-            <div className="md:col-span-5 flex gap-2">
+            <div className="md:col-span-6 flex flex-wrap gap-2">
               <Button onClick={fetchRecords} disabled={loading}>{loading ? 'Memuat…' : 'Terapkan'}</Button>
-              <Button variant="outline" onClick={() => { setStatusFilter('all'); setEmployeeFilter('all'); setNameSearch(''); setStartDate(firstDay); setEndDate(lastDay); }}>Reset</Button>
+              <Button variant="outline" onClick={() => { setStatusFilter('all'); setAttendanceTypeFilter('all'); setEmployeeFilter('all'); setNameSearch(''); setStartDate(firstDay); setEndDate(lastDay); }}>Reset</Button>
               <Button variant="default" onClick={exportExcel} disabled={loading || filtered.length === 0}>
                 <FileSpreadsheet className="h-4 w-4 mr-1" /> Export Excel
               </Button>
