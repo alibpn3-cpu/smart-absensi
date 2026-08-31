@@ -92,6 +92,7 @@ const SubAdminReports: React.FC = () => {
   const [startDate, setStartDate] = useState(firstDay);
   const [endDate, setEndDate] = useState(lastDay);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [attendanceTypeFilter, setAttendanceTypeFilter] = useState<string>('all');
   const [employeeFilter, setEmployeeFilter] = useState<string>('all');
   const [nameSearch, setNameSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -151,6 +152,8 @@ const SubAdminReports: React.FC = () => {
           .range(from, from + BATCH - 1);
 
         if (statusFilter !== 'all') q = q.eq('status', statusFilter);
+        if (attendanceTypeFilter === 'overtime') q = q.eq('attendance_type', 'overtime');
+        else if (attendanceTypeFilter === 'regular') q = q.or('attendance_type.is.null,attendance_type.neq.overtime');
         if (employeeFilter !== 'all') q = q.eq('staff_uid', employeeFilter);
 
         const { data, error } = await q;
@@ -271,7 +274,7 @@ const SubAdminReports: React.FC = () => {
         uid: r.staff_uid,
         nama: r.staff_name,
         status: (r.status || '-').toUpperCase(),
-        jenis: r.attendance_type === 'overtime' ? 'LEMBUR' : 'REGULAR',
+        jenis: r.attendance_type === 'overtime' ? 'LEMBUR' : (r.attendance_type === 'shift' ? 'SHIFT' : ''),
         in: fmtTime(r.check_in_time),
         out: fmtTime(r.check_out_time),
         locIn: r.checkin_location_address || '-',
@@ -351,7 +354,7 @@ const SubAdminReports: React.FC = () => {
               <Filter className="h-4 w-4" /> Filter
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <div>
               <Label>Tanggal Mulai</Label>
               <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
@@ -373,6 +376,17 @@ const SubAdminReports: React.FC = () => {
               </Select>
             </div>
             <div>
+              <Label>Jenis Absensi</Label>
+              <Select value={attendanceTypeFilter} onValueChange={setAttendanceTypeFilter}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua</SelectItem>
+                  <SelectItem value="regular">Reguler</SelectItem>
+                  <SelectItem value="overtime">Lembur</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Karyawan</Label>
               <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -388,9 +402,9 @@ const SubAdminReports: React.FC = () => {
               <Label>Cari Nama</Label>
               <Input placeholder="Ketik nama…" value={nameSearch} onChange={(e) => { setNameSearch(e.target.value); setPage(1); }} />
             </div>
-            <div className="md:col-span-5 flex gap-2">
+            <div className="md:col-span-6 flex flex-wrap gap-2">
               <Button onClick={fetchRecords} disabled={loading}>{loading ? 'Memuat…' : 'Terapkan'}</Button>
-              <Button variant="outline" onClick={() => { setStatusFilter('all'); setEmployeeFilter('all'); setNameSearch(''); setStartDate(firstDay); setEndDate(lastDay); }}>Reset</Button>
+              <Button variant="outline" onClick={() => { setStatusFilter('all'); setAttendanceTypeFilter('all'); setEmployeeFilter('all'); setNameSearch(''); setStartDate(firstDay); setEndDate(lastDay); }}>Reset</Button>
               <Button variant="default" onClick={exportExcel} disabled={loading || filtered.length === 0}>
                 <FileSpreadsheet className="h-4 w-4 mr-1" /> Export Excel
               </Button>
