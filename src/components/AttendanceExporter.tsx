@@ -543,10 +543,11 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     const allDates = generateDateRange(filters.startDate, filters.endDate);
     
     // Create attendance map for quick lookup
-    const attendanceMap = new Map();
+    const attendanceMap = new Map<string, any[]>();
     attendanceData.forEach((record: any) => {
       const key = `${record.staff_uid}_${record.date}`;
-      attendanceMap.set(key, record);
+      if (!attendanceMap.has(key)) attendanceMap.set(key, []);
+      attendanceMap.get(key)!.push(record);
     });
     
     // Determine target UIDs
@@ -567,9 +568,13 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
     for (const uid of targetUids) {
       const emp = allEmployees.find((e) => e.uid === uid);
       for (const date of allDates) {
-        const record = attendanceMap.get(`${uid}_${date}`);
-        if (record) {
-          result.push(record);
+        const dayRecords = attendanceMap.get(`${uid}_${date}`);
+        if (dayRecords && dayRecords.length) {
+          // Keep every record of the day (regular + overtime rows)
+          const sorted = [...dayRecords].sort((a, b) =>
+            (a.attendance_type === 'overtime' ? 1 : 0) - (b.attendance_type === 'overtime' ? 1 : 0)
+          );
+          sorted.forEach((r) => result.push(r));
         } else {
           // Create empty record for this date
           result.push({
