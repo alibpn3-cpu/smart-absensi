@@ -167,6 +167,75 @@ export type Database = {
         }
         Relationships: []
       }
+      attendance_correction_requests: {
+        Row: {
+          attendance_record_id: string | null
+          created_at: string
+          division: string | null
+          id: string
+          original_check_in: string | null
+          original_check_out: string | null
+          reason: string
+          request_date: string
+          request_kind: string
+          requested_check_in: string | null
+          requested_check_out: string | null
+          reviewed_at: string | null
+          reviewer_comment: string | null
+          reviewer_name: string | null
+          reviewer_uid: string | null
+          staff_name: string
+          staff_uid: string
+          status: string
+          updated_at: string
+          work_area: string | null
+        }
+        Insert: {
+          attendance_record_id?: string | null
+          created_at?: string
+          division?: string | null
+          id?: string
+          original_check_in?: string | null
+          original_check_out?: string | null
+          reason: string
+          request_date: string
+          request_kind?: string
+          requested_check_in?: string | null
+          requested_check_out?: string | null
+          reviewed_at?: string | null
+          reviewer_comment?: string | null
+          reviewer_name?: string | null
+          reviewer_uid?: string | null
+          staff_name: string
+          staff_uid: string
+          status?: string
+          updated_at?: string
+          work_area?: string | null
+        }
+        Update: {
+          attendance_record_id?: string | null
+          created_at?: string
+          division?: string | null
+          id?: string
+          original_check_in?: string | null
+          original_check_out?: string | null
+          reason?: string
+          request_date?: string
+          request_kind?: string
+          requested_check_in?: string | null
+          requested_check_out?: string | null
+          reviewed_at?: string | null
+          reviewer_comment?: string | null
+          reviewer_name?: string | null
+          reviewer_uid?: string | null
+          staff_name?: string
+          staff_uid?: string
+          status?: string
+          updated_at?: string
+          work_area?: string | null
+        }
+        Relationships: []
+      }
       attendance_records: {
         Row: {
           attendance_type: string | null

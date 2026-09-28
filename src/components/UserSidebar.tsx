@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   Menu, User, FileText, RefreshCw, Bug, MapPin, Camera, Satellite, Star,
-  LogOut, Info, Lock, Shield, ChevronRight, BarChart3, MapPinned, Bell, History
+  LogOut, Info, Lock, Shield, ChevronRight, BarChart3, MapPinned, Bell, History, Clock
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -18,6 +18,7 @@ import DebugLogger from './DebugLogger';
 import ChangePasswordDialog from './ChangePasswordDialog';
 import NotificationsDialog from './NotificationsDialog';
 import AttendanceHistoryDialog from './AttendanceHistoryDialog';
+import AttendanceCorrectionDialog from './AttendanceCorrectionDialog';
 
 interface UserSession {
   uid: string;
@@ -46,6 +47,7 @@ const UserSidebar: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showCorrection, setShowCorrection] = useState(false);
   const featureFlags = useFeatureFlags();
   const [leaveHiddenForArea, setLeaveHiddenForArea] = useState(false);
 
@@ -363,6 +365,18 @@ const UserSidebar: React.FC = () => {
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </Button>
 
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between h-11"
+                  onClick={() => { setOpen(false); setShowCorrection(true); }}
+                >
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-4 w-4 text-primary" />
+                    <span>Koreksi Clock In/Out</span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </Button>
+
                 {!leaveHiddenForArea && (featureFlags.leaveRequestEnabled || featureFlags.permissionRequestEnabled) && (
                   <Button
                     variant="ghost"
@@ -510,6 +524,8 @@ const UserSidebar: React.FC = () => {
           />
         );
       })()}
+
+      <AttendanceCorrectionDialog open={showCorrection} onOpenChange={setShowCorrection} />
     </>
   );
 };

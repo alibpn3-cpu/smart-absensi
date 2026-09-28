@@ -48,6 +48,7 @@ const WorkScheduleManager = React.lazy(() => import('../components/WorkScheduleM
 const DebugLogViewer = React.lazy(() => import('../components/DebugLogViewer'));
 const SubAdminReports = React.lazy(() => import('../pages/SubAdminReports'));
 import AnnouncementManager from '../components/AnnouncementManager';
+import AttendanceCorrectionManager from '../components/AttendanceCorrectionManager';
 const LeaveBalanceManager = React.lazy(() => import('../components/LeaveBalanceManager'));
 import { PieChart as RePieChart, Pie, Cell } from 'recharts';
 
@@ -422,7 +423,7 @@ const Dashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="attendance" className="space-y-4 sm:space-y-6">
-          <TabsList className={`flex w-full justify-start overflow-x-auto gap-1 bg-muted h-auto p-1 [&>button]:flex-none [&>button]:shrink-0 [&>button]:whitespace-nowrap sm:[&>button]:flex-1 sm:grid ${isSiteAdmin ? 'sm:grid-cols-6' : (isSuperAdmin ? 'sm:grid-cols-[repeat(15,minmax(0,1fr))]' : 'sm:grid-cols-11')}`}>
+          <TabsList className={`flex w-full justify-start overflow-x-auto gap-1 bg-muted h-auto p-1 [&>button]:flex-none [&>button]:shrink-0 [&>button]:whitespace-nowrap sm:[&>button]:flex-1 sm:grid ${isSiteAdmin ? 'sm:grid-cols-7' : (isSuperAdmin ? 'sm:grid-cols-[repeat(16,minmax(0,1fr))]' : 'sm:grid-cols-12')}`}>
             <TabsTrigger value="attendance" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Attendance</span>
               <span className="sm:hidden">Absen</span>
@@ -482,6 +483,10 @@ const Dashboard = () => {
               <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Export</span>
               <span className="sm:hidden">Data</span>
+            </TabsTrigger>
+            <TabsTrigger value="corrections" className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex-1 py-2 text-xs sm:text-sm">
+              <span className="hidden sm:inline">Koreksi</span>
+              <span className="sm:hidden">Koreksi</span>
             </TabsTrigger>
             {isSiteAdmin && (
               <>
@@ -949,6 +954,14 @@ const Dashboard = () => {
             <React.Suspense fallback={<div className="text-center py-8">Loading...</div>}>
               <AdManager />
             </React.Suspense>
+          </TabsContent>
+
+          <TabsContent value="corrections">
+            <AttendanceCorrectionManager
+              siteArea={isSiteAdmin ? siteAdminArea : null}
+              reviewerUid={parsedSession?.uid || 'superadmin'}
+              reviewerName={parsedSession?.name || 'Super Admin'}
+            />
           </TabsContent>
 
           <TabsContent value="leavebal">
