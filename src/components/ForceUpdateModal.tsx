@@ -46,6 +46,9 @@ const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({
         'app_installed_version',
         'selected_staff_uid',
         'kiosk_geofence_area_id',
+        'userSession',
+        'adminSession',
+        'attendance_device_id',
       ]);
 
       try {

@@ -30,7 +30,8 @@ const AttendanceCorrectionDialog: React.FC<Props> = ({ open, onOpenChange }) => 
   const minDate = ymd(new Date(now.getFullYear(), now.getMonth(), 1));
   const maxDate = ymd(now);
 
-  const [date, setDate] = useState(maxDate);
+  // Before 06:00 the user most likely corrects yesterday's (cross-midnight) shift
+  const [date, setDate] = useState(now.getHours() < 6 && now.getDate() > 1 ? ymd(new Date(now.getTime() - 86400000)) : maxDate);
   const [record, setRecord] = useState<any>(null);
   const [inTime, setInTime] = useState('');
   const [outTime, setOutTime] = useState('');
@@ -66,6 +67,9 @@ const AttendanceCorrectionDialog: React.FC<Props> = ({ open, onOpenChange }) => 
     }
     if (!inTime && !outTime) { toast({ title: 'Isi jam clock in atau clock out', variant: 'destructive' }); return; }
     if (!record && !inTime) { toast({ title: 'Absen susulan wajib ada jam clock in', variant: 'destructive' }); return; }
+    if (date === maxDate && inTime && inTime > `${pad(now.getHours())}:${pad(now.getMinutes())}`) {
+      toast({ title: 'Jam clock in belum terjadi', description: 'Jika shift kemarin, pilih tanggal kemarin.', variant: 'destructive' }); return;
+    }
     if (reason.trim().length < 10) { toast({ title: 'Alasan minimal 10 karakter', variant: 'destructive' }); return; }
     setSaving(true);
     const { error } = await supabase.from('attendance_correction_requests' as any).insert({
@@ -110,6 +114,9 @@ const AttendanceCorrectionDialog: React.FC<Props> = ({ open, onOpenChange }) => 
             <div className="space-y-1"><Label>Clock in</Label><Input type="time" value={inTime} onChange={(e) => setInTime(e.target.value)} /></div>
             <div className="space-y-1"><Label>Clock out</Label><Input type="time" value={outTime} onChange={(e) => setOutTime(e.target.value)} /></div>
           </div>
+          {inTime && outTime && outTime < inTime && (
+            <p className="text-xs text-muted-foreground">Clock out lewat tengah malam — dihitung hari berikutnya, tetap masuk hari kerja {date}.</p>
+          )}
           <div className="space-y-1">
             <Label>Alasan</Label>
             <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Contoh: lupa clock out karena HP mati" />
