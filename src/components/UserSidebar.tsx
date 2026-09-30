@@ -185,7 +185,13 @@ const UserSidebar: React.FC = () => {
       const userTimezone = localStorage.getItem('user_timezone');
       const installedVersion = localStorage.getItem('app_installed_version');
 
-      localStorage.clear();
+      {
+        const keep = new Set(['userSession','adminSession','selected_staff_uid','attendance_device_id','kiosk_geofence_area_id']);
+        const saved: [string,string][] = [];
+        for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && (keep.has(k) || k.startsWith('sb-'))) saved.push([k, localStorage.getItem(k) || '']); }
+        localStorage.clear();
+        saved.forEach(([k, v]) => localStorage.setItem(k, v));
+      }
       sessionStorage.clear();
 
       if (kioskMode) localStorage.setItem('shared_device_mode', kioskMode);

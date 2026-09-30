@@ -19,7 +19,7 @@ const offsetOf = (ts?: string | null) => {
   const s = o >= 0 ? '+' : '-';
   return `${s}${String(Math.floor(Math.abs(o) / 60)).padStart(2, '0')}:${String(Math.abs(o) % 60).padStart(2, '0')}`;
 };
-const nextDay = (d: string) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + 1); return x.toISOString().slice(0, 10); };
+const nextDay = (d: string) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + 1); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
 
 const AttendanceCorrectionManager: React.FC<Props> = ({ siteArea, reviewerUid, reviewerName }) => {
   const [rows, setRows] = useState<any[]>([]);
@@ -58,6 +58,8 @@ const AttendanceCorrectionManager: React.FC<Props> = ({ siteArea, reviewerUid, r
         const inTs = e.in ? `${r.request_date} ${e.in}:00${off}` : null;
         const outDate = e.in && e.out && e.out < e.in ? nextDay(r.request_date) : r.request_date;
         const outTs = e.out ? `${outDate} ${e.out}:00${off}` : null;
+        if (inTs && new Date(inTs.replace(' ', 'T')).getTime() > Date.now()) throw new Error('Jam clock in belum terjadi (di masa depan). Cek tanggal — jika shift kemarin, tanggal harus kemarin.');
+        if (inTs && outTs && new Date(outTs.replace(' ', 'T')).getTime() <= new Date(inTs.replace(' ', 'T')).getTime()) throw new Error('Clock out harus setelah clock in');
         if (r.attendance_record_id) {
           const upd: any = {};
           if (inTs) upd.check_in_time = inTs;
