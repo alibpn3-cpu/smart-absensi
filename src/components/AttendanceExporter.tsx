@@ -229,9 +229,13 @@ const AttendanceExporter: React.FC<AttendanceExporterProps> = ({ forcedWorkArea 
   const formatTimeHMS = (timeStr: string | null, workArea?: string): string => {
     if (!timeStr) return '-';
     try {
-      // Parse the stored time string (format: "YYYY-MM-DD HH:mm:ss.sss+HH:mm")
+      // Stored format "YYYY-MM-DD HH:mm:ss.sss+HH:mm" = jam lokal user saat absen
+      // (WIB/WITA sesuai lokasi). Pakai jam apa adanya, jangan konversi ke zona area.
+      const local = timeStr.match(/^\d{4}-\d{2}-\d{2}[ T](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?[+-]\d{2}:?\d{2}$/);
+      if (local) return `${local[1]}:${local[2]}:${local[3]}`;
       const normalized = timeStr.replace(' ', 'T');
       const date = new Date(normalized);
+      
       
       if (isNaN(date.getTime())) {
         // Fallback: extract time portion directly (handle both : and . separators)
