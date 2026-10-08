@@ -69,6 +69,8 @@ const flagLabel = (f: string | null) => {
 const fmtTime = (s: string | null) => {
   if (!s) return '-';
   try {
+    const local = s.match(/^\d{4}-\d{2}-\d{2}[ T](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?[+-]\d{2}:?\d{2}$/);
+    if (local) return `${local[1]}:${local[2]}:${local[3]}`;
     const d = new Date(s.replace(' ', 'T'));
     if (isNaN(d.getTime())) {
       const m = s.match(/(\d{2}[:.]\d{2}[:.]\d{2})/);
